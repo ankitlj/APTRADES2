@@ -60,3 +60,4 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
   - `redis: unknown`
   - `breeze: unknown`
 - `npm.cmd run build` passed
+- Railway runtime diagnosis showed `gunicorn: command not found`, so the backend now includes an explicit `requirements.txt` for Railpack dependency installation.

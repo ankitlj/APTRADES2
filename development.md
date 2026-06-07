@@ -80,12 +80,13 @@
   - `python -m pytest` -> `3 passed`
   - `curl http://127.0.0.1:5000/api/health/deployment` -> `{"checks":{"api":"online","breeze":"unknown","postgres":"unknown","redis":"unknown"},"environment":"development",...}`
   - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the same known sandbox filesystem denial
+  - Railway runtime diagnosis after deploy attempt: `gunicorn: command not found`
 - Manual user tasks:
   - Create Railway project and connect the GitHub repo.
   - Create Vercel project and connect the GitHub repo.
   - Add Phase 2 environment variables when the cloud projects exist.
 - Remaining risks:
-  - No Railway URL or Vercel URL exists yet, so deployed verification is still blocked on project setup.
+  - Railway now has a public URL, but the current deploy runtime is failing until Railpack installs backend dependencies from an explicit `requirements.txt`.
   - DB/Redis/Breeze states intentionally remain `unknown` until later phases wire those services.
   - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
 - Next step: Connect Railway and Vercel, set env vars, and verify the deployed dashboard can read backend deployment health.
