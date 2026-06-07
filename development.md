@@ -120,12 +120,13 @@
   - `python` inline check -> `check_database('sqlite:///healthcheck.db') == online`
   - `python` inline check -> `check_redis(None) == not_configured`
   - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the same known sandbox filesystem denial
+  - Railway follow-up fix: added PostgreSQL driver dependency for SQLAlchemy runtime connections
 - Manual user tasks:
   - Add Railway Postgres plugin/service and set `DATABASE_URL`
   - Add Railway Redis plugin/service and set `REDIS_URL`
   - Verify deployed readiness shows DB and Redis `online` after those services are attached
 - Remaining risks:
-  - No actual Railway Postgres or Redis service is attached yet, so deployed readiness will not show `online` for those checks.
+  - Redis is still not attached yet, so deployed readiness will not show Redis `online` until `REDIS_URL` is configured.
   - Alembic is scaffolded but there are no real application tables yet.
   - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
 - Next step: Attach Railway Postgres and Redis plugins, then confirm deployed readiness.

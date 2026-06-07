@@ -77,3 +77,4 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
   - SQLite database probe: `online`
   - Redis without URL: `not_configured`
 - `npm.cmd run build` passed
+- Follow-up deploy fix: added `psycopg[binary]` so Railway can connect SQLAlchemy to Postgres instead of reporting `offline` due to a missing driver.
