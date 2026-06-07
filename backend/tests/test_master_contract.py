@@ -51,12 +51,12 @@ def test_master_contract_import_uses_csv_when_security_master_is_unavailable(tmp
         payload = service.import_master_contract()
 
     assert payload["status"] == "ok"
-    assert payload["row_count"] == 4
+    assert payload["row_count"] == 6
     assert payload["alias_count"] >= 4
     assert "SecurityMaster download failed: timeout" in payload["warnings"]
 
     status = service.get_status()
-    assert status["instrument_count"] == 4
+    assert status["instrument_count"] == 6
     assert status["alias_count"] >= 4
     assert status["latest_run"]["status"] == "success"
     assert status["verified_aliases"][0]["broker_symbol"] == "RELIND"
@@ -67,6 +67,32 @@ def test_master_contract_import_uses_csv_when_security_master_is_unavailable(tmp
 
     assert future_contract.product_type == "futures"
     assert future_contract.expiry_date.isoformat() == "2026-03-30"
+
+
+def test_master_contract_import_falls_back_to_seed_rows_when_no_sources_are_available(tmp_path):
+    db_path = tmp_path / "master_contract.sqlite"
+    service = MasterContractService(
+        database_url=f"sqlite:///{db_path}",
+        stock_script_csv_path=str(tmp_path / "missing.csv"),
+        security_master_url="http://example.com/securitymaster.zip",
+    )
+
+    with patch.object(
+        service,
+        "_load_security_master_rows",
+        return_value=SourcePayload(
+            name="security_master",
+            rows=[],
+            digest_source=None,
+            warnings=["SecurityMaster download failed: timeout"],
+        ),
+    ):
+        payload = service.import_master_contract()
+
+    assert payload["status"] == "ok"
+    assert payload["row_count"] == 5
+    assert payload["alias_count"] >= 5
+    assert any("fallback seeded aliases" in warning.lower() for warning in payload["warnings"])
 
 
 def test_master_contract_status_endpoint_returns_not_configured(client):

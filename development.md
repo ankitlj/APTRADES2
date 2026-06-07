@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 6 - SymbolResolver and Quote Service
+- Current phase: Phase 5 - Master Contract Import deployment fix
 - Last completed phase: Phase 5 - Master Contract Import
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import endpoints and dashboard status panel ready for deployed verification
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now has a seeded fallback for unreachable SecurityMaster
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -227,8 +227,23 @@
   - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
 - Next step: Build `SymbolResolver` and quote APIs on top of the imported instrument and alias tables.
 
+### 2026-06-07 - Phase 5 Follow-up: Deployed Import Timeout Fix
+- Goal: Prevent Railway worker timeouts when the external SecurityMaster zip is unreachable.
+- Backend changes:
+  - Reduced SecurityMaster request timeout to fail fast instead of hanging the Gunicorn worker.
+  - Added a seeded alias/instrument fallback source so imports can still complete on Railway when both SecurityMaster and the local CSV are unavailable.
+- Verification:
+  - `python -m pytest` -> `16 passed`
+  - Fallback import test now succeeds with a missing CSV and failed SecurityMaster download
+- Manual user tasks:
+  - Retry `POST /api/master-contract/import` on Railway after this deploy
+  - Refresh the deployed dashboard and verify the master-contract panel shows non-zero counts
+- Remaining risks:
+  - Seeded fallback is intentionally minimal and not a replacement for full SecurityMaster/CSV import.
+  - Full contract coverage on Railway still depends on either a reachable SecurityMaster source or a deployment-safe CSV copy.
+
 ## Manual Tasks Pending
-- [ ] Trigger the first deployed master-contract import run
+- [ ] Retry the deployed master-contract import run after the timeout-fix deploy
 - [ ] Verify the deployed master-contract panel after import
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Keep Breeze secrets and session token only in env vars
@@ -271,6 +286,6 @@
 - Test command: `curl -X POST http://127.0.0.1:5000/api/master-contract/import`
 
 ## Deployment Notes
-- Last commit: pending phase 5 commit
+- Last commit: pending phase 5 timeout-fix commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 5 deploy still needs the first master-contract import run for the new panel to show live counts
+- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 5 import now has a fast-fail + seeded fallback path for Railway retry

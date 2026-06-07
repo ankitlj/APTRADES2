@@ -153,3 +153,19 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 ## Phase 5 Note
 
 - Railway will not be able to read `C:\Users\Ankit\Desktop\Claude_Code\StockScriptNew.csv` directly. Deployed imports can still use Breeze SecurityMaster, but CSV-driven alias enhancement on Railway requires a safe deployment-side copy or upload path.
+
+## Phase 5 Deployment Fix
+
+- Railway runtime logs showed the worker timing out while trying to download:
+  - `http://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip`
+- Added a Phase 5 follow-up fix so the import:
+  - fails fast on unreachable SecurityMaster
+  - falls back to a minimal seeded alias/instrument set instead of crashing the worker
+- Added test coverage for the fallback import path.
+
+## Phase 5 Deployment Fix Verification
+
+- `python -m pytest` passed: `16 passed`
+- The new fallback test confirms import succeeds even when:
+  - SecurityMaster download fails
+  - no local CSV is available
