@@ -19,6 +19,16 @@ function createInitialState<T>(): AsyncState<T> {
   return { data: null, loading: true, error: null };
 }
 
+function statusClassName(value: string) {
+  if (value === "online") {
+    return "status-value status-online";
+  }
+  if (value === "offline") {
+    return "status-value status-offline";
+  }
+  return "status-value status-unknown";
+}
+
 export function DashboardPage() {
   const [healthState, setHealthState] = useState<AsyncState<HealthResponse>>(createInitialState);
   const [readinessState, setReadinessState] = useState<AsyncState<ReadinessResponse>>(createInitialState);
@@ -104,7 +114,7 @@ export function DashboardPage() {
             {Object.entries(readinessState.data?.checks ?? {}).map(([name, value]) => (
               <div key={name} className="status-card">
                 <p>{name}</p>
-                <strong>{value}</strong>
+                <strong className={statusClassName(value)}>{value}</strong>
               </div>
             ))}
           </div>
@@ -124,7 +134,7 @@ export function DashboardPage() {
             {Object.entries(deploymentState.data?.checks ?? {}).map(([name, value]) => (
               <div key={name} className="status-card">
                 <p>{name}</p>
-                <strong>{value}</strong>
+                <strong className={statusClassName(value)}>{value}</strong>
               </div>
             ))}
           </div>

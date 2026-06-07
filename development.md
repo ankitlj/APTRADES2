@@ -1,11 +1,10 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 2 - Deployment Foundation
-- Last completed phase: Phase 1 - Clean Project Skeleton
-- Deployment status: Local deployment foundation ready, cloud projects not connected yet
+- Current phase: Phase 3 - PostgreSQL and Redis Setup
+- Last completed phase: Phase 2 - Deployment Foundation
+- Deployment status: Railway and Vercel deployed; DB and Redis services not attached yet
 - Known blockers:
-  - Railway and Vercel projects are not configured yet
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
 ## Environment
@@ -82,20 +81,59 @@
   - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the same known sandbox filesystem denial
   - Railway runtime diagnosis after deploy attempt: `gunicorn: command not found`
 - Manual user tasks:
-  - Create Railway project and connect the GitHub repo.
-  - Create Vercel project and connect the GitHub repo.
-  - Add Phase 2 environment variables when the cloud projects exist.
+  - Verify the deployed dashboard page.
 - Remaining risks:
-  - Railway now has a public URL, but the current deploy runtime is failing until Railpack installs backend dependencies from an explicit `requirements.txt`.
   - DB/Redis/Breeze states intentionally remain `unknown` until later phases wire those services.
   - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
-- Next step: Connect Railway and Vercel, set env vars, and verify the deployed dashboard can read backend deployment health.
+- Next step: Attach Railway Postgres and Redis, then verify readiness status.
+
+### 2026-06-07 - Phase 3: PostgreSQL and Redis Setup
+- Goal: Add durable DB/cache foundation and make readiness reflect actual DB and Redis state.
+- Backend changes:
+  - Added SQLAlchemy engine helpers and Redis client helpers.
+  - Added connection-aware Postgres and Redis health checks to `/api/health/readiness` and `/api/health/deployment`.
+  - Added Alembic scaffold files for future migrations.
+  - Added a minimal declarative base model module for future tables.
+  - Added explicit backend dependency declarations for SQLAlchemy, Alembic, and Redis in both `pyproject.toml` and `requirements.txt`.
+- Frontend changes:
+  - Updated readiness and deployment status cards to show colored status pills for `online`, `offline`, and `unknown/not_configured`.
+- Files changed:
+  - `backend/pyproject.toml`
+  - `backend/requirements.txt`
+  - `backend/app/config.py`
+  - `backend/app/api/health.py`
+  - `backend/app/db.py`
+  - `backend/app/cache.py`
+  - `backend/app/models.py`
+  - `backend/alembic.ini`
+  - `backend/alembic/env.py`
+  - `backend/alembic/script.py.mako`
+  - `backend/alembic/versions/.gitkeep`
+  - `backend/tests/test_health.py`
+  - `frontend/src/pages/DashboardPage.tsx`
+  - `frontend/src/index.css`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - `python -m pip install -e .[dev]`
+  - `python -m pytest` -> `3 passed`
+  - `python` inline check -> `check_database('sqlite:///healthcheck.db') == online`
+  - `python` inline check -> `check_redis(None) == not_configured`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the same known sandbox filesystem denial
+- Manual user tasks:
+  - Add Railway Postgres plugin/service and set `DATABASE_URL`
+  - Add Railway Redis plugin/service and set `REDIS_URL`
+  - Verify deployed readiness shows DB and Redis `online` after those services are attached
+- Remaining risks:
+  - No actual Railway Postgres or Redis service is attached yet, so deployed readiness will not show `online` for those checks.
+  - Alembic is scaffolded but there are no real application tables yet.
+  - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
+- Next step: Attach Railway Postgres and Redis plugins, then confirm deployed readiness.
 
 ## Manual Tasks Pending
-- [ ] Create Railway project for backend deployment
-- [ ] Create Vercel project for frontend deployment
-- [ ] Add `FLASK_ENV=production`, `FRONTEND_ORIGIN`, `DATABASE_URL`, and `REDIS_URL` in Railway when available
-- [ ] Add `VITE_API_BASE_URL` in Vercel after Railway URL exists
+- [ ] Add Railway Postgres service/plugin and wire `DATABASE_URL`
+- [ ] Add Railway Redis service/plugin and wire `REDIS_URL`
+- [ ] Verify deployed readiness returns DB and Redis `online`
 - [ ] Provide approval if external `Claude_Code` workspace file updates are required
 
 ## API Contracts Confirmed
@@ -111,10 +149,10 @@
 
 - Endpoint: `GET /api/health/deployment`
 - Request: no body
-- Response: `{ "status": "ok", "environment": "<env>", "frontend_origin": "<origin|null>", "checks": { "api": "online", "postgres": "unknown", "redis": "unknown", "breeze": "unknown" }, "timestamp": "<UTC ISO8601>" }`
+- Response: `{ "status": "ok", "environment": "<env>", "frontend_origin": "<origin|null>", "checks": { "api": "online", "postgres": "online|offline|not_configured", "redis": "online|offline|not_configured", "breeze": "unknown" }, "timestamp": "<UTC ISO8601>" }`
 - Test command: `curl http://127.0.0.1:5000/api/health/deployment`
 
 ## Deployment Notes
 - Last commit: pending
-- Last deployed URL: not deployed
-- Smoke test result: local Phase 2 smoke checks passed; cloud deployment not started
+- Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
+- Smoke test result: local Phase 3 smoke checks passed; deployed DB/Redis still pending service attachment

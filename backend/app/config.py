@@ -46,6 +46,8 @@ class AppConfig:
             "ENV": self.env,
             "DEBUG": self.debug,
             "APP_NAME": self.app_name,
+            "DATABASE_URL": self.database_url,
+            "REDIS_URL": self.redis_url,
             "FRONTEND_ORIGIN": self.frontend_origin,
             "VERCEL_PREVIEW_ORIGIN": self.vercel_preview_origin,
             "CORS_ORIGINS": self.cors_origins,

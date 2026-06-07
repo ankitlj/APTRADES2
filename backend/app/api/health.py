@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify
 
+from ..cache import check_redis
+from ..db import check_database
+
 health_bp = Blueprint("health", __name__)
 
 
@@ -29,8 +32,8 @@ def health() -> tuple[object, int]:
 def readiness() -> tuple[object, int]:
     checks = {
         "api": "online",
-        "postgres": "not_configured",
-        "redis": "not_configured",
+        "postgres": check_database(current_app.config.get("DATABASE_URL")),
+        "redis": check_redis(current_app.config.get("REDIS_URL")),
         "breeze": "not_configured",
     }
     return jsonify({"status": "ok", "checks": checks, "timestamp": _utc_timestamp()}), 200
@@ -40,8 +43,8 @@ def readiness() -> tuple[object, int]:
 def deployment() -> tuple[object, int]:
     checks = {
         "api": "online",
-        "postgres": "unknown",
-        "redis": "unknown",
+        "postgres": check_database(current_app.config.get("DATABASE_URL")),
+        "redis": check_redis(current_app.config.get("REDIS_URL")),
         "breeze": "unknown",
     }
     return (

@@ -227,6 +227,22 @@ select {
   background: var(--surface-muted);
 }
 
+.status-value {
+  text-transform: lowercase;
+}
+
+.status-online {
+  color: #15803d;
+}
+
+.status-offline {
+  color: #dc2626;
+}
+
+.status-unknown {
+  color: #a16207;
+}
+
 .route-list {
   margin: 12px 0 0;
   padding-left: 18px;

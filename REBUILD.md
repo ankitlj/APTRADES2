@@ -61,3 +61,19 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
   - `breeze: unknown`
 - `npm.cmd run build` passed
 - Railway runtime diagnosis showed `gunicorn: command not found`, so the backend now includes an explicit `requirements.txt` for Railpack dependency installation.
+
+## Phase 3 DB/Redis Foundation
+
+- Added SQLAlchemy engine helpers and Redis health helpers.
+- Updated readiness and deployment health endpoints to report real DB/Redis status instead of fixed placeholders.
+- Added Alembic scaffold files for future migrations.
+- Added dashboard status pill coloring for service states.
+
+## Phase 3 Verification
+
+- `python -m pip install -e .[dev]` completed with SQLAlchemy, Alembic, and Redis
+- `python -m pytest` passed: `3 passed`
+- Inline backend checks returned:
+  - SQLite database probe: `online`
+  - Redis without URL: `not_configured`
+- `npm.cmd run build` passed
