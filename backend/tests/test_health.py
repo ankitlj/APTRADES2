@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+from app.db import normalize_database_url
+
 
 def test_health(client):
     response = client.get("/api/health")
@@ -36,3 +38,9 @@ def test_deployment(client):
     assert payload["checks"]["api"] == "online"
     assert payload["checks"]["postgres"] == "offline"
     assert payload["checks"]["redis"] == "online"
+
+
+def test_normalize_database_url_uses_psycopg_driver():
+    url = "postgresql://user:pass@host:5432/dbname"
+
+    assert normalize_database_url(url) == "postgresql+psycopg://user:pass@host:5432/dbname"

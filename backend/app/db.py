@@ -4,8 +4,14 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 
+def normalize_database_url(database_url: str) -> str:
+    if database_url.startswith("postgresql://") and "+psycopg" not in database_url:
+        return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    return database_url
+
+
 def create_db_engine(database_url: str) -> Engine:
-    return create_engine(database_url, future=True, pool_pre_ping=True)
+    return create_engine(normalize_database_url(database_url), future=True, pool_pre_ping=True)
 
 
 def check_database(database_url: str | None) -> str:
