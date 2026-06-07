@@ -35,10 +35,14 @@ class MasterContractService:
         database_url: str | None,
         stock_script_csv_path: str | None,
         security_master_url: str,
+        security_master_connect_timeout: int = 20,
+        security_master_read_timeout: int = 30,
     ):
         self.database_url = database_url
         self.stock_script_csv_path = stock_script_csv_path
         self.security_master_url = security_master_url
+        self.security_master_connect_timeout = security_master_connect_timeout
+        self.security_master_read_timeout = security_master_read_timeout
 
     def get_status(self) -> dict[str, Any]:
         if not self.database_url:
@@ -153,16 +157,20 @@ class MasterContractService:
         }
 
     def _load_sources(self) -> list[SourcePayload]:
-        return [
+        sources = [
             self._load_security_master_rows(),
             self._load_stock_script_rows(),
-            self._load_seed_rows(),
         ]
+        sources.append(self._load_seed_rows(include_warning=not any(source.rows for source in sources)))
+        return sources
 
     def _load_security_master_rows(self) -> SourcePayload:
         warnings: list[str] = []
         try:
-            response = requests.get(self.security_master_url, timeout=(5, 8))
+            response = requests.get(
+                self.security_master_url,
+                timeout=(self.security_master_connect_timeout, self.security_master_read_timeout),
+            )
             response.raise_for_status()
             archive_bytes = response.content
         except requests.RequestException as error:
@@ -173,13 +181,13 @@ class MasterContractService:
         try:
             with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
                 for filename in archive.namelist():
-                    if not filename.lower().endswith(".csv"):
+                    if not filename.lower().endswith((".csv", ".txt")):
                         continue
                     with archive.open(filename) as handle:
                         rows.extend(
-                            self._read_csv_rows(
+                            self._read_security_master_rows(
                                 io.TextIOWrapper(handle, encoding="utf-8-sig", errors="ignore"),
-                                source_name="security_master",
+                                filename=filename,
                             )
                         )
         except zipfile.BadZipFile as error:
@@ -209,7 +217,7 @@ class MasterContractService:
         rows = self._read_csv_rows(io.StringIO(text), source_name="stock_script_csv")
         return SourcePayload(name="stock_script_csv", rows=rows, digest_source=data, warnings=warnings)
 
-    def _load_seed_rows(self) -> SourcePayload:
+    def _load_seed_rows(self, *, include_warning: bool = True) -> SourcePayload:
         seed_rows = [
             self._seed_row("RELIND", "RELIANCE INDUSTRIES", "NSE", "RELIND", "EQUITY", "2885", "1", "RELIND", "RELIANCE", "0.1", "INE002A01018", "EQ", ""),
             self._seed_row("ADAPOR", "ADANI PORT AND SPECIAL ECONO", "NSE", "ADAPOR", "EQUITY", "15083", "1", "ADAPOR", "ADANIPORTS", "0.1", "INE742F01042", "EQ", ""),
@@ -221,7 +229,7 @@ class MasterContractService:
             name="seed_aliases",
             rows=seed_rows,
             digest_source="\n".join(row["SC"] for row in seed_rows).encode("utf-8"),
-            warnings=["Using fallback seeded aliases because persistent source data may be unavailable."],
+            warnings=["Using fallback seeded aliases because persistent source data may be unavailable."] if include_warning else [],
         )
 
     @staticmethod
@@ -267,6 +275,94 @@ class MasterContractService:
             cleaned["__source_name"] = source_name
             rows.append(cleaned)
         return rows
+
+    def _read_security_master_rows(self, handle: io.TextIOBase, *, filename: str) -> list[dict[str, str]]:
+        exchange_code = self._exchange_code_from_security_master_filename(filename)
+        if not exchange_code:
+            return []
+
+        reader = csv.DictReader(handle)
+        rows: list[dict[str, str]] = []
+        for raw_row in reader:
+            row = self._clean_security_master_row(raw_row)
+            mapped = self._security_master_row_to_stock_script_row(row, exchange_code)
+            if mapped:
+                rows.append(mapped)
+        return rows
+
+    @staticmethod
+    def _exchange_code_from_security_master_filename(filename: str) -> str | None:
+        normalized = Path(filename).name.upper()
+        if normalized.startswith("NSE"):
+            return "NSE"
+        if normalized.startswith("BSE"):
+            return "BSE"
+        if normalized.startswith("FONSE"):
+            return "NFO"
+        if normalized.startswith("FOBSE"):
+            return "BFO"
+        return None
+
+    @staticmethod
+    def _clean_security_master_row(row: dict[str, str]) -> dict[str, str]:
+        return {
+            key.strip().strip('"'): (value or "").strip().strip('"')
+            for key, value in row.items()
+            if key
+        }
+
+    def _security_master_row_to_stock_script_row(self, row: dict[str, str], exchange_code: str) -> dict[str, str] | None:
+        short_name = row.get("ShortName", "").upper()
+        if not short_name:
+            return None
+
+        if exchange_code in {"NSE", "BSE"}:
+            return {
+                "SC": short_name,
+                "SN": row.get("CompanyName") or row.get("ScripName") or row.get("Name") or short_name,
+                "EC": exchange_code,
+                "SM": short_name,
+                "SG": "EQUITY",
+                "TK": row.get("Token") or row.get("ScripCode") or "",
+                "LS": row.get("Lotsize") or row.get("LotSize") or row.get("MarketLot") or "1",
+                "CD": row.get("ExchangeCode") or row.get("ScripID") or short_name,
+                "NS": row.get("ExchangeCode") or row.get("ScripID") or short_name,
+                "TS": row.get("ticksize") or row.get("TickSize") or "",
+                "ISIN": row.get("ISINCode") or "",
+                "SR": row.get("Series") or "",
+                "SI": row.get("Symbol") or row.get("ScripID") or row.get("ExchangeCode") or "",
+                "__source_name": "security_master",
+            }
+
+        expiry = row.get("ExpiryDate", "")
+        if not expiry:
+            return None
+
+        instrument_name = row.get("InstrumentName", "").upper()
+        option_type = row.get("OptionType", "").upper()
+        strike_price = row.get("StrikePrice") or "0"
+        if instrument_name.startswith("FUT"):
+            contract_code = f"{short_name}~F:{expiry}"
+        else:
+            right = "call" if option_type == "CE" else "put" if option_type == "PE" else "others"
+            contract_code = f"{short_name}~O:{expiry}:{right}:{strike_price}"
+
+        return {
+            "SC": short_name,
+            "SN": row.get("CompanyName") or short_name,
+            "EC": exchange_code,
+            "SM": contract_code,
+            "SG": "DERIVATIVE",
+            "TK": row.get("Token") or "",
+            "LS": row.get("LotSize") or row.get("MinimumLotQty") or "1",
+            "CD": row.get("AssetName") or short_name,
+            "NS": row.get("AssetName") or short_name,
+            "TS": row.get("TickSize") or "",
+            "ISIN": "",
+            "SR": row.get("Series") or "",
+            "SI": row.get("AssetName") or short_name,
+            "__source_name": "security_master",
+        }
 
     def _build_payloads(self, rows: list[dict[str, str]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         instruments_by_key: dict[tuple[str, str], dict[str, Any]] = {}

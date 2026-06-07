@@ -3,7 +3,7 @@
 ## Current Status
 - Current phase: Phase 5 - Master Contract Import completion fix
 - Last completed phase: Phase 5 - Master Contract Import
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses the repo-contained StockScriptNew.csv plus seeded fallback when SecurityMaster is unreachable
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -268,8 +268,38 @@
   - Railway still may not reach `http://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip`; that is now isolated from the CSV mapping issue.
   - If ICICI SecurityMaster is required for daily derivatives freshness, a later fix must provide a reachable mirror/schedule/source that follows the Breeze-only plan.
 
+### 2026-06-08 - Phase 5 Hardening Fix: HTTPS SecurityMaster
+- Goal: Make the official ICICI SecurityMaster source usable without a manual daily download.
+- Root cause:
+  - The old HTTP SecurityMaster URL timed out from Railway and local network probes.
+  - The reachable ICICI endpoint is the HTTPS variant, and the current archive contains `.txt` files, not `.csv` files.
+  - The importer was only parsing `.csv` archive entries.
+- Backend changes:
+  - Changed default `SECURITY_MASTER_URL` to `https://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip`.
+  - Added configurable `SECURITY_MASTER_CONNECT_TIMEOUT` and `SECURITY_MASTER_READ_TIMEOUT`.
+  - Added parsing for ICICI SecurityMaster `.txt` files.
+  - Added mapping for NSE/BSE cash rows and NFO/BFO derivative rows into the internal instrument format.
+  - Limited the seed fallback warning to seed-only imports.
+- Verification:
+  - `curl.exe -I --max-time 20 https://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip` -> `HTTP/1.1 200 OK`
+  - Python `requests.get(..., timeout=(20, 30))` downloaded a valid zip with ICICI master files.
+  - `python -m pytest` -> `19 passed`
+  - Live HTTPS SecurityMaster smoke import with repo CSV:
+    - `status = ok`
+    - `row_count = 127774`
+    - `alias_count = 37204`
+    - `source_name = security_master+stock_script_csv+seed_aliases`
+    - `warnings = []`
+- Manual user tasks:
+  - Wait for Railway deployment of this commit.
+  - Retry `POST /api/master-contract/import`.
+  - Verify the deployed response includes `security_master` and no timeout warning.
+- Remaining risks:
+  - ICICI directlink can still be slow or temporarily unavailable, so the repo CSV remains the safe fallback.
+  - A Railway scheduled import should use the CLI command after this deploy rather than a browser-triggered request.
+
 ## Manual Tasks Pending
-- [ ] Retry the deployed master-contract import run after the repo-CSV deploy
+- [ ] Retry the deployed master-contract import run after the HTTPS SecurityMaster deploy
 - [ ] Verify the deployed master-contract panel after import
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Keep Breeze secrets and session token only in env vars
@@ -312,6 +342,6 @@
 - Test command: `curl -X POST http://127.0.0.1:5000/api/master-contract/import`
 
 ## Deployment Notes
-- Last commit: pending phase 5 repo-CSV fix commit
+- Last commit: pending phase 5 HTTPS SecurityMaster fix commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 5 import now has a committed StockScriptNew.csv path plus fast-fail SecurityMaster handling
+- Smoke test result: deployed readiness and Breeze diagnostics are verified; local live SecurityMaster HTTPS import is verified with repo CSV fallback

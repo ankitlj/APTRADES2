@@ -38,6 +38,55 @@ def test_master_contract_resolves_repo_relative_stock_script_path():
     assert service._csv_available() is True
 
 
+def test_master_contract_maps_security_master_cash_row():
+    service = MasterContractService(None, None, "http://example.com")
+
+    mapped = service._security_master_row_to_stock_script_row(
+        {
+            "Token": "2885",
+            "ShortName": "RELIND",
+            "Series": "EQ",
+            "CompanyName": "RELIANCE INDUSTRIES",
+            "Lotsize": "1",
+            "ticksize": "0.1",
+            "ISINCode": "INE002A01018",
+            "ExchangeCode": "RELIANCE",
+        },
+        "NSE",
+    )
+
+    assert mapped is not None
+    assert mapped["SC"] == "RELIND"
+    assert mapped["EC"] == "NSE"
+    assert mapped["NS"] == "RELIANCE"
+    assert mapped["__source_name"] == "security_master"
+
+
+def test_master_contract_maps_security_master_future_row():
+    service = MasterContractService(None, None, "http://example.com")
+
+    mapped = service._security_master_row_to_stock_script_row(
+        {
+            "Token": "62873",
+            "InstrumentName": "FUTSTK",
+            "ShortName": "WAAENE",
+            "Series": "FUTURE",
+            "ExpiryDate": "30-Jun-2026",
+            "StrikePrice": "0",
+            "OptionType": "XX",
+            "LotSize": "500",
+            "TickSize": "0.05",
+            "CompanyName": "WAAREE ENERGIES LIMITED",
+        },
+        "NFO",
+    )
+
+    assert mapped is not None
+    assert mapped["EC"] == "NFO"
+    assert mapped["SM"] == "WAAENE~F:30-Jun-2026"
+    assert mapped["SG"] == "DERIVATIVE"
+
+
 def test_master_contract_import_uses_csv_when_security_master_is_unavailable(tmp_path):
     csv_path = tmp_path / "StockScriptNew.csv"
     db_path = tmp_path / "master_contract.sqlite"

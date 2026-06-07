@@ -22,6 +22,8 @@ def _register_cli(app: Flask) -> None:
             database_url=app.config.get("DATABASE_URL"),
             stock_script_csv_path=app.config.get("STOCK_SCRIPT_CSV_PATH"),
             security_master_url=app.config.get("SECURITY_MASTER_URL"),
+            security_master_connect_timeout=app.config.get("SECURITY_MASTER_CONNECT_TIMEOUT", 20),
+            security_master_read_timeout=app.config.get("SECURITY_MASTER_READ_TIMEOUT", 30),
         )
         try:
             payload = service.import_master_contract()

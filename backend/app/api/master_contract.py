@@ -12,6 +12,8 @@ def _service() -> MasterContractService:
         database_url=current_app.config.get("DATABASE_URL"),
         stock_script_csv_path=current_app.config.get("STOCK_SCRIPT_CSV_PATH"),
         security_master_url=current_app.config.get("SECURITY_MASTER_URL"),
+        security_master_connect_timeout=current_app.config.get("SECURITY_MASTER_CONNECT_TIMEOUT", 20),
+        security_master_read_timeout=current_app.config.get("SECURITY_MASTER_READ_TIMEOUT", 30),
     )
 
 

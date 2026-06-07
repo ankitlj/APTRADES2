@@ -194,3 +194,36 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 - `http://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip` may still be unreachable from Railway.
 - The repo-contained CSV now prevents the deployed import from dropping to the minimal seed-only source, but daily SecurityMaster freshness still needs a separate reachable-source solution if ICICI directlink continues timing out.
+
+## Phase 5 HTTPS SecurityMaster Fix
+
+- Tested the old HTTP ICICI SecurityMaster URL and confirmed it times out.
+- Tested the HTTPS variant:
+  - `https://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip`
+  - It returned `HTTP/1.1 200 OK` and a valid zip archive.
+- Changed the backend default SecurityMaster URL from HTTP to HTTPS.
+- Added configurable SecurityMaster connect/read timeouts:
+  - `SECURITY_MASTER_CONNECT_TIMEOUT`
+  - `SECURITY_MASTER_READ_TIMEOUT`
+- Added parser support for ICICI SecurityMaster `.txt` files inside the zip.
+- Mapped:
+  - NSE/BSE cash master rows
+  - NFO/BFO derivative master rows
+- Removed the misleading seed fallback warning when SecurityMaster or StockScriptNew.csv data is available.
+
+## Phase 5 HTTPS SecurityMaster Verification
+
+- `python -m pytest` passed: `19 passed`
+- Live Python `requests` probe downloaded the HTTPS SecurityMaster zip successfully.
+- Live smoke import with SecurityMaster + repo CSV returned:
+  - `status = ok`
+  - `row_count = 127774`
+  - `alias_count = 37204`
+  - `source_name = security_master+stock_script_csv+seed_aliases`
+  - `warnings = []`
+
+## Phase 5 Daily Operations Note
+
+- After this deploy, daily manual SecurityMaster download should not be required if Railway can reach the HTTPS ICICI URL.
+- Breeze `BREEZE_SESSION_TOKEN` still must be refreshed in Railway when it expires.
+- Master-contract import should be run by a Railway scheduled job once scheduling is configured.

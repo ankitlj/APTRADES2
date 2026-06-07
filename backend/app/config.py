@@ -20,8 +20,10 @@ class AppConfig:
     stock_script_csv_path: str | None = os.getenv("STOCK_SCRIPT_CSV_PATH", "data/StockScriptNew.csv")
     security_master_url: str = os.getenv(
         "SECURITY_MASTER_URL",
-        "http://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip",
+        "https://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip",
     )
+    security_master_connect_timeout: int = int(os.getenv("SECURITY_MASTER_CONNECT_TIMEOUT", "20"))
+    security_master_read_timeout: int = int(os.getenv("SECURITY_MASTER_READ_TIMEOUT", "30"))
     frontend_origin: str | None = os.getenv("FRONTEND_ORIGIN")
     vercel_preview_origin: str | None = os.getenv("VERCEL_PREVIEW_ORIGIN")
 
@@ -60,6 +62,8 @@ class AppConfig:
             "BREEZE_SESSION_TOKEN": self.breeze_session_token,
             "STOCK_SCRIPT_CSV_PATH": self.stock_script_csv_path,
             "SECURITY_MASTER_URL": self.security_master_url,
+            "SECURITY_MASTER_CONNECT_TIMEOUT": self.security_master_connect_timeout,
+            "SECURITY_MASTER_READ_TIMEOUT": self.security_master_read_timeout,
             "FRONTEND_ORIGIN": self.frontend_origin,
             "VERCEL_PREVIEW_ORIGIN": self.vercel_preview_origin,
             "CORS_ORIGINS": self.cors_origins,
