@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 5 - Master Contract Import completion fix
+- Current phase: Phase 6 - SymbolResolver and Quote Service
 - Last completed phase: Phase 5 - Master Contract Import
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, and Phase 6 quote APIs are implemented locally
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -298,10 +298,41 @@
   - ICICI directlink can still be slow or temporarily unavailable, so the repo CSV remains the safe fallback.
   - A Railway scheduled import should use the CLI command after this deploy rather than a browser-triggered request.
 
+### 2026-06-08 - Phase 6: SymbolResolver and Quote Service
+- Goal: Make display symbols work reliably with Breeze stock codes and imported derivative contracts.
+- Backend changes:
+  - Implemented `SymbolResolver` backed by `instruments` and `instrument_aliases`.
+  - Added cash alias resolution and derivative resolution for nearest futures contracts on NFO/BFO.
+  - Implemented `QuoteService` to combine resolver output with `BreezeGateway`.
+  - Added `GET /api/quotes`.
+  - Added `POST /api/quotes/batch`.
+  - Updated `GET /api/debug/breeze-test` to use the resolver-backed quote flow instead of hardcoded Breeze payload guessing.
+- Frontend changes:
+  - Added shared `useQuote` and `useBatchQuotes` hooks.
+  - Added a small quote status component.
+  - Replaced the dashboard quote diagnostics panel with resolver-backed quote API calls.
+  - Updated the dashboard hero and topbar to Phase 6 wording.
+- Verification:
+  - Read the Phase 6 section in `APTRADES_v2_master_development_playbook.md` before implementation.
+  - Re-checked the official Breeze quotes documentation for required `stock_code`, `exchange_code`, `product_type`, `expiry_date`, `right`, and `strike_price` fields.
+  - `python -m pytest` -> `23 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+  - Verified resolver contracts in tests:
+    - `SBIN` -> `STABAN` on `NSE` cash
+    - `BANKNIFTY` -> `CNXBAN` on `NFO` futures with a real expiry
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this commit.
+  - Verify the dashboard quote panel now resolves NIFTY and BANKNIFTY through the backend quote API instead of returning the old missing-expiry error.
+  - Refresh `BREEZE_SESSION_TOKEN` only if Breeze auth expires.
+- Remaining risks:
+  - Quote freshness is still request/response based REST only; WebSocket live quotes arrive in a later phase.
+  - Options-specific resolution beyond nearest futures is intentionally deferred until later phases.
+
 ## Manual Tasks Pending
 - [ ] Retry the deployed master-contract import run after the HTTPS SecurityMaster deploy
 - [ ] Verify the deployed master-contract panel after import
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
+- [ ] Verify the deployed Phase 6 quote panel after Railway/Vercel finish deploying
 - [ ] Keep Breeze secrets and session token only in env vars
 - [ ] Provide approval if external `Claude_Code` workspace file updates are required
 
@@ -341,7 +372,17 @@
 - Response: `{ "status": "ok", "row_count": 33109, "alias_count": 35445, "source_name": "stock_script_csv", "warnings": ["..."] }`
 - Test command: `curl -X POST http://127.0.0.1:5000/api/master-contract/import`
 
+- Endpoint: `GET /api/quotes?symbol=SBIN&exchange=NSE`
+- Request: query params `symbol`, `exchange`, optional `product_type`, `expiry_date`, `right`, `strike_price`
+- Response: `{ "status": "ok", "symbol": "SBIN", "resolved": { "display_symbol": "SBIN", "broker_symbol": "STABAN", ... }, "quote": { "ltp": 977.7, ... } }`
+- Test command: `curl "http://127.0.0.1:5000/api/quotes?symbol=SBIN&exchange=NSE"`
+
+- Endpoint: `POST /api/quotes/batch`
+- Request: `{ "symbols": [{ "symbol": "NIFTY", "exchange": "NFO", "product_type": "futures" }, { "symbol": "SBIN", "exchange": "NSE" }] }`
+- Response: `{ "status": "ok", "results": [{ "status": "ok", "symbol": "NIFTY", "resolved": { ... }, "quote": { ... } }] }`
+- Test command: `curl -X POST http://127.0.0.1:5000/api/quotes/batch -H "Content-Type: application/json" -d "{\"symbols\":[{\"symbol\":\"SBIN\",\"exchange\":\"NSE\"}]}" `
+
 ## Deployment Notes
-- Last commit: pending phase 5 HTTPS SecurityMaster fix commit
+- Last commit: pending phase 6 quote-service commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness and Breeze diagnostics are verified; local live SecurityMaster HTTPS import is verified with repo CSV fallback
+- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 6 resolver and quote contracts are verified locally

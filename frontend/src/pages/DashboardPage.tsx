@@ -2,18 +2,20 @@ import { useEffect, useState } from "react";
 
 import {
   getBreezeAuth,
-  getBreezeTest,
   getDeploymentStatus,
   getHealth,
   getMasterContractStatus,
   getReadiness,
   type BreezeAuthResponse,
-  type BreezeTestResponse,
+  type BatchQuoteRequestItem,
+  type BatchQuoteResponse,
   type DeploymentStatusResponse,
   type HealthResponse,
   type MasterContractStatusResponse,
   type ReadinessResponse,
 } from "../lib/api";
+import { QuoteStatus } from "../components/QuoteStatus";
+import { useBatchQuotes } from "../hooks/useQuotes";
 
 type AsyncState<T> = {
   data: T | null;
@@ -36,16 +38,21 @@ function statusClassName(value: string) {
 }
 
 function getPrimaryQuote(
-  quote: BreezeTestResponse["symbols"][number]["quote"],
+  quote: Record<string, unknown> | undefined,
 ): Record<string, unknown> | null {
-  if (Array.isArray(quote)) {
-    return (quote[0] as Record<string, unknown> | undefined) ?? null;
-  }
   if (quote && typeof quote === "object") {
     return quote;
   }
   return null;
 }
+
+const quoteRequests: BatchQuoteRequestItem[] = [
+  { symbol: "NIFTY", exchange: "NFO", product_type: "futures" },
+  { symbol: "BANKNIFTY", exchange: "NFO", product_type: "futures" },
+  { symbol: "RELIANCE", exchange: "NSE", product_type: "cash" },
+  { symbol: "ADANIPORTS", exchange: "NSE", product_type: "cash" },
+  { symbol: "SBIN", exchange: "NSE", product_type: "cash" },
+];
 
 function renderQuoteValue(value: unknown) {
   if (value === null || value === undefined || value === "") {
@@ -59,21 +66,20 @@ export function DashboardPage() {
   const [readinessState, setReadinessState] = useState<AsyncState<ReadinessResponse>>(createInitialState);
   const [deploymentState, setDeploymentState] = useState<AsyncState<DeploymentStatusResponse>>(createInitialState);
   const [breezeAuthState, setBreezeAuthState] = useState<AsyncState<BreezeAuthResponse>>(createInitialState);
-  const [breezeTestState, setBreezeTestState] = useState<AsyncState<BreezeTestResponse>>(createInitialState);
   const [masterContractState, setMasterContractState] =
     useState<AsyncState<MasterContractStatusResponse>>(createInitialState);
+  const quoteState = useBatchQuotes(quoteRequests);
 
   useEffect(() => {
     let isMounted = true;
 
     async function load() {
       try {
-        const [health, readiness, deploymentStatus, breezeAuth, breezeTest, masterContractStatus] = await Promise.all([
+        const [health, readiness, deploymentStatus, breezeAuth, masterContractStatus] = await Promise.all([
           getHealth(),
           getReadiness(),
           getDeploymentStatus(),
           getBreezeAuth(),
-          getBreezeTest(),
           getMasterContractStatus(),
         ]);
         if (!isMounted) {
@@ -83,7 +89,6 @@ export function DashboardPage() {
         setReadinessState({ data: readiness, loading: false, error: null });
         setDeploymentState({ data: deploymentStatus, loading: false, error: null });
         setBreezeAuthState({ data: breezeAuth, loading: false, error: null });
-        setBreezeTestState({ data: breezeTest, loading: false, error: null });
         setMasterContractState({ data: masterContractStatus, loading: false, error: null });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
@@ -94,7 +99,6 @@ export function DashboardPage() {
         setReadinessState({ data: null, loading: false, error: message });
         setDeploymentState({ data: null, loading: false, error: message });
         setBreezeAuthState({ data: null, loading: false, error: message });
-        setBreezeTestState({ data: null, loading: false, error: message });
         setMasterContractState({ data: null, loading: false, error: message });
       }
     }
@@ -109,11 +113,11 @@ export function DashboardPage() {
   return (
     <section className="dashboard-grid">
       <article className="panel panel-hero">
-        <p className="eyebrow">Phase 5</p>
-        <h3>Master contract foundation</h3>
+        <p className="eyebrow">Phase 6</p>
+        <h3>Symbol resolution and quote service</h3>
         <p className="panel-copy">
-          This phase persists instrument and alias data so later quote and options flows stop guessing broker symbols or
-          futures expiries at runtime.
+          Imported instruments now drive resolver-backed quote requests so display symbols, Breeze stock codes, and
+          nearest futures contracts flow through one backend contract.
         </p>
       </article>
       <article className="panel">
@@ -257,27 +261,33 @@ export function DashboardPage() {
       </article>
       <article className="panel panel-full">
         <div className="panel-header">
-          <h3>Breeze test symbols</h3>
-          <span className="badge badge-muted">{breezeTestState.data?.status ?? "Pending"}</span>
+          <h3>Resolver-backed quotes</h3>
+          <span className="badge badge-muted">
+            {quoteState.loading ? "Loading" : (quoteState.data?.status ?? "Pending")}
+          </span>
         </div>
-        {breezeTestState.error ? (
-          <p className="error-text">Breeze test unavailable: {breezeTestState.error}</p>
+        {quoteState.error ? (
+          <p className="error-text">Quote service unavailable: {quoteState.error}</p>
         ) : (
           <div className="symbol-diagnostics">
-            {(breezeTestState.data?.symbols ?? []).map((symbol) => {
-              const quote = getPrimaryQuote(symbol.quote);
+            {(quoteState.data?.results ?? []).map((result) => {
+              const quote = getPrimaryQuote(result.quote);
+              const resolved = result.resolved;
 
               return (
-                <div key={symbol.symbol} className="status-card">
+                <div key={`${result.symbol}-${resolved?.exchange_code ?? result.exchange_code ?? "NA"}`} className="status-card">
                   <p>
-                    {symbol.symbol} / {symbol.broker_symbol}
+                    {result.symbol} / {resolved?.broker_symbol ?? "unresolved"}
                   </p>
-                  <strong className={statusClassName(symbol.status === "ok" ? "online" : "offline")}>
-                    {symbol.status}
-                  </strong>
+                  <QuoteStatus status={result.status} />
                   <span className="symbol-meta">
-                    {symbol.exchange} {symbol.product_type}
+                    {resolved?.exchange_code ?? result.exchange_code} {resolved?.product_type ?? result.product_type}
                   </span>
+                  {resolved ? (
+                    <span className="symbol-meta">
+                      token {resolved.token ?? "n/a"} | via {resolved.resolution_source}
+                    </span>
+                  ) : null}
                   {quote ? (
                     <dl className="quote-list">
                       <div>
@@ -294,11 +304,11 @@ export function DashboardPage() {
                       </div>
                       <div>
                         <dt>Expiry</dt>
-                        <dd>{renderQuoteValue(quote.expiry_date)}</dd>
+                        <dd>{renderQuoteValue(quote.expiry_date ?? resolved?.expiry_date)}</dd>
                       </div>
                     </dl>
                   ) : null}
-                  {symbol.error ? <span className="symbol-error">{symbol.error}</span> : null}
+                  {result.error ? <span className="symbol-error">{result.error}</span> : null}
                 </div>
               );
             })}

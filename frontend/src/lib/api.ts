@@ -47,6 +47,48 @@ export interface BreezeTestResponse {
   symbols: BreezeTestSymbolResult[];
 }
 
+export interface QuoteResolvedInstrument {
+  display_symbol: string;
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  token: string | null;
+  contract_code: string;
+  expiry_date: string | null;
+  right: string;
+  strike_price: string;
+  lot_size: number | null;
+  tick_size: string | null;
+  source: string | null;
+  resolution_source: string;
+}
+
+export interface QuoteResult {
+  status: string;
+  symbol: string;
+  resolved?: QuoteResolvedInstrument;
+  quote?: Record<string, unknown>;
+  exchange_code?: string;
+  product_type?: string | null;
+  error?: string;
+}
+
+export interface BatchQuoteRequestItem {
+  symbol: string;
+  exchange: string;
+  product_type?: string;
+  expiry_date?: string;
+  right?: string;
+  strike_price?: string;
+}
+
+export interface QuoteResponse extends QuoteResult {}
+
+export interface BatchQuoteResponse {
+  status: string;
+  results: QuoteResult[];
+}
+
 export interface MasterContractAlias {
   display_symbol: string;
   broker_symbol: string;
@@ -78,8 +120,8 @@ export interface MasterContractStatusResponse {
 
 const API_BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
 
-async function requestJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`);
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, init);
 
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status}`);
@@ -110,4 +152,34 @@ export function getBreezeTest() {
 
 export function getMasterContractStatus() {
   return requestJson<MasterContractStatusResponse>("/api/master-contract/status");
+}
+
+export function getQuote(item: BatchQuoteRequestItem) {
+  const params = new URLSearchParams({
+    symbol: item.symbol,
+    exchange: item.exchange,
+  });
+  if (item.product_type) {
+    params.set("product_type", item.product_type);
+  }
+  if (item.expiry_date) {
+    params.set("expiry_date", item.expiry_date);
+  }
+  if (item.right) {
+    params.set("right", item.right);
+  }
+  if (item.strike_price) {
+    params.set("strike_price", item.strike_price);
+  }
+  return requestJson<QuoteResponse>(`/api/quotes?${params.toString()}`);
+}
+
+export function getBatchQuotes(symbols: BatchQuoteRequestItem[]) {
+  return requestJson<BatchQuoteResponse>("/api/quotes/batch", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ symbols }),
+  });
 }

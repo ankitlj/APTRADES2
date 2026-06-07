@@ -5,7 +5,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 
 const pages = [
-  { path: "/", title: "Dashboard", description: "Backend health and deployment checks start here." },
+  { path: "/", title: "Dashboard", description: "Resolver-backed quotes and deployment checks start here." },
   { path: "/orderbook", title: "Orderbook", description: "Compact Breeze-backed orders table lands in a later phase." },
   { path: "/tradebook", title: "Tradebook", description: "Normalized Breeze trades page starts after backend contracts." },
   { path: "/positions", title: "Positions", description: "Live quote enrichment begins after QuoteService exists." },

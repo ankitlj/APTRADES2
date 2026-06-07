@@ -9,6 +9,7 @@ from flask_cors import CORS
 from .api.debug import debug_bp
 from .api.health import health_bp
 from .api.master_contract import master_contract_bp
+from .api.quotes import quotes_bp
 from .config import load_config
 from .services.master_contract_service import MasterContractImportError, MasterContractService
 
@@ -46,5 +47,6 @@ def create_app() -> Flask:
     app.register_blueprint(health_bp, url_prefix=config.api_prefix)
     app.register_blueprint(debug_bp, url_prefix=config.api_prefix)
     app.register_blueprint(master_contract_bp, url_prefix=config.api_prefix)
+    app.register_blueprint(quotes_bp, url_prefix=config.api_prefix)
     _register_cli(app)
     return app

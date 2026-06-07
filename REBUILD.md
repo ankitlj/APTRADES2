@@ -227,3 +227,29 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - After this deploy, daily manual SecurityMaster download should not be required if Railway can reach the HTTPS ICICI URL.
 - Breeze `BREEZE_SESSION_TOKEN` still must be refreshed in Railway when it expires.
 - Master-contract import should be run by a Railway scheduled job once scheduling is configured.
+
+## Phase 6 SymbolResolver and Quote Service
+
+- Implemented `SymbolResolver` against `instruments` and `instrument_aliases`.
+- Added:
+  - cash alias resolution
+  - derivative resolution for nearest futures contracts
+  - shared `QuoteService` on top of `SymbolResolver` + `BreezeGateway`
+- Added quote APIs:
+  - `GET /api/quotes`
+  - `POST /api/quotes/batch`
+- Updated the old dashboard quote diagnostics path so it now uses the new quote API instead of constructing hardcoded Breeze requests directly.
+- Added frontend shared hooks:
+  - `useQuote`
+  - `useBatchQuotes`
+- Added a small quote status component and updated the dashboard to Phase 6 wording.
+
+## Phase 6 Verification
+
+- Read the Phase 6 section in the master playbook before implementation.
+- Re-checked the official Breeze quotes API contract for mandatory request fields.
+- `python -m pytest` passed: `23 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial.
+- Verified mappings in tests:
+  - `SBIN` resolves to `STABAN` on `NSE`
+  - `BANKNIFTY` resolves to `CNXBAN` on `NFO` futures with a real expiry
