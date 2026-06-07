@@ -3,7 +3,6 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
-import os
 import re
 import zipfile
 from dataclasses import dataclass
@@ -197,7 +196,10 @@ class MasterContractService:
             warnings.append("StockScriptNew.csv path is not configured.")
             return SourcePayload(name="stock_script_csv", rows=[], digest_source=None, warnings=warnings)
 
-        csv_path = Path(self.stock_script_csv_path)
+        csv_path = self._resolve_csv_path()
+        if not csv_path:
+            warnings.append("StockScriptNew.csv path is not configured.")
+            return SourcePayload(name="stock_script_csv", rows=[], digest_source=None, warnings=warnings)
         if not csv_path.exists():
             warnings.append(f"StockScriptNew.csv was not found at {csv_path}.")
             return SourcePayload(name="stock_script_csv", rows=[], digest_source=None, warnings=warnings)
@@ -386,7 +388,19 @@ class MasterContractService:
         return row.get("__source_name") == "stock_script_csv"
 
     def _csv_available(self) -> bool:
-        return bool(self.stock_script_csv_path and os.path.exists(self.stock_script_csv_path))
+        csv_path = self._resolve_csv_path()
+        return bool(csv_path and csv_path.exists())
+
+    def _resolve_csv_path(self) -> Path | None:
+        if not self.stock_script_csv_path:
+            return None
+
+        csv_path = Path(self.stock_script_csv_path)
+        if csv_path.is_absolute():
+            return csv_path
+
+        backend_root = Path(__file__).resolve().parents[2]
+        return backend_root / csv_path
 
     @staticmethod
     def _serialize_run(run: MasterContractRun | None) -> dict[str, Any] | None:

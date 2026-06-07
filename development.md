@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 5 - Master Contract Import deployment fix
+- Current phase: Phase 5 - Master Contract Import completion fix
 - Last completed phase: Phase 5 - Master Contract Import
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now has a seeded fallback for unreachable SecurityMaster
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses the repo-contained StockScriptNew.csv plus seeded fallback when SecurityMaster is unreachable
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -242,8 +242,34 @@
   - Seeded fallback is intentionally minimal and not a replacement for full SecurityMaster/CSV import.
   - Full contract coverage on Railway still depends on either a reachable SecurityMaster source or a deployment-safe CSV copy.
 
+### 2026-06-08 - Phase 5 Completion Fix: Repo StockScriptNew.csv
+- Goal: Remove the Railway dependency on the local desktop-only `C:\Users\Ankit\Desktop\Claude_Code\StockScriptNew.csv` path.
+- Root cause:
+  - Railway can download code from GitHub, but it cannot access files on the user's Windows desktop.
+  - The deployed import therefore fell back to the minimal seed aliases when SecurityMaster also timed out.
+- Backend changes:
+  - Added `backend/data/StockScriptNew.csv` as the deployed stock-code mapping source.
+  - Changed the default `STOCK_SCRIPT_CSV_PATH` to `data/StockScriptNew.csv`.
+  - Added backend-root relative path resolution so Railway and local runs resolve the same CSV path.
+  - Added regression coverage for repo-relative CSV availability.
+- Verification:
+  - `python -m pytest` -> `17 passed`
+  - Real repo-CSV smoke import with SecurityMaster disabled:
+    - `status = ok`
+    - `row_count = 33109`
+    - `alias_count = 35445`
+    - `source_name = stock_script_csv+seed_aliases`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+- Manual user tasks:
+  - Wait for Railway to deploy this commit.
+  - Retry `POST /api/master-contract/import` on Railway.
+  - Verify the response `source_name` includes `stock_script_csv` and `row_count` is around `33109`, not `5`.
+- Remaining risks:
+  - Railway still may not reach `http://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip`; that is now isolated from the CSV mapping issue.
+  - If ICICI SecurityMaster is required for daily derivatives freshness, a later fix must provide a reachable mirror/schedule/source that follows the Breeze-only plan.
+
 ## Manual Tasks Pending
-- [ ] Retry the deployed master-contract import run after the timeout-fix deploy
+- [ ] Retry the deployed master-contract import run after the repo-CSV deploy
 - [ ] Verify the deployed master-contract panel after import
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Keep Breeze secrets and session token only in env vars
@@ -286,6 +312,6 @@
 - Test command: `curl -X POST http://127.0.0.1:5000/api/master-contract/import`
 
 ## Deployment Notes
-- Last commit: pending phase 5 timeout-fix commit
+- Last commit: pending phase 5 repo-CSV fix commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 5 import now has a fast-fail + seeded fallback path for Railway retry
+- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 5 import now has a committed StockScriptNew.csv path plus fast-fail SecurityMaster handling

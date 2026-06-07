@@ -17,7 +17,7 @@ class AppConfig:
     breeze_api_key: str | None = os.getenv("BREEZE_API_KEY")
     breeze_secret_key: str | None = os.getenv("BREEZE_SECRET_KEY")
     breeze_session_token: str | None = os.getenv("BREEZE_SESSION_TOKEN")
-    stock_script_csv_path: str | None = os.getenv("STOCK_SCRIPT_CSV_PATH", "C:/Users/Ankit/Desktop/Claude_Code/StockScriptNew.csv")
+    stock_script_csv_path: str | None = os.getenv("STOCK_SCRIPT_CSV_PATH", "data/StockScriptNew.csv")
     security_master_url: str = os.getenv(
         "SECURITY_MASTER_URL",
         "http://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip",

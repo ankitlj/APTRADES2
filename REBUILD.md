@@ -169,3 +169,28 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - The new fallback test confirms import succeeds even when:
   - SecurityMaster download fails
   - no local CSV is available
+
+## Phase 5 Repo CSV Completion Fix
+
+- Railway cannot read `C:\Users\Ankit\Desktop\Claude_Code\StockScriptNew.csv`, so the fallback-only import was expected once SecurityMaster timed out.
+- Added the stable stock-code mapping file to the backend repo at:
+  - `backend/data/StockScriptNew.csv`
+- Changed the default backend CSV path to:
+  - `data/StockScriptNew.csv`
+- Added backend-root relative path resolution so the same config works when Railway uses `backend/` as the service root.
+- Added regression coverage for repo-relative CSV availability.
+
+## Phase 5 Repo CSV Completion Verification
+
+- `python -m pytest` passed: `17 passed`
+- Real repo-CSV smoke import with SecurityMaster disabled returned:
+  - `status = ok`
+  - `row_count = 33109`
+  - `alias_count = 35445`
+  - `source_name = stock_script_csv+seed_aliases`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial.
+
+## Phase 5 Remaining Risk
+
+- `http://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip` may still be unreachable from Railway.
+- The repo-contained CSV now prevents the deployed import from dropping to the minimal seed-only source, but daily SecurityMaster freshness still needs a separate reachable-source solution if ICICI directlink continues timing out.

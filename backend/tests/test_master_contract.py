@@ -28,6 +28,16 @@ def test_master_contract_status_not_configured():
     assert payload["database_configured"] is False
 
 
+def test_master_contract_resolves_repo_relative_stock_script_path():
+    service = MasterContractService(
+        database_url=None,
+        stock_script_csv_path="data/StockScriptNew.csv",
+        security_master_url="http://example.com",
+    )
+
+    assert service._csv_available() is True
+
+
 def test_master_contract_import_uses_csv_when_security_master_is_unavailable(tmp_path):
     csv_path = tmp_path / "StockScriptNew.csv"
     db_path = tmp_path / "master_contract.sqlite"
