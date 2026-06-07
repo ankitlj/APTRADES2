@@ -5,6 +5,8 @@ description = "APTRADES v2 Flask backend skeleton"
 requires-python = ">=3.10"
 dependencies = [
   "Flask>=3.0,<4.0",
+  "flask-cors>=6.0,<7.0",
+  "gunicorn>=23.0,<24.0",
 ]
 
 [project.optional-dependencies]

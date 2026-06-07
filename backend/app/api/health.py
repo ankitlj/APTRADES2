@@ -34,3 +34,25 @@ def readiness() -> tuple[object, int]:
         "breeze": "not_configured",
     }
     return jsonify({"status": "ok", "checks": checks, "timestamp": _utc_timestamp()}), 200
+
+
+@health_bp.get("/health/deployment")
+def deployment() -> tuple[object, int]:
+    checks = {
+        "api": "online",
+        "postgres": "unknown",
+        "redis": "unknown",
+        "breeze": "unknown",
+    }
+    return (
+        jsonify(
+            {
+                "status": "ok",
+                "environment": current_app.config["ENV"],
+                "frontend_origin": current_app.config.get("FRONTEND_ORIGIN"),
+                "checks": checks,
+                "timestamp": _utc_timestamp(),
+            }
+        ),
+        200,
+    )

@@ -42,3 +42,21 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 ## Remaining Note
 
 - The separate `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` file could not be updated from this workspace because it is outside the writable roots for this session.
+
+## Phase 2 Deployment Foundation
+
+- Added `flask-cors` and app-level CORS setup for local Vite plus future Vercel origin configuration.
+- Added `/api/health/deployment` for a deployment-focused dashboard check.
+- Added a Railway-friendly root `Procfile` using `gunicorn`.
+- Updated the dashboard with a deployment status card and deployment target summary.
+
+## Phase 2 Verification
+
+- `python -m pip install -e .[dev]` completed with `flask-cors` and `gunicorn`
+- `python -m pytest` passed: `3 passed`
+- `curl http://127.0.0.1:5000/api/health/deployment` returned:
+  - `api: online`
+  - `postgres: unknown`
+  - `redis: unknown`
+  - `breeze: unknown`
+- `npm.cmd run build` passed

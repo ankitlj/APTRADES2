@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 
-import { getHealth, getReadiness, type HealthResponse, type ReadinessResponse } from "../lib/api";
+import {
+  getDeploymentStatus,
+  getHealth,
+  getReadiness,
+  type DeploymentStatusResponse,
+  type HealthResponse,
+  type ReadinessResponse,
+} from "../lib/api";
 
 type AsyncState<T> = {
   data: T | null;
@@ -15,18 +22,24 @@ function createInitialState<T>(): AsyncState<T> {
 export function DashboardPage() {
   const [healthState, setHealthState] = useState<AsyncState<HealthResponse>>(createInitialState);
   const [readinessState, setReadinessState] = useState<AsyncState<ReadinessResponse>>(createInitialState);
+  const [deploymentState, setDeploymentState] = useState<AsyncState<DeploymentStatusResponse>>(createInitialState);
 
   useEffect(() => {
     let isMounted = true;
 
     async function load() {
       try {
-        const [health, readiness] = await Promise.all([getHealth(), getReadiness()]);
+        const [health, readiness, deploymentStatus] = await Promise.all([
+          getHealth(),
+          getReadiness(),
+          getDeploymentStatus(),
+        ]);
         if (!isMounted) {
           return;
         }
         setHealthState({ data: health, loading: false, error: null });
         setReadinessState({ data: readiness, loading: false, error: null });
+        setDeploymentState({ data: deploymentStatus, loading: false, error: null });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         if (!isMounted) {
@@ -34,6 +47,7 @@ export function DashboardPage() {
         }
         setHealthState({ data: null, loading: false, error: message });
         setReadinessState({ data: null, loading: false, error: message });
+        setDeploymentState({ data: null, loading: false, error: message });
       }
     }
 
@@ -98,19 +112,47 @@ export function DashboardPage() {
       </article>
       <article className="panel">
         <div className="panel-header">
-          <h3>Phase 1 route map</h3>
-          <span className="badge badge-muted">MVP shell</span>
+          <h3>Deployment status</h3>
+          <span className="badge badge-muted">
+            {deploymentState.loading ? "Loading" : deploymentState.data?.environment ?? "Unknown"}
+          </span>
         </div>
-        <ul className="route-list">
-          <li>Dashboard</li>
-          <li>Orderbook</li>
-          <li>Tradebook</li>
-          <li>Positions</li>
-          <li>Action Centre</li>
-          <li>Strategy</li>
-          <li>Logs</li>
-          <li>Tools</li>
-        </ul>
+        {deploymentState.error ? (
+          <p className="error-text">Deployment status unavailable: {deploymentState.error}</p>
+        ) : (
+          <div className="status-grid">
+            {Object.entries(deploymentState.data?.checks ?? {}).map(([name, value]) => (
+              <div key={name} className="status-card">
+                <p>{name}</p>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+      </article>
+      <article className="panel">
+        <div className="panel-header">
+          <h3>Deployment targets</h3>
+          <span className="badge badge-muted">Phase 2</span>
+        </div>
+        <dl className="metric-list">
+          <div>
+            <dt>Frontend</dt>
+            <dd>Vercel</dd>
+          </div>
+          <div>
+            <dt>Backend</dt>
+            <dd>Railway</dd>
+          </div>
+          <div>
+            <dt>Database</dt>
+            <dd>PostgreSQL planned</dd>
+          </div>
+          <div>
+            <dt>Cache</dt>
+            <dd>Redis planned</dd>
+          </div>
+        </dl>
       </article>
     </section>
   );
