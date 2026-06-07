@@ -208,6 +208,8 @@ frontend/node_modules/
 frontend/dist/
 frontend/*.tsbuildinfo
 frontend/vite.config.d.ts
+!frontend/src/lib/
+!frontend/src/lib/**
 
 # Ruff stuff:
 .ruff_cache/

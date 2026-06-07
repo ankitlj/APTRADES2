@@ -31,6 +31,7 @@
   - Added APTRADES shell with 224px sidebar, 48px topbar, main content padding, and mobile bottom nav.
   - Added MVP navigation placeholders for Dashboard, Orderbook, Tradebook, Positions, Action Centre, Strategy, Logs, and Tools.
   - Added dashboard health/readiness cards wired to backend endpoints.
+  - Added Vite dev proxy so local browser health checks hit the Flask backend without cross-origin failures.
 - Files changed:
   - `backend/*`
   - `frontend/*`
@@ -41,6 +42,7 @@
   - `python -m pytest` -> `2 passed`
   - `npm.cmd install`
   - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit a sandbox filesystem access denial
+  - `curl http://localhost:5173/api/health` via Vite dev proxy -> backend response returned successfully during local validation
   - `curl http://127.0.0.1:5000/api/health` -> `{"service":"APTRADES v2","status":"ok",...}`
   - `curl http://127.0.0.1:5000/api/health/readiness` -> `{"checks":{"api":"online","breeze":"not_configured","postgres":"not_configured","redis":"not_configured"},"status":"ok",...}`
 - Manual user tasks:

@@ -27,6 +27,7 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
   - mobile bottom nav
   - Dashboard backend health/readiness panel
   - MVP route placeholders only
+  - Vite dev proxy for local `/api/*` calls to Flask
 
 ## Verification
 
@@ -34,6 +35,7 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - `python -m pytest` passed: `2 passed`
 - `npm.cmd install` completed
 - `npm.cmd run build` passed
+- `http://localhost:5173/api/health` now works in local dev through the Vite proxy instead of failing in the browser with cross-origin fetch errors
 - `curl http://127.0.0.1:5000/api/health` returned `status: ok`
 - `curl http://127.0.0.1:5000/api/health/readiness` returned `api: online`, `postgres: not_configured`, `redis: not_configured`, `breeze: not_configured`
 
