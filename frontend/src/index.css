@@ -160,6 +160,10 @@ select {
   box-shadow: var(--shadow);
 }
 
+.panel-full {
+  grid-column: 1 / -1;
+}
+
 .panel-hero {
   background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
 }
@@ -225,6 +229,8 @@ select {
   padding: 12px;
   border-radius: 8px;
   background: var(--surface-muted);
+  display: grid;
+  gap: 6px;
 }
 
 .status-value {
@@ -241,6 +247,42 @@ select {
 
 .status-unknown {
   color: #a16207;
+}
+
+.symbol-diagnostics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.symbol-meta,
+.symbol-error {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.quote-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.quote-list dt {
+  margin: 0 0 2px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.quote-list dd {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.symbol-error {
+  color: #b45309;
 }
 
 .route-list {
@@ -263,6 +305,14 @@ select {
   }
 
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .symbol-diagnostics {
+    grid-template-columns: 1fr;
+  }
+
+  .quote-list {
     grid-template-columns: 1fr;
   }
 

@@ -78,3 +78,38 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
   - Redis without URL: `not_configured`
 - `npm.cmd run build` passed
 - Follow-up deploy fix: added `psycopg[binary]` so Railway can connect SQLAlchemy to Postgres instead of reporting `offline` due to a missing driver.
+
+## Phase 4 Breeze Diagnostics
+
+- Re-read the official Breeze API reference for request headers, `CustomerDetails`, and `Quotes`, and used the `breeze-connect` PyPI page only as supporting reference.
+- Implemented a real `BreezeGateway` with:
+  - `CustomerDetails` token exchange
+  - Breeze checksum/header signing
+  - 3-attempt retry handling with 1 second delay
+  - cached customer-session reuse during a single diagnostic run
+- Added:
+  - `GET /api/debug/breeze-auth`
+  - `GET /api/debug/breeze-test`
+- Added a temporary dashboard Breeze diagnostics panel that surfaces:
+  - auth/config status
+  - symbol-level status
+  - returned LTP / previous close / spot / expiry when available
+  - real Breeze error text when calls fail
+- Added dedicated backend tests for Breeze gateway behavior.
+
+## Phase 4 Verification
+
+- `python -m pip install -e .[dev]` passed after rerunning with network access outside the sandbox
+- `python -m pytest` passed: `11 passed`
+- Local Flask test-client check returned:
+  - `/api/debug/breeze-auth` -> `status: not_configured`
+  - `/api/debug/breeze-test` -> structured error state without secrets
+- `npm.cmd run build` passed after rerunning outside the sandbox
+- User-confirmed deployed readiness now shows:
+  - `api: online`
+  - `postgres: online`
+  - `redis: online`
+
+## Phase 4 Note
+
+- The user shared a fresh Breeze session token during the session. It was intentionally not written into repo files, logs, or commits. Live Breeze verification still depends on env vars for `BREEZE_API_KEY`, `BREEZE_SECRET_KEY`, and `BREEZE_SESSION_TOKEN`.

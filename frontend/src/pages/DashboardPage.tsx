@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 
 import {
+  getBreezeAuth,
+  getBreezeTest,
   getDeploymentStatus,
   getHealth,
   getReadiness,
+  type BreezeAuthResponse,
+  type BreezeTestResponse,
   type DeploymentStatusResponse,
   type HealthResponse,
   type ReadinessResponse,
@@ -29,20 +33,43 @@ function statusClassName(value: string) {
   return "status-value status-unknown";
 }
 
+function getPrimaryQuote(
+  quote: BreezeTestResponse["symbols"][number]["quote"],
+): Record<string, unknown> | null {
+  if (Array.isArray(quote)) {
+    return (quote[0] as Record<string, unknown> | undefined) ?? null;
+  }
+  if (quote && typeof quote === "object") {
+    return quote;
+  }
+  return null;
+}
+
+function renderQuoteValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "n/a";
+  }
+  return String(value);
+}
+
 export function DashboardPage() {
   const [healthState, setHealthState] = useState<AsyncState<HealthResponse>>(createInitialState);
   const [readinessState, setReadinessState] = useState<AsyncState<ReadinessResponse>>(createInitialState);
   const [deploymentState, setDeploymentState] = useState<AsyncState<DeploymentStatusResponse>>(createInitialState);
+  const [breezeAuthState, setBreezeAuthState] = useState<AsyncState<BreezeAuthResponse>>(createInitialState);
+  const [breezeTestState, setBreezeTestState] = useState<AsyncState<BreezeTestResponse>>(createInitialState);
 
   useEffect(() => {
     let isMounted = true;
 
     async function load() {
       try {
-        const [health, readiness, deploymentStatus] = await Promise.all([
+        const [health, readiness, deploymentStatus, breezeAuth, breezeTest] = await Promise.all([
           getHealth(),
           getReadiness(),
           getDeploymentStatus(),
+          getBreezeAuth(),
+          getBreezeTest(),
         ]);
         if (!isMounted) {
           return;
@@ -50,6 +77,8 @@ export function DashboardPage() {
         setHealthState({ data: health, loading: false, error: null });
         setReadinessState({ data: readiness, loading: false, error: null });
         setDeploymentState({ data: deploymentStatus, loading: false, error: null });
+        setBreezeAuthState({ data: breezeAuth, loading: false, error: null });
+        setBreezeTestState({ data: breezeTest, loading: false, error: null });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         if (!isMounted) {
@@ -58,6 +87,8 @@ export function DashboardPage() {
         setHealthState({ data: null, loading: false, error: message });
         setReadinessState({ data: null, loading: false, error: message });
         setDeploymentState({ data: null, loading: false, error: message });
+        setBreezeAuthState({ data: null, loading: false, error: message });
+        setBreezeTestState({ data: null, loading: false, error: message });
       }
     }
 
@@ -71,11 +102,11 @@ export function DashboardPage() {
   return (
     <section className="dashboard-grid">
       <article className="panel panel-hero">
-        <p className="eyebrow">Phase 1</p>
-        <h3>Clean Breeze-only APTRADES v2 skeleton</h3>
+        <p className="eyebrow">Phase 4</p>
+        <h3>Breeze auth diagnostic</h3>
         <p className="panel-copy">
-          Backend contract first. Typed frontend second. Full trading workflows start after deployment and broker
-          diagnostics are in place.
+          This phase proves Breeze configuration and request signing before any page depends on broker data. Real
+          failures are surfaced directly instead of hidden behind placeholders.
         </p>
       </article>
       <article className="panel">
@@ -142,27 +173,81 @@ export function DashboardPage() {
       </article>
       <article className="panel">
         <div className="panel-header">
-          <h3>Deployment targets</h3>
-          <span className="badge badge-muted">Phase 2</span>
+          <h3>Breeze auth</h3>
+          <span className="badge badge-muted">{breezeAuthState.data?.status ?? "Pending"}</span>
         </div>
-        <dl className="metric-list">
-          <div>
-            <dt>Frontend</dt>
-            <dd>Vercel</dd>
+        {breezeAuthState.error ? (
+          <p className="error-text">Breeze auth unavailable: {breezeAuthState.error}</p>
+        ) : (
+          <dl className="metric-list">
+            <div>
+              <dt>Configured</dt>
+              <dd>{String(breezeAuthState.data?.configured ?? false)}</dd>
+            </div>
+            <div>
+              <dt>User</dt>
+              <dd>{breezeAuthState.data?.user_id ?? "pending"}</dd>
+            </div>
+            <div>
+              <dt>Session token received</dt>
+              <dd>{String(breezeAuthState.data?.session_token_received ?? false)}</dd>
+            </div>
+            <div>
+              <dt>Missing config</dt>
+              <dd>{breezeAuthState.data?.missing?.join(", ") ?? "none"}</dd>
+            </div>
+          </dl>
+        )}
+      </article>
+      <article className="panel panel-full">
+        <div className="panel-header">
+          <h3>Breeze test symbols</h3>
+          <span className="badge badge-muted">{breezeTestState.data?.status ?? "Pending"}</span>
+        </div>
+        {breezeTestState.error ? (
+          <p className="error-text">Breeze test unavailable: {breezeTestState.error}</p>
+        ) : (
+          <div className="symbol-diagnostics">
+            {(breezeTestState.data?.symbols ?? []).map((symbol) => {
+              const quote = getPrimaryQuote(symbol.quote);
+
+              return (
+                <div key={symbol.symbol} className="status-card">
+                  <p>
+                    {symbol.symbol} / {symbol.broker_symbol}
+                  </p>
+                  <strong className={statusClassName(symbol.status === "ok" ? "online" : "offline")}>
+                    {symbol.status}
+                  </strong>
+                  <span className="symbol-meta">
+                    {symbol.exchange} {symbol.product_type}
+                  </span>
+                  {quote ? (
+                    <dl className="quote-list">
+                      <div>
+                        <dt>LTP</dt>
+                        <dd>{renderQuoteValue(quote.ltp)}</dd>
+                      </div>
+                      <div>
+                        <dt>Previous close</dt>
+                        <dd>{renderQuoteValue(quote.previous_close)}</dd>
+                      </div>
+                      <div>
+                        <dt>Spot</dt>
+                        <dd>{renderQuoteValue(quote.spot_price)}</dd>
+                      </div>
+                      <div>
+                        <dt>Expiry</dt>
+                        <dd>{renderQuoteValue(quote.expiry_date)}</dd>
+                      </div>
+                    </dl>
+                  ) : null}
+                  {symbol.error ? <span className="symbol-error">{symbol.error}</span> : null}
+                </div>
+              );
+            })}
           </div>
-          <div>
-            <dt>Backend</dt>
-            <dd>Railway</dd>
-          </div>
-          <div>
-            <dt>Database</dt>
-            <dd>PostgreSQL planned</dd>
-          </div>
-          <div>
-            <dt>Cache</dt>
-            <dd>Redis planned</dd>
-          </div>
-        </dl>
+        )}
       </article>
     </section>
   );

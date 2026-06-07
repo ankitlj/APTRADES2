@@ -44,3 +44,22 @@ def test_normalize_database_url_uses_psycopg_driver():
     url = "postgresql://user:pass@host:5432/dbname"
 
     assert normalize_database_url(url) == "postgresql+psycopg://user:pass@host:5432/dbname"
+
+
+def test_breeze_auth_returns_not_configured(client):
+    response = client.get("/api/debug/breeze-auth")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "not_configured"
+    assert payload["configured"] is False
+
+
+def test_breeze_test_returns_not_configured_symbols(client):
+    response = client.get("/api/debug/breeze-test")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["configured"] is False
+    assert payload["status"] == "error"
+    assert len(payload["symbols"]) == 5

@@ -1,19 +1,19 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 3 - PostgreSQL and Redis Setup
-- Last completed phase: Phase 2 - Deployment Foundation
-- Deployment status: Railway and Vercel deployed; DB and Redis services not attached yet
+- Current phase: Phase 5 - Master Contract Import
+- Last completed phase: Phase 4 - BreezeGateway Auth Diagnostic
+- Deployment status: Railway and Vercel deployed; DB and Redis online; Breeze diagnostics deployed for final user verification
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
 ## Environment
 - Backend: Flask 3 skeleton
 - Frontend: React + Vite + TypeScript skeleton
-- Database: PostgreSQL planned, not configured
-- Cache: Redis planned, not configured
-- Broker: Breeze only, Phase 4 implementation pending
-- Deployment: Railway + Vercel planned
+- Database: PostgreSQL online on Railway
+- Cache: Redis online on Railway
+- Broker: Breeze only, diagnostic gateway implemented
+- Deployment: Railway + Vercel live
 
 ## Phase Log
 
@@ -131,10 +131,52 @@
   - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
 - Next step: Attach Railway Postgres and Redis plugins, then confirm deployed readiness.
 
+### 2026-06-07 - Phase 4: BreezeGateway Auth Diagnostic
+- Goal: Prove Breeze auth, request signing, and diagnostic quote calls work before any trading page depends on broker data.
+- Backend changes:
+  - Implemented a real `BreezeGateway` using the official Breeze request-header and checksum flow.
+  - Added `CustomerDetails` token exchange, request retry handling, and cached customer-session reuse during one diagnostic run.
+  - Added `GET /api/debug/breeze-auth` for configuration and auth diagnostics.
+  - Added `GET /api/debug/breeze-test` for five-symbol diagnostic quote checks.
+  - Added dedicated Breeze gateway tests covering missing config, unsigned `CustomerDetails`, signed quote requests, retry behavior, and diagnostic error reporting.
+- Frontend changes:
+  - Added typed Breeze diagnostic API clients.
+  - Updated the Dashboard with a temporary Breeze auth panel.
+  - Added Breeze symbol diagnostics showing returned LTP, previous close, spot, expiry, or the real broker error per symbol.
+- Files changed:
+  - `backend/pyproject.toml`
+  - `backend/requirements.txt`
+  - `backend/app/config.py`
+  - `backend/app/factory.py`
+  - `backend/app/api/debug.py`
+  - `backend/app/services/breeze_gateway.py`
+  - `backend/tests/test_breeze_gateway.py`
+  - `backend/tests/test_health.py`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/DashboardPage.tsx`
+  - `frontend/src/index.css`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Reviewed the official Breeze API documentation for request headers, `CustomerDetails`, and `Quotes`, plus the `breeze-connect` PyPI package page before implementation.
+  - `python -m pip install -e .[dev]` -> passed after rerunning with network access outside the sandbox
+  - `python -m pytest` -> `11 passed`
+  - `python -c "from app import create_app; ..."` -> `/api/debug/breeze-auth` returned `not_configured` locally without secrets and `/api/debug/breeze-test` returned a structured error state
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+  - User-supplied deployed readiness check confirmed `api`, `postgres`, and `redis` are `online`
+- Manual user tasks:
+  - Keep `BREEZE_API_KEY`, `BREEZE_SECRET_KEY`, and `BREEZE_SESSION_TOKEN` only in local/Railway environment variables.
+  - Verify the deployed Dashboard Breeze panels and `/api/debug/breeze-test` response with live broker credentials.
+  - Rotate or refresh the Breeze session token if it expires; do not commit or paste it into repository files.
+- Remaining risks:
+  - This workspace does not hold the Breeze API key/secret, so live broker-number verification still depends on the user's deployed/local environment.
+  - Futures/options diagnostics can still return broker-side contract errors until Phase 5 adds master-contract-driven expiry and alias resolution.
+  - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
+- Next step: Start Phase 5 master-contract import using `StockScriptNew.csv` and Breeze SecurityMaster.
+
 ## Manual Tasks Pending
-- [ ] Add Railway Postgres service/plugin and wire `DATABASE_URL`
-- [ ] Add Railway Redis service/plugin and wire `REDIS_URL`
-- [ ] Verify deployed readiness returns DB and Redis `online`
+- [ ] Verify deployed Breeze auth/test panels return live broker data or a clear Breeze error
+- [ ] Keep Breeze secrets and session token only in env vars
 - [ ] Provide approval if external `Claude_Code` workspace file updates are required
 
 ## API Contracts Confirmed
@@ -153,7 +195,17 @@
 - Response: `{ "status": "ok", "environment": "<env>", "frontend_origin": "<origin|null>", "checks": { "api": "online", "postgres": "online|offline|not_configured", "redis": "online|offline|not_configured", "breeze": "unknown" }, "timestamp": "<UTC ISO8601>" }`
 - Test command: `curl http://127.0.0.1:5000/api/health/deployment`
 
+- Endpoint: `GET /api/debug/breeze-auth`
+- Request: no body
+- Response: `{ "status": "ok|not_configured|error", "configured": true|false, "user_id": "<id|optional>", "user_name": "<name|optional>", "session_token_received": true|false, "missing": ["<env names>"] }`
+- Test command: `curl http://127.0.0.1:5000/api/debug/breeze-auth`
+
+- Endpoint: `GET /api/debug/breeze-test`
+- Request: no body
+- Response: `{ "status": "ok|error", "configured": true|false, "symbols": [{ "symbol": "SBIN", "broker_symbol": "STABAN", "status": "ok|error", "exchange": "NSE", "product_type": "cash", "quote": "<optional>", "error": "<optional>" }] }`
+- Test command: `curl http://127.0.0.1:5000/api/debug/breeze-test`
+
 ## Deployment Notes
-- Last commit: pending
+- Last commit: pending phase 4 commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: local Phase 3 smoke checks passed; deployed DB/Redis still pending service attachment
+- Smoke test result: deployed readiness now reports `api`, `postgres`, and `redis` as `online`; Breeze diagnostic deploy verification pending the latest Phase 4 push
