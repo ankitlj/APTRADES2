@@ -45,7 +45,7 @@ export function AppShell({ children }: PropsWithChildren) {
           </div>
           <div className="topbar-status">
             <span className="status-dot" />
-            Phase 1 skeleton
+            Phase 5 foundation
           </div>
         </header>
         <main className="main-content">{children}</main>

@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 5 - Master Contract Import
-- Last completed phase: Phase 4 - BreezeGateway Auth Diagnostic
-- Deployment status: Railway and Vercel deployed; DB and Redis online; Breeze diagnostics deployed for final user verification
+- Current phase: Phase 6 - SymbolResolver and Quote Service
+- Last completed phase: Phase 5 - Master Contract Import
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import endpoints and dashboard status panel ready for deployed verification
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -12,7 +12,7 @@
 - Frontend: React + Vite + TypeScript skeleton
 - Database: PostgreSQL online on Railway
 - Cache: Redis online on Railway
-- Broker: Breeze only, diagnostic gateway implemented
+- Broker: Breeze only, diagnostic gateway and master-contract import implemented
 - Deployment: Railway + Vercel live
 
 ## Phase Log
@@ -174,8 +174,63 @@
   - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
 - Next step: Start Phase 5 master-contract import using `StockScriptNew.csv` and Breeze SecurityMaster.
 
+### 2026-06-07 - Phase 5: Master Contract Import
+- Goal: Persist Breeze instrument and alias data in PostgreSQL so later quote/futures/options flows stop guessing broker symbols and expiries at runtime.
+- Backend changes:
+  - Added persistent SQLAlchemy models for `instruments`, `instrument_aliases`, and `master_contract_runs`.
+  - Added DB session/table helpers for service-level schema creation without importing contracts during web startup.
+  - Implemented `MasterContractService` with:
+    - SecurityMaster zip download/parsing
+    - `StockScriptNew.csv` parsing fallback/supplement
+    - contract parsing for cash, futures, and options rows
+    - alias extraction for display symbol to broker symbol mapping
+    - import status/run logging
+  - Added `GET /api/master-contract/status`.
+  - Added `POST /api/master-contract/import`.
+  - Added `flask master-contract import` CLI command for scheduled/manual runs.
+- Frontend changes:
+  - Added typed master-contract status client.
+  - Updated the Dashboard hero/topbar to Phase 5 wording.
+  - Added a developer-facing Master Contract status panel showing row count, alias count, CSV availability, last import time, source/checksum, and verified alias examples.
+- Files changed:
+  - `backend/app/config.py`
+  - `backend/app/db.py`
+  - `backend/app/factory.py`
+  - `backend/app/models.py`
+  - `backend/app/api/master_contract.py`
+  - `backend/app/services/master_contract_service.py`
+  - `backend/tests/test_master_contract.py`
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/DashboardPage.tsx`
+  - `frontend/src/index.css`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Read the Breeze SecurityMaster/master-contract phase requirements and used `StockScriptNew.csv` as the alias source of truth.
+  - `python -m pytest` -> `15 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the same known sandbox filesystem denial
+  - Real CSV smoke import against `C:\Users\Ankit\Desktop\Claude_Code\StockScriptNew.csv` with a temp SQLite DB:
+    - `instrument_count = 33109`
+    - `alias_count = 35445`
+  - Endpoint contract tests:
+    - `/api/master-contract/status` returns `not_configured` cleanly without a DB
+    - `/api/master-contract/import` returns a clear error when `DATABASE_URL` is missing
+- Manual user tasks:
+  - Trigger the first deployed import run with `POST /api/master-contract/import` or `flask master-contract import`.
+  - Verify the deployed Dashboard master-contract panel updates after the first import.
+  - Configure a daily Railway schedule for `flask master-contract import`.
+  - If you want the deployed app to use the local CSV instead of SecurityMaster-only fallback, provide a safe Railway-accessible copy via env-mounted file or another upload mechanism.
+- Remaining risks:
+  - Railway cannot see `C:\Users\Ankit\Desktop\Claude_Code\StockScriptNew.csv`, so deployed imports will rely on SecurityMaster unless you provide that CSV through a deployment-safe path.
+  - `SymbolResolver` and quote APIs still do not consume these persisted tables yet; that starts in Phase 6.
+  - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` could not be updated from this workspace because it is outside the writable roots.
+- Next step: Build `SymbolResolver` and quote APIs on top of the imported instrument and alias tables.
+
 ## Manual Tasks Pending
-- [ ] Verify deployed Breeze auth/test panels return live broker data or a clear Breeze error
+- [ ] Trigger the first deployed master-contract import run
+- [ ] Verify the deployed master-contract panel after import
+- [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Keep Breeze secrets and session token only in env vars
 - [ ] Provide approval if external `Claude_Code` workspace file updates are required
 
@@ -205,7 +260,17 @@
 - Response: `{ "status": "ok|error", "configured": true|false, "symbols": [{ "symbol": "SBIN", "broker_symbol": "STABAN", "status": "ok|error", "exchange": "NSE", "product_type": "cash", "quote": "<optional>", "error": "<optional>" }] }`
 - Test command: `curl http://127.0.0.1:5000/api/debug/breeze-test`
 
+- Endpoint: `GET /api/master-contract/status`
+- Request: no body
+- Response: `{ "status": "ok|not_configured", "database_configured": true|false, "csv_available": true|false, "instrument_count": 33109, "alias_count": 35445, "latest_run": { "status": "success", "source_name": "stock_script_csv", ... } }`
+- Test command: `curl http://127.0.0.1:5000/api/master-contract/status`
+
+- Endpoint: `POST /api/master-contract/import`
+- Request: no body
+- Response: `{ "status": "ok", "row_count": 33109, "alias_count": 35445, "source_name": "stock_script_csv", "warnings": ["..."] }`
+- Test command: `curl -X POST http://127.0.0.1:5000/api/master-contract/import`
+
 ## Deployment Notes
-- Last commit: pending phase 4 commit
+- Last commit: pending phase 5 commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness now reports `api`, `postgres`, and `redis` as `online`; Breeze diagnostic deploy verification pending the latest Phase 4 push
+- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 5 deploy still needs the first master-contract import run for the new panel to show live counts

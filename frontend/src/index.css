@@ -225,12 +225,22 @@ select {
   gap: 12px;
 }
 
+.master-contract-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .status-card {
   padding: 12px;
   border-radius: 8px;
   background: var(--surface-muted);
   display: grid;
   gap: 6px;
+}
+
+.panel-span-2 {
+  grid-column: span 2;
 }
 
 .status-value {
@@ -259,6 +269,22 @@ select {
 .symbol-error {
   color: var(--text-muted);
   font-size: 0.85rem;
+}
+
+.alias-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.alias-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
 }
 
 .quote-list {
@@ -310,6 +336,14 @@ select {
 
   .symbol-diagnostics {
     grid-template-columns: 1fr;
+  }
+
+  .master-contract-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel-span-2 {
+    grid-column: auto;
   }
 
   .quote-list {

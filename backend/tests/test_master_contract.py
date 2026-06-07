@@ -1,0 +1,86 @@
+from pathlib import Path
+from unittest.mock import patch
+
+from app.db import create_session_factory
+from app.models import Instrument
+from app.services.master_contract_service import MasterContractService, SourcePayload
+
+
+CSV_HEADER = "SC,SN,EC,SM,SG,TK,LS,CD,NS,TS,ISIN,SR,SI\n"
+CSV_ROWS = [
+    "RELIND,RELIANCE INDUSTRIES,NSE,RELIND,EQUITY,2885,1,RELIND,RELIANCE,0.1,INE002A01018,EQ,\n",
+    "ADAPOR,ADANI PORT AND SPECIAL ECONO,NSE,ADAPOR,EQUITY,15083,1,ADAPOR,ADANIPORTS,0.1,INE742F01042,EQ,\n",
+    "CNXBAN,NIFTY BANK,NSE,CNXBAN,EQUITY,NIFTY BANK,1,CNXBAN,BANK NIFTY,0,,0,\n",
+    "RELIND,RELIANCE INDUSTRIES,NFO,RELIND~F:30-Mar-2026,DERIVATIVE,52023,500,FUT-RELIND-30-Mar-2026,RELIANCE,10,,,\n",
+]
+
+
+def _write_csv(path: Path) -> None:
+    path.write_text(CSV_HEADER + "".join(CSV_ROWS), encoding="utf-8")
+
+
+def test_master_contract_status_not_configured():
+    service = MasterContractService(database_url=None, stock_script_csv_path=None, security_master_url="http://example.com")
+
+    payload = service.get_status()
+
+    assert payload["status"] == "not_configured"
+    assert payload["database_configured"] is False
+
+
+def test_master_contract_import_uses_csv_when_security_master_is_unavailable(tmp_path):
+    csv_path = tmp_path / "StockScriptNew.csv"
+    db_path = tmp_path / "master_contract.sqlite"
+    _write_csv(csv_path)
+    service = MasterContractService(
+        database_url=f"sqlite:///{db_path}",
+        stock_script_csv_path=str(csv_path),
+        security_master_url="http://example.com/securitymaster.zip",
+    )
+
+    with patch.object(
+        service,
+        "_load_security_master_rows",
+        return_value=SourcePayload(
+            name="security_master",
+            rows=[],
+            digest_source=None,
+            warnings=["SecurityMaster download failed: timeout"],
+        ),
+    ):
+        payload = service.import_master_contract()
+
+    assert payload["status"] == "ok"
+    assert payload["row_count"] == 4
+    assert payload["alias_count"] >= 4
+    assert "SecurityMaster download failed: timeout" in payload["warnings"]
+
+    status = service.get_status()
+    assert status["instrument_count"] == 4
+    assert status["alias_count"] >= 4
+    assert status["latest_run"]["status"] == "success"
+    assert status["verified_aliases"][0]["broker_symbol"] == "RELIND"
+
+    session_factory = create_session_factory(f"sqlite:///{db_path}")
+    with session_factory() as session:
+        future_contract = session.query(Instrument).filter_by(exchange_code="NFO", broker_symbol="RELIND").one()
+
+    assert future_contract.product_type == "futures"
+    assert future_contract.expiry_date.isoformat() == "2026-03-30"
+
+
+def test_master_contract_status_endpoint_returns_not_configured(client):
+    response = client.get("/api/master-contract/status")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "not_configured"
+
+
+def test_master_contract_import_endpoint_requires_database(client):
+    response = client.post("/api/master-contract/import")
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["status"] == "error"
+    assert "DATABASE_URL is not configured" in payload["error"]

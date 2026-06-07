@@ -113,3 +113,43 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 ## Phase 4 Note
 
 - The user shared a fresh Breeze session token during the session. It was intentionally not written into repo files, logs, or commits. Live Breeze verification still depends on env vars for `BREEZE_API_KEY`, `BREEZE_SECRET_KEY`, and `BREEZE_SESSION_TOKEN`.
+
+## Phase 5 Master Contract Import
+
+- Added persistent SQLAlchemy models for:
+  - `instruments`
+  - `instrument_aliases`
+  - `master_contract_runs`
+- Implemented `MasterContractService` with:
+  - SecurityMaster zip download/parsing
+  - fallback/supplemental parsing of `C:\Users\Ankit\Desktop\Claude_Code\StockScriptNew.csv`
+  - contract parsing for cash, futures, and options rows
+  - alias extraction for display-symbol to broker-symbol mapping
+  - import-run logging and status reporting
+- Added:
+  - `GET /api/master-contract/status`
+  - `POST /api/master-contract/import`
+  - `flask master-contract import`
+- Added a Dashboard developer panel for:
+  - instrument count
+  - alias count
+  - CSV availability
+  - last import time
+  - source/checksum
+  - verified alias examples
+- Cleaned up the stale topbar label so the deployed UI no longer says `Phase 1 skeleton`.
+
+## Phase 5 Verification
+
+- `python -m pytest` passed: `15 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox
+- Real local smoke import against the supplied CSV returned:
+  - `instrument_count = 33109`
+  - `alias_count = 35445`
+- Default endpoint behavior was verified:
+  - `/api/master-contract/status` returns `not_configured` cleanly without a DB
+  - `/api/master-contract/import` returns a clear DB-config-required error when `DATABASE_URL` is missing
+
+## Phase 5 Note
+
+- Railway will not be able to read `C:\Users\Ankit\Desktop\Claude_Code\StockScriptNew.csv` directly. Deployed imports can still use Breeze SecurityMaster, but CSV-driven alias enhancement on Railway requires a safe deployment-side copy or upload path.

@@ -47,6 +47,35 @@ export interface BreezeTestResponse {
   symbols: BreezeTestSymbolResult[];
 }
 
+export interface MasterContractAlias {
+  display_symbol: string;
+  broker_symbol: string;
+}
+
+export interface MasterContractRun {
+  status: string;
+  source_name: string;
+  source_checksum: string | null;
+  row_count: number;
+  alias_count: number;
+  warning_count: number;
+  error_message: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface MasterContractStatusResponse {
+  status: string;
+  database_configured: boolean;
+  csv_path: string | null;
+  csv_available: boolean;
+  security_master_url: string;
+  instrument_count?: number;
+  alias_count?: number;
+  latest_run?: MasterContractRun | null;
+  verified_aliases?: MasterContractAlias[];
+}
+
 const API_BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
 
 async function requestJson<T>(path: string): Promise<T> {
@@ -77,4 +106,8 @@ export function getBreezeAuth() {
 
 export function getBreezeTest() {
   return requestJson<BreezeTestResponse>("/api/debug/breeze-test");
+}
+
+export function getMasterContractStatus() {
+  return requestJson<MasterContractStatusResponse>("/api/master-contract/status");
 }

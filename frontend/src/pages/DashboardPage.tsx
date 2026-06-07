@@ -5,11 +5,13 @@ import {
   getBreezeTest,
   getDeploymentStatus,
   getHealth,
+  getMasterContractStatus,
   getReadiness,
   type BreezeAuthResponse,
   type BreezeTestResponse,
   type DeploymentStatusResponse,
   type HealthResponse,
+  type MasterContractStatusResponse,
   type ReadinessResponse,
 } from "../lib/api";
 
@@ -58,18 +60,21 @@ export function DashboardPage() {
   const [deploymentState, setDeploymentState] = useState<AsyncState<DeploymentStatusResponse>>(createInitialState);
   const [breezeAuthState, setBreezeAuthState] = useState<AsyncState<BreezeAuthResponse>>(createInitialState);
   const [breezeTestState, setBreezeTestState] = useState<AsyncState<BreezeTestResponse>>(createInitialState);
+  const [masterContractState, setMasterContractState] =
+    useState<AsyncState<MasterContractStatusResponse>>(createInitialState);
 
   useEffect(() => {
     let isMounted = true;
 
     async function load() {
       try {
-        const [health, readiness, deploymentStatus, breezeAuth, breezeTest] = await Promise.all([
+        const [health, readiness, deploymentStatus, breezeAuth, breezeTest, masterContractStatus] = await Promise.all([
           getHealth(),
           getReadiness(),
           getDeploymentStatus(),
           getBreezeAuth(),
           getBreezeTest(),
+          getMasterContractStatus(),
         ]);
         if (!isMounted) {
           return;
@@ -79,6 +84,7 @@ export function DashboardPage() {
         setDeploymentState({ data: deploymentStatus, loading: false, error: null });
         setBreezeAuthState({ data: breezeAuth, loading: false, error: null });
         setBreezeTestState({ data: breezeTest, loading: false, error: null });
+        setMasterContractState({ data: masterContractStatus, loading: false, error: null });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
         if (!isMounted) {
@@ -89,6 +95,7 @@ export function DashboardPage() {
         setDeploymentState({ data: null, loading: false, error: message });
         setBreezeAuthState({ data: null, loading: false, error: message });
         setBreezeTestState({ data: null, loading: false, error: message });
+        setMasterContractState({ data: null, loading: false, error: message });
       }
     }
 
@@ -102,11 +109,11 @@ export function DashboardPage() {
   return (
     <section className="dashboard-grid">
       <article className="panel panel-hero">
-        <p className="eyebrow">Phase 4</p>
-        <h3>Breeze auth diagnostic</h3>
+        <p className="eyebrow">Phase 5</p>
+        <h3>Master contract foundation</h3>
         <p className="panel-copy">
-          This phase proves Breeze configuration and request signing before any page depends on broker data. Real
-          failures are surfaced directly instead of hidden behind placeholders.
+          This phase persists instrument and alias data so later quote and options flows stop guessing broker symbols or
+          futures expiries at runtime.
         </p>
       </article>
       <article className="panel">
@@ -197,6 +204,55 @@ export function DashboardPage() {
               <dd>{breezeAuthState.data?.missing?.join(", ") ?? "none"}</dd>
             </div>
           </dl>
+        )}
+      </article>
+      <article className="panel panel-full">
+        <div className="panel-header">
+          <h3>Master contract status</h3>
+          <span className="badge badge-muted">
+            {masterContractState.loading ? "Loading" : masterContractState.data?.latest_run?.status ?? masterContractState.data?.status ?? "Pending"}
+          </span>
+        </div>
+        {masterContractState.error ? (
+          <p className="error-text">Master contract status unavailable: {masterContractState.error}</p>
+        ) : (
+          <div className="master-contract-grid">
+            <div className="status-card">
+              <p>Instrument rows</p>
+              <strong>{masterContractState.data?.instrument_count ?? 0}</strong>
+            </div>
+            <div className="status-card">
+              <p>Alias rows</p>
+              <strong>{masterContractState.data?.alias_count ?? 0}</strong>
+            </div>
+            <div className="status-card">
+              <p>CSV available</p>
+              <strong className={statusClassName(masterContractState.data?.csv_available ? "online" : "offline")}>
+                {masterContractState.data?.csv_available ? "online" : "offline"}
+              </strong>
+            </div>
+            <div className="status-card">
+              <p>Last import</p>
+              <strong>{masterContractState.data?.latest_run?.completed_at ?? "not imported"}</strong>
+            </div>
+            <div className="status-card panel-span-2">
+              <p>Source</p>
+              <strong>{masterContractState.data?.latest_run?.source_name ?? "pending"}</strong>
+              <span className="symbol-meta">{masterContractState.data?.latest_run?.source_checksum ?? "checksum pending"}</span>
+            </div>
+            <div className="status-card panel-span-2">
+              <p>Verified aliases</p>
+              <div className="alias-list">
+                {(masterContractState.data?.verified_aliases ?? []).map((alias) => (
+                  <span key={`${alias.display_symbol}-${alias.broker_symbol}`} className="alias-chip">
+                    {alias.display_symbol}
+                    {" -> "}
+                    {alias.broker_symbol}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       </article>
       <article className="panel panel-full">

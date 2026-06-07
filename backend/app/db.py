@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session, sessionmaker
 
 
 def normalize_database_url(database_url: str) -> str:
@@ -12,6 +13,19 @@ def normalize_database_url(database_url: str) -> str:
 
 def create_db_engine(database_url: str) -> Engine:
     return create_engine(normalize_database_url(database_url), future=True, pool_pre_ping=True)
+
+
+def create_session_factory(database_url: str) -> sessionmaker[Session]:
+    engine = create_db_engine(database_url)
+    return sessionmaker(bind=engine, future=True, expire_on_commit=False)
+
+
+def ensure_tables(database_url: str) -> None:
+    from .models import Base
+
+    engine = create_db_engine(database_url)
+    Base.metadata.create_all(bind=engine)
+    engine.dispose()
 
 
 def check_database(database_url: str | None) -> str:

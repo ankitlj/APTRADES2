@@ -17,6 +17,11 @@ class AppConfig:
     breeze_api_key: str | None = os.getenv("BREEZE_API_KEY")
     breeze_secret_key: str | None = os.getenv("BREEZE_SECRET_KEY")
     breeze_session_token: str | None = os.getenv("BREEZE_SESSION_TOKEN")
+    stock_script_csv_path: str | None = os.getenv("STOCK_SCRIPT_CSV_PATH", "C:/Users/Ankit/Desktop/Claude_Code/StockScriptNew.csv")
+    security_master_url: str = os.getenv(
+        "SECURITY_MASTER_URL",
+        "http://directlink.icicidirect.com/NewSecurityMaster/SecurityMaster.zip",
+    )
     frontend_origin: str | None = os.getenv("FRONTEND_ORIGIN")
     vercel_preview_origin: str | None = os.getenv("VERCEL_PREVIEW_ORIGIN")
 
@@ -53,6 +58,8 @@ class AppConfig:
             "BREEZE_API_KEY": self.breeze_api_key,
             "BREEZE_SECRET_KEY": self.breeze_secret_key,
             "BREEZE_SESSION_TOKEN": self.breeze_session_token,
+            "STOCK_SCRIPT_CSV_PATH": self.stock_script_csv_path,
+            "SECURITY_MASTER_URL": self.security_master_url,
             "FRONTEND_ORIGIN": self.frontend_origin,
             "VERCEL_PREVIEW_ORIGIN": self.vercel_preview_origin,
             "CORS_ORIGINS": self.cors_origins,
