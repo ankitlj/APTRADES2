@@ -9,7 +9,9 @@ from .symbol_resolver import ResolvedInstrument, SymbolResolver, SymbolResolverE
 
 
 class QuoteServiceError(Exception):
-    pass
+    def __init__(self, message: str, *, resolved: ResolvedInstrument | None = None):
+        super().__init__(message)
+        self.resolved = resolved
 
 
 @dataclass(frozen=True)
@@ -37,9 +39,13 @@ class QuoteService:
                 right=request.right,
                 strike_price=request.strike_price,
             )
-            quote = self.gateway.get_quote(self._to_breeze_instrument(resolved))
-        except (SymbolResolverError, BreezeGatewayError) as error:
+        except SymbolResolverError as error:
             raise QuoteServiceError(str(error)) from error
+
+        try:
+            quote = self.gateway.get_quote(self._to_breeze_instrument(resolved))
+        except BreezeGatewayError as error:
+            raise QuoteServiceError(str(error), resolved=resolved) from error
 
         primary_quote = quote[0] if isinstance(quote, list) and quote else quote
         return {
@@ -59,6 +65,7 @@ class QuoteService:
                     {
                         "status": "error",
                         "symbol": request.symbol.upper(),
+                        "resolved": self._serialize_resolved(error.resolved) if error.resolved else None,
                         "exchange_code": request.exchange_code.upper(),
                         "product_type": (request.product_type or "").lower() or None,
                         "error": str(error),

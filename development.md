@@ -328,11 +328,36 @@
   - Quote freshness is still request/response based REST only; WebSocket live quotes arrive in a later phase.
   - Options-specific resolution beyond nearest futures is intentionally deferred until later phases.
 
+### 2026-06-08 - Phase 6 Hardening Fix: Current Futures Selection
+- Goal: Fix deployed NIFTY/BANKNIFTY resolver-backed quotes returning `No Data Found`.
+- Root cause:
+  - `StockScriptNew.csv` contains expired March/April/May 2026 NFO futures rows.
+  - The resolver ordered futures by earliest expiry without filtering out past expiries.
+  - Because the import includes both repo CSV and SecurityMaster rows, expired CSV contracts were selected ahead of current SecurityMaster contracts.
+  - Breeze correctly rejected those expired NFO contracts with `No Data Found`.
+- Backend changes:
+  - Updated futures resolution to prefer the nearest expiry on or after the current date.
+  - Kept a fallback to latest expired futures only if no active future exists.
+  - Updated quote error handling so a Breeze quote failure still returns the resolved contract metadata.
+  - Fixed `/api/debug/breeze-test` to handle unresolved error entries safely.
+- Verification:
+  - Reproduced the deployed API symptom with `POST /api/quotes/batch` returning `No Data Found` for NIFTY/BANKNIFTY.
+  - Ran a local SecurityMaster + repo CSV import and confirmed the previous resolver selected expired `30-MAR-2026` contracts.
+  - Confirmed the fixed resolver selects SecurityMaster `30-JUN-2026` contracts for:
+    - `NIFTY` -> `NIFTY~F:30-JUN-2026`
+    - `BANKNIFTY` -> `CNXBAN~F:30-JUN-2026`
+  - `python -m pytest` -> `24 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this commit.
+  - Refresh the dashboard and verify NIFTY/BANKNIFTY show resolved June 2026 futures instead of expired/unresolved errors.
+  - If Breeze still returns an error, use the resolved expiry/token shown in the response to determine whether the broker currently accepts that index future quote.
+
 ## Manual Tasks Pending
 - [ ] Retry the deployed master-contract import run after the HTTPS SecurityMaster deploy
 - [ ] Verify the deployed master-contract panel after import
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
-- [ ] Verify the deployed Phase 6 quote panel after Railway/Vercel finish deploying
+- [ ] Verify the deployed Phase 6 quote panel after Railway/Vercel finish deploying the current-futures fix
 - [ ] Keep Breeze secrets and session token only in env vars
 - [ ] Provide approval if external `Claude_Code` workspace file updates are required
 
@@ -383,6 +408,6 @@
 - Test command: `curl -X POST http://127.0.0.1:5000/api/quotes/batch -H "Content-Type: application/json" -d "{\"symbols\":[{\"symbol\":\"SBIN\",\"exchange\":\"NSE\"}]}" `
 
 ## Deployment Notes
-- Last commit: pending phase 6 quote-service commit
+- Last commit: pending phase 6 current-futures fix commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 6 resolver and quote contracts are verified locally
+- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 6 resolver and quote contracts are verified locally, including the expired-futures regression

@@ -4,6 +4,7 @@ from unittest.mock import patch
 from app import create_app
 from app.db import create_session_factory, ensure_tables
 from app.models import Instrument, InstrumentAlias
+from app.services.breeze_gateway import BreezeGatewayError
 
 
 def _seed_quote_data(database_url: str) -> None:
@@ -59,7 +60,24 @@ def _seed_quote_data(database_url: str) -> None:
             source="security_master",
             is_active=True,
         )
-        session.add_all([sbin, nifty_cash, nifty_future])
+        expired_nifty_future = Instrument(
+            exchange_code="NFO",
+            broker_symbol="NIFTY",
+            contract_code="NIFTY~F:30-Mar-2026",
+            display_symbol="NIFTY",
+            name="NIFTY EXPIRED FUTURE",
+            instrument_group="DERIVATIVE",
+            product_type="futures",
+            token="51714",
+            lot_size=50,
+            tick_size="0.05",
+            expiry_date=date(2026, 3, 30),
+            option_right="others",
+            strike_price="0",
+            source="stock_script_csv",
+            is_active=True,
+        )
+        session.add_all([sbin, nifty_cash, expired_nifty_future, nifty_future])
         session.flush()
         session.add_all(
             [
@@ -125,4 +143,26 @@ def test_batch_quotes_endpoint_returns_nfo_future_resolution(tmp_path):
     assert payload["status"] == "ok"
     assert payload["results"][0]["resolved"]["broker_symbol"] == "NIFTY"
     assert payload["results"][0]["resolved"]["exchange_code"] == "NFO"
+    assert payload["results"][0]["resolved"]["expiry_date"] == "2026-06-25"
+
+
+def test_batch_quotes_endpoint_keeps_resolved_contract_on_breeze_error(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'quotes.sqlite'}"
+    _seed_quote_data(database_url)
+
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote",
+        side_effect=BreezeGatewayError("No Data Found"),
+    ):
+        response = client.post(
+            "/api/quotes/batch",
+            json={"symbols": [{"symbol": "NIFTY", "exchange": "NFO", "product_type": "futures"}]},
+        )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "error"
+    assert payload["results"][0]["status"] == "error"
+    assert payload["results"][0]["error"] == "No Data Found"
+    assert payload["results"][0]["resolved"]["broker_symbol"] == "NIFTY"
     assert payload["results"][0]["resolved"]["expiry_date"] == "2026-06-25"

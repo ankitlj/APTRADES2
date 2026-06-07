@@ -74,7 +74,24 @@ def _seed_symbol_data(database_url: str) -> None:
             source="security_master",
             is_active=True,
         )
-        session.add_all([relind, sbin, cnxban_cash, cnxban_future])
+        expired_cnxban_future = Instrument(
+            exchange_code="NFO",
+            broker_symbol="CNXBAN",
+            contract_code="CNXBAN~F:30-Mar-2026",
+            display_symbol="BANKNIFTY",
+            name="NIFTY BANK EXPIRED FUTURE",
+            instrument_group="DERIVATIVE",
+            product_type="futures",
+            token="51701",
+            lot_size=30,
+            tick_size="0.05",
+            expiry_date=date(2026, 3, 30),
+            option_right="others",
+            strike_price="0",
+            source="stock_script_csv",
+            is_active=True,
+        )
+        session.add_all([relind, sbin, cnxban_cash, expired_cnxban_future, cnxban_future])
         session.flush()
         session.add_all(
             [

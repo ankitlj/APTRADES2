@@ -49,20 +49,22 @@ def breeze_test() -> tuple[object, int]:
         payload = {
             "status": payload["status"],
             "configured": _gateway().is_configured(),
-            "symbols": [
-                {
-                    "symbol": item["symbol"],
-                    "broker_symbol": item.get("resolved", {}).get("broker_symbol", item["symbol"]),
-                    "status": item["status"],
-                    "exchange": item.get("resolved", {}).get("exchange_code", item.get("exchange_code", "")),
-                    "product_type": item.get("resolved", {}).get("product_type", item.get("product_type", "")),
-                    "quote": item.get("quote"),
-                    "error": item.get("error"),
-                }
-                for item in payload["results"]
-            ],
+            "symbols": [_debug_symbol_payload(item) for item in payload["results"]],
         }
     except (BreezeGatewayError, QuoteServiceError) as error:
         return jsonify({"status": "error", "configured": _gateway().is_configured(), "error": str(error)}), 200
 
     return jsonify(payload), 200
+
+
+def _debug_symbol_payload(item: dict) -> dict:
+    resolved = item.get("resolved") or {}
+    return {
+        "symbol": item["symbol"],
+        "broker_symbol": resolved.get("broker_symbol", item["symbol"]),
+        "status": item["status"],
+        "exchange": resolved.get("exchange_code", item.get("exchange_code", "")),
+        "product_type": resolved.get("product_type", item.get("product_type", "")),
+        "quote": item.get("quote"),
+        "error": item.get("error"),
+    }

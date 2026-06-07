@@ -253,3 +253,26 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - Verified mappings in tests:
   - `SBIN` resolves to `STABAN` on `NSE`
   - `BANKNIFTY` resolves to `CNXBAN` on `NFO` futures with a real expiry
+
+## Phase 6 Current Futures Fix
+
+- Deployed dashboard showed cash quotes working but NIFTY/BANKNIFTY NFO futures returning `No Data Found`.
+- Root cause:
+  - `StockScriptNew.csv` includes expired March/April/May 2026 futures rows.
+  - The resolver selected the earliest expiry overall, so expired CSV futures won over current SecurityMaster futures.
+- Fixed futures resolution to select the nearest non-expired expiry first.
+- Kept fallback behavior for cases where only expired contracts exist.
+- Quote API error responses now preserve resolved contract metadata when Breeze rejects the quote, making future broker failures easier to diagnose.
+- Fixed `/api/debug/breeze-test` null handling for unresolved error rows.
+
+## Phase 6 Current Futures Verification
+
+- Reproduced deployed `No Data Found` for NIFTY/BANKNIFTY through `POST /api/quotes/batch`.
+- Local SecurityMaster + repo CSV import reproduced the old bad selections:
+  - `NIFTY~F:30-MAR-2026`
+  - `CNXBAN~F:30-MAR-2026`
+- After the fix, local resolver selects:
+  - `NIFTY~F:30-JUN-2026`
+  - `CNXBAN~F:30-JUN-2026`
+- `python -m pytest` passed: `24 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial.

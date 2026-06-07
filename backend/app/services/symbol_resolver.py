@@ -159,9 +159,20 @@ class SymbolResolver:
         if expiry_date is not None:
             statement = statement.where(Instrument.expiry_date == expiry_date)
         elif product_type == "futures":
+            upcoming_statement = statement.where(
+                Instrument.expiry_date.is_not(None),
+                Instrument.expiry_date >= date.today(),
+            ).order_by(
+                Instrument.expiry_date.asc(),
+                Instrument.updated_at.desc(),
+            )
+            instrument = session.scalars(upcoming_statement).first()
+            if instrument:
+                return instrument
+
             statement = statement.order_by(
                 Instrument.expiry_date.is_(None),
-                Instrument.expiry_date.asc(),
+                Instrument.expiry_date.desc(),
                 Instrument.updated_at.desc(),
             )
 
