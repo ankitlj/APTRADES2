@@ -1,0 +1,20 @@
+[project]
+name = "aptrades2-backend"
+version = "0.1.0"
+description = "APTRADES v2 Flask backend skeleton"
+requires-python = ">=3.10"
+dependencies = [
+  "Flask>=3.0,<4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0,<9.0",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
