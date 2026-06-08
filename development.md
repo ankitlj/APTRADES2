@@ -431,6 +431,26 @@
     - chart loads instead of `500`
     - positions shows an empty state when Breeze has no open positions instead of an error panel
 
+### 2026-06-08 - Phase 7: Vercel SPA Routing Fix
+- Goal: Restore deployed frontend access after direct navigation to `/dashboard` started returning a Vercel `404 NOT_FOUND` page.
+- Root cause:
+  - The frontend uses `BrowserRouter`, but the Vercel frontend root had no SPA rewrite rule.
+  - A direct request to `/dashboard` was handled by Vercel as a file lookup instead of serving `index.html`.
+- Frontend changes:
+  - Added `frontend/vercel.json` with a catch-all rewrite to `index.html`.
+- Files changed:
+  - `frontend/vercel.json`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Confirmed the frontend uses `BrowserRouter` in `frontend/src/main.tsx`.
+  - Confirmed routes include `/dashboard` in `frontend/src/App.tsx`.
+  - Frontend build verification pending after config update.
+- Manual user tasks:
+  - Wait for Vercel to redeploy this commit.
+  - Re-open `https://aptrades-2.vercel.app/dashboard`.
+  - Confirm the Vercel 404 page is replaced by the React dashboard shell.
+
 ## Manual Tasks Pending
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Verify the deployed Phase 7 dashboard page after Railway/Vercel finish deploying

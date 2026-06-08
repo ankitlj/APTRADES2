@@ -328,3 +328,18 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
   - dashboard chart loads instead of `500`
   - alerts load normally
   - positions panel shows empty-state messaging when there are no open Breeze positions
+
+## Phase 7 Vercel SPA Routing Fix
+
+- Directly opening `https://aptrades-2.vercel.app/dashboard` returned a Vercel `404 NOT_FOUND` page.
+- Root cause:
+  - frontend uses `BrowserRouter`
+  - Vercel frontend root had no rewrite sending unknown paths back to `index.html`
+- Fixed:
+  - added `frontend/vercel.json` with a catch-all rewrite to `index.html`
+
+## Phase 7 Vercel SPA Routing Verification
+
+- Confirmed `/dashboard` is a client route in `frontend/src/App.tsx`
+- Confirmed the app mounts with `BrowserRouter` in `frontend/src/main.tsx`
+- Frontend build re-run pending for this config-only deploy fix
