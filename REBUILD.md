@@ -377,3 +377,25 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 ## Phase 7 Breeze Chart Interval Verification
 
 - `python -m pytest` passed: `28 passed`
+
+## Phase 8 Orderbook and Tradebook
+
+- Added Breeze-backed order/trade API contracts:
+  - `GET /api/orders`
+  - `POST /api/orders/cancel`
+  - `POST /api/orders/cancel-all`
+  - `GET /api/trades`
+- Extended `BreezeGateway` for:
+  - order list
+  - cancel order
+  - trade list
+- Added normalized backend services so frontend pages consume consistent rows and stats instead of raw Breeze payloads.
+- Implemented `/orderbook` and `/tradebook` pages in the frontend and removed those placeholders.
+- Added compact table layouts, filters, refresh, CSV export, and orderbook cancel actions.
+
+## Phase 8 Verification
+
+- `python -m pytest` passed: `32 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+- Added response examples to `development.md`
+- Live broker cancel actions were implemented but not executed against the real account in this phase

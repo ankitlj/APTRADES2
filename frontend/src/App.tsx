@@ -2,12 +2,12 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
+import { OrderbookPage } from "./pages/OrderbookPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { TradebookPage } from "./pages/TradebookPage";
 
 const pages = [
   { path: "/dashboard", title: "Dashboard", description: "The main APTRADES dashboard now runs through backend contracts." },
-  { path: "/orderbook", title: "Orderbook", description: "Compact Breeze-backed orders table lands in a later phase." },
-  { path: "/tradebook", title: "Tradebook", description: "Normalized Breeze trades page starts after backend contracts." },
   { path: "/positions", title: "Positions", description: "Live quote enrichment begins after QuoteService exists." },
   { path: "/action-centre", title: "Action Centre", description: "Approval and review workflow comes after trading pages." },
   { path: "/strategy", title: "Strategy", description: "Strategy Builder and Strategy Portfolio stay under Tools in MVP." },
@@ -21,8 +21,10 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/orderbook" element={<OrderbookPage />} />
+        <Route path="/tradebook" element={<TradebookPage />} />
         {pages
-          .filter((page) => page.path !== "/dashboard")
+          .filter((page) => !["/dashboard", "/orderbook", "/tradebook"].includes(page.path))
           .map((page) => (
             <Route
               key={page.path}

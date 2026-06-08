@@ -125,6 +125,53 @@ class BreezeGateway:
             raise BreezeGatewayError(response.get("Error") or "Breeze portfolio positions response missing Success field")
         return success
 
+    def get_order_list(self, *, exchange_code: str, from_date: datetime, to_date: datetime) -> Any:
+        payload = {
+            "exchange_code": exchange_code,
+            "from_date": self._format_datetime(from_date),
+            "to_date": self._format_datetime(to_date),
+        }
+        response = self._request("GET", "/orderlist", payload, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze order list response missing Success field")
+        return success
+
+    def cancel_order(self, *, exchange_code: str, order_id: str) -> Any:
+        payload = {
+            "exchange_code": exchange_code,
+            "order_id": order_id,
+        }
+        response = self._request("DELETE", "/cancelorder", payload, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze cancel order response missing Success field")
+        return success
+
+    def get_trade_list(
+        self,
+        *,
+        from_date: datetime,
+        to_date: datetime,
+        exchange_code: str,
+        product_type: str = "",
+        action: str = "",
+        stock_code: str = "",
+    ) -> Any:
+        payload = {
+            "from_date": self._format_datetime(from_date),
+            "to_date": self._format_datetime(to_date),
+            "exchange_code": exchange_code,
+            "product_type": product_type,
+            "action": action,
+            "stock_code": stock_code,
+        }
+        response = self._request("GET", "/tradelist", payload, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze trade list response missing Success field")
+        return success
+
     def get_historical_charts(
         self,
         instrument: BreezeInstrument,

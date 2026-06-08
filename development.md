@@ -504,6 +504,94 @@
   - Refresh `/dashboard`.
   - Confirm the chart panel renders instead of the Breeze interval validation error.
 
+### 2026-06-08 - Phase 8: Orderbook and Tradebook
+- Goal: Build broker order/trade pages with compact tables.
+- Backend changes:
+  - Added `GET /api/orders`.
+  - Added `POST /api/orders/cancel`.
+  - Added `POST /api/orders/cancel-all`.
+  - Added `GET /api/trades`.
+  - Extended `BreezeGateway` with:
+    - `get_order_list`
+    - `cancel_order`
+    - `get_trade_list`
+  - Added normalized `OrdersService` and `TradesService` so the frontend is not tied to raw Breeze response keys.
+  - `cancel-all` only targets cancellable order states such as open, pending, ordered, partially executed, requested, and trigger-pending.
+- Frontend changes:
+  - Replaced `/orderbook` placeholder with a real Orderbook page.
+  - Added:
+    - page header/subtitle
+    - filter toolbar
+    - refresh
+    - export CSV
+    - cancel all action
+    - orders-only tab strip
+    - order stats cards
+    - compact orders table with row cancel actions
+  - Replaced `/tradebook` placeholder with a real Tradebook page.
+  - Added:
+    - page header/toolbar
+    - exchange/action filters
+    - refresh
+    - export CSV
+    - trade stats cards
+    - compact trade table
+  - Updated topbar phase label for the current app phase.
+- Files changed:
+  - `backend/app/api/orders.py`
+  - `backend/app/factory.py`
+  - `backend/app/services/breeze_gateway.py`
+  - `backend/app/services/orders_service.py`
+  - `backend/app/services/trades_service.py`
+  - `backend/tests/test_orders_contract.py`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/index.css`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/OrderbookPage.tsx`
+  - `frontend/src/pages/TradebookPage.tsx`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Re-read the Phase 8 section in the master playbook before implementation.
+  - `python -m pytest` -> `32 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+  - Contract tests cover:
+    - normalized orders payload and stats
+    - single cancel payload
+    - cancel-all only targeting open/pending orders
+    - normalized trades payload and stats
+- Real order/trade action note:
+  - Live Breeze cancel actions were implemented but not executed against the real broker account in this phase.
+  - They remain untested against production broker state until you intentionally approve live order-action testing.
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this Phase 8 commit.
+  - Verify `/orderbook` renders filters, stats, and a compact table.
+  - Verify `/tradebook` renders stats and a compact table.
+  - Do not place or cancel real orders unless intentionally testing order actions.
+
+## Phase 8 Response Examples
+
+- Endpoint: `GET /api/orders`
+- Response example:
+  - `{ "status": "ok", "exchange_code": "NFO", "stats": { "total": 2, "completed": 1, "open": 1, "rejected": 0, "cancelled": 0 }, "orders": [{ "order_id": "1001", "symbol": "NIFTY", "status": "Open", "status_normalized": "open", "quantity": 50.0 }] }`
+
+- Endpoint: `POST /api/orders/cancel`
+- Request example:
+  - `{ "exchange_code": "NFO", "order_id": "1001" }`
+- Response example:
+  - `{ "status": "ok", "exchange_code": "NFO", "order_id": "1001", "result": { "message": "Order cancellation requested" } }`
+
+- Endpoint: `POST /api/orders/cancel-all`
+- Request example:
+  - `{ "exchange_code": "NFO" }`
+- Response example:
+  - `{ "status": "ok", "requested": 2, "cancelled_count": 2, "error_count": 0, "cancelled": [{ "order_id": "1001", "status": "ok" }], "errors": [] }`
+
+- Endpoint: `GET /api/trades`
+- Response example:
+  - `{ "status": "ok", "exchange_code": "NFO", "stats": { "total": 2, "buy": 1, "sell": 1 }, "trades": [{ "trade_id": "T1", "order_id": "1001", "symbol": "NIFTY", "action": "BUY", "quantity": 50.0, "price": 23270.5 }] }`
+
 ## Manual Tasks Pending
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Verify the deployed Phase 7 dashboard page after Railway/Vercel finish deploying

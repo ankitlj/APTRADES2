@@ -419,6 +419,158 @@ select {
   gap: 2px;
 }
 
+.route-page {
+  max-width: 1500px;
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+}
+
+.route-header h3 {
+  margin: 6px 0 0;
+  font-size: 1.6rem;
+}
+
+.route-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.route-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.toolbar-group,
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toolbar-field {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.toolbar-field span {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.toolbar-field select {
+  min-width: 132px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: #111827;
+}
+
+.toolbar-button,
+.row-action {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: #111827;
+  cursor: pointer;
+}
+
+.toolbar-button:hover,
+.row-action:hover {
+  background: var(--surface-muted);
+}
+
+.toolbar-button-danger {
+  border-color: rgba(220, 38, 38, 0.2);
+  color: var(--negative);
+}
+
+.toolbar-button:disabled,
+.row-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tab-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tab-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.tab-chip-active {
+  background: #111827;
+  color: #ffffff;
+}
+
+.stats-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.stats-grid-orders {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.stats-grid-trades {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stat-card {
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: 0.92rem;
+}
+
+.data-table th {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.data-table .numeric {
+  text-align: right;
+}
+
+.data-table-orders {
+  min-width: 1200px;
+}
+
+.data-table-trades {
+  min-width: 900px;
+}
+
 .table-symbol strong {
   font-size: 0.95rem;
 }
