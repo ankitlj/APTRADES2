@@ -305,3 +305,26 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
   - chart
 - `python -m pytest` passed: `27 passed`
 - `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial.
+
+## Phase 7 Railway Runtime Fix
+
+- Railway logs showed deployed Phase 7 was still incomplete:
+  - `GET /api/dashboard/chart` returned `500`
+  - Breeze `No Positions available.` surfaced as a dashboard error instead of an empty state
+- Root cause:
+  - chart code passed a `ResolvedInstrument` directly into the Breeze historical-chart gateway path
+  - the gateway expects a normalized Breeze request instrument exposing `stock_code`
+- Fixed:
+  - dashboard chart now converts the resolved symbol through the shared quote-to-Breeze adapter before calling Breeze
+  - positions service now treats `No Positions available.` as `status = ok` with zero totals and an empty list
+  - dashboard contract tests now lock in both behaviors
+
+## Phase 7 Railway Runtime Verification
+
+- Reviewed Railway traceback confirming:
+  - `AttributeError: 'ResolvedInstrument' object has no attribute 'stock_code'`
+- `python -m pytest` passed: `28 passed`
+- After deploy, expected user-visible result:
+  - dashboard chart loads instead of `500`
+  - alerts load normally
+  - positions panel shows empty-state messaging when there are no open Breeze positions

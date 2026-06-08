@@ -403,6 +403,34 @@
   - The chart currently uses daily historical candles for `NIFTY`; intraday/live charting remains part of the later WebSocket/live-data phase.
   - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` still cannot be updated from this workspace because it is outside the writable roots.
 
+### 2026-06-08 - Phase 7: Railway Runtime Fix
+- Goal: Complete Phase 7 on deployed Railway/Vercel after production logs exposed runtime mismatches that local happy-path tests had missed.
+- Root cause:
+  - `GET /api/dashboard/chart` passed a `ResolvedInstrument` into `BreezeGateway.get_historical_charts()`, but the Breeze gateway expects a normalized request object with `stock_code`.
+  - Breeze `No Positions available.` was being treated as a dashboard failure instead of the intended empty-state response.
+- Backend changes:
+  - Updated dashboard chart generation to convert resolved symbols through the shared quote-to-Breeze adapter before calling Breeze historical charts.
+  - Updated `PositionsService` so `No Positions available.` returns `status = ok`, zero totals, and an empty positions list.
+  - Strengthened dashboard contract tests so chart requests assert the normalized Breeze instrument and alerts assert the no-positions empty state.
+- Files changed:
+  - `backend/app/services/dashboard_service.py`
+  - `backend/app/services/positions_service.py`
+  - `backend/tests/test_dashboard_contract.py`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Reviewed Railway production traceback for `/api/dashboard/chart`:
+    - `AttributeError: 'ResolvedInstrument' object has no attribute 'stock_code'`
+  - Re-ran backend tests after the fix:
+    - `python -m pytest` -> `28 passed`
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this fix commit.
+  - Refresh `/dashboard` and confirm:
+    - summary metrics load
+    - alerts load
+    - chart loads instead of `500`
+    - positions shows an empty state when Breeze has no open positions instead of an error panel
+
 ## Manual Tasks Pending
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Verify the deployed Phase 7 dashboard page after Railway/Vercel finish deploying

@@ -46,6 +46,17 @@ class PositionsService:
         try:
             raw_positions = self.gateway.get_portfolio_positions()
         except BreezeGatewayError as error:
+            if "No Positions" in str(error):
+                return {
+                    "status": "ok",
+                    "positions": [],
+                    "totals": {
+                        "open_positions": 0,
+                        "long_positions": 0,
+                        "short_positions": 0,
+                        "total_pnl": 0.0,
+                    },
+                }
             raise PositionsServiceError(str(error)) from error
 
         normalized = [self._normalize_position(item) for item in raw_positions if isinstance(item, dict)]

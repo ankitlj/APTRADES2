@@ -169,7 +169,7 @@ class DashboardService:
         to_date = datetime.now(timezone.utc)
         try:
             candles = self.gateway.get_historical_charts(
-                resolved,
+                QuoteService._to_breeze_instrument(resolved),
                 interval="1day",
                 from_date=from_date,
                 to_date=to_date,

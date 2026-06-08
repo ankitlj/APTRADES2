@@ -4,6 +4,7 @@ from unittest.mock import patch
 from app import create_app
 from app.db import create_session_factory, ensure_tables
 from app.models import Instrument, InstrumentAlias, MasterContractRun
+from app.services.breeze_gateway import BreezeGatewayError
 
 
 def _seed_dashboard_data(database_url: str) -> None:
@@ -207,16 +208,44 @@ def test_dashboard_alerts_endpoint_returns_real_status_messages(tmp_path):
     assert any(alert["title"] == "Master contract loaded" for alert in payload["alerts"])
 
 
-def test_dashboard_chart_endpoint_returns_normalized_points(tmp_path):
+def test_dashboard_alerts_endpoint_treats_no_positions_as_empty_state(tmp_path):
     database_url = f"sqlite:///{tmp_path / 'dashboard.sqlite'}"
     _seed_dashboard_data(database_url)
 
     with _client_with_db(database_url) as client, patch(
-        "app.services.breeze_gateway.BreezeGateway.get_historical_charts",
-        return_value=[
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.auth_diagnostic",
+        return_value={"status": "ok", "user_id": "AJ510524", "configured": True, "session_token_received": True},
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_portfolio_positions",
+        side_effect=BreezeGatewayError("No Positions available."),
+    ):
+        response = client.get("/api/dashboard/alerts")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert any(alert["title"] == "No active positions" for alert in payload["alerts"])
+
+
+def test_dashboard_chart_endpoint_returns_normalized_points(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'dashboard.sqlite'}"
+    _seed_dashboard_data(database_url)
+
+    def _chart_response(instrument, **kwargs):
+        assert instrument.stock_code == "NIFTY"
+        assert instrument.exchange_code == "NSE"
+        assert kwargs["interval"] == "1day"
+        return [
             {"datetime": "2026-06-05T00:00:00.000Z", "open": 23210.0, "high": 23490.0, "low": 23180.0, "close": 23420.0, "volume": 1200},
             {"datetime": "2026-06-06T00:00:00.000Z", "open": 23420.0, "high": 23510.0, "low": 23320.0, "close": 23440.0, "volume": 1180},
-        ],
+        ]
+
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.get_historical_charts",
+        side_effect=_chart_response,
     ):
         response = client.get("/api/dashboard/chart?symbol=NIFTY")
 
