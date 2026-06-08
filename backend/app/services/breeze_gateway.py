@@ -131,7 +131,7 @@ class BreezeGateway:
             "from_date": self._format_datetime(from_date),
             "to_date": self._format_datetime(to_date),
         }
-        response = self._request("GET", "/orderlist", payload, requires_auth=True)
+        response = self._request("GET", "/order", payload, requires_auth=True)
         success = response.get("Success")
         if success is None:
             raise BreezeGatewayError(response.get("Error") or "Breeze order list response missing Success field")
@@ -142,7 +142,7 @@ class BreezeGateway:
             "exchange_code": exchange_code,
             "order_id": order_id,
         }
-        response = self._request("DELETE", "/cancelorder", payload, requires_auth=True)
+        response = self._request("DELETE", "/order", payload, requires_auth=True)
         success = response.get("Success")
         if success is None:
             raise BreezeGatewayError(response.get("Error") or "Breeze cancel order response missing Success field")
@@ -166,7 +166,7 @@ class BreezeGateway:
             "action": action,
             "stock_code": stock_code,
         }
-        response = self._request("GET", "/tradelist", payload, requires_auth=True)
+        response = self._request("GET", "/trades", payload, requires_auth=True)
         success = response.get("Success")
         if success is None:
             raise BreezeGatewayError(response.get("Error") or "Breeze trade list response missing Success field")

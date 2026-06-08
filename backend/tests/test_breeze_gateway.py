@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 
 from app.services.breeze_gateway import BreezeGateway, BreezeGatewayError, BreezeInstrument
@@ -81,3 +82,66 @@ def test_request_raises_clear_error_after_retries():
 
     assert "Breeze request failed for /customerdetails" in str(response_error)
     assert sleep_mock.call_count == 2
+
+
+def test_get_order_list_calls_breeze_order_endpoint():
+    gateway = BreezeGateway(app_key="app-key", secret_key="secret-key", session_token="api-session")
+    customer_response = Mock()
+    customer_response.raise_for_status.return_value = None
+    customer_response.json.return_value = {"Success": {"session_token": "customer-session"}}
+    orders_response = Mock()
+    orders_response.raise_for_status.return_value = None
+    orders_response.json.return_value = {"Success": []}
+
+    with patch(
+        "app.services.breeze_gateway.requests.request",
+        side_effect=[customer_response, orders_response],
+    ) as request_mock:
+        gateway.get_order_list(
+            exchange_code="NFO",
+            from_date=datetime(2026, 6, 8, tzinfo=timezone.utc),
+            to_date=datetime(2026, 6, 8, 23, 59, tzinfo=timezone.utc),
+        )
+
+    assert request_mock.call_args_list[1].args[1].endswith("/order")
+
+
+def test_cancel_order_calls_breeze_order_delete_endpoint():
+    gateway = BreezeGateway(app_key="app-key", secret_key="secret-key", session_token="api-session")
+    customer_response = Mock()
+    customer_response.raise_for_status.return_value = None
+    customer_response.json.return_value = {"Success": {"session_token": "customer-session"}}
+    cancel_response = Mock()
+    cancel_response.raise_for_status.return_value = None
+    cancel_response.json.return_value = {"Success": {"message": "ok"}}
+
+    with patch(
+        "app.services.breeze_gateway.requests.request",
+        side_effect=[customer_response, cancel_response],
+    ) as request_mock:
+        gateway.cancel_order(exchange_code="NFO", order_id="1001")
+
+    assert request_mock.call_args_list[1].args[0] == "DELETE"
+    assert request_mock.call_args_list[1].args[1].endswith("/order")
+
+
+def test_get_trade_list_calls_breeze_trades_endpoint():
+    gateway = BreezeGateway(app_key="app-key", secret_key="secret-key", session_token="api-session")
+    customer_response = Mock()
+    customer_response.raise_for_status.return_value = None
+    customer_response.json.return_value = {"Success": {"session_token": "customer-session"}}
+    trades_response = Mock()
+    trades_response.raise_for_status.return_value = None
+    trades_response.json.return_value = {"Success": []}
+
+    with patch(
+        "app.services.breeze_gateway.requests.request",
+        side_effect=[customer_response, trades_response],
+    ) as request_mock:
+        gateway.get_trade_list(
+            exchange_code="NFO",
+            from_date=datetime(2026, 6, 8, tzinfo=timezone.utc),
+            to_date=datetime(2026, 6, 8, 23, 59, tzinfo=timezone.utc),
+        )
+
+    assert request_mock.call_args_list[1].args[1].endswith("/trades")

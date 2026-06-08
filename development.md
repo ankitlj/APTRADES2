@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 7 - Dashboard
-- Last completed phase: Phase 7 - Dashboard
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, and the Phase 7 dashboard contracts are implemented locally
+- Current phase: Phase 8 - Orderbook and Tradebook
+- Last completed phase: Phase 8 - Orderbook and Tradebook
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, and Phase 8 orderbook/tradebook runtime fix is ready for redeploy
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -569,6 +569,33 @@
   - Verify `/orderbook` renders filters, stats, and a compact table.
   - Verify `/tradebook` renders stats and a compact table.
   - Do not place or cancel real orders unless intentionally testing order actions.
+
+### 2026-06-08 - Phase 8: Breeze Orders/Trades Endpoint Runtime Fix
+- Goal: Complete deployed Phase 8 after Railway showed live Breeze `404 Not Found` errors for orderbook and tradebook requests.
+- Root cause:
+  - The first Phase 8 implementation used incorrect Breeze REST paths:
+    - `/orderlist`
+    - `/cancelorder`
+    - `/tradelist`
+  - Live Railway calls therefore failed even though local contract tests passed, because those tests mocked the gateway methods and did not lock down the actual Breeze endpoint paths.
+- Backend changes:
+  - Updated `BreezeGateway.get_order_list()` to call `/order`.
+  - Updated `BreezeGateway.cancel_order()` to send `DELETE /order`.
+  - Updated `BreezeGateway.get_trade_list()` to call `/trades`.
+  - Added gateway regression tests so future changes must keep the live Breeze order/trade endpoint paths intact.
+- Files changed:
+  - `backend/app/services/breeze_gateway.py`
+  - `backend/tests/test_breeze_gateway.py`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - `python -m pytest` -> `35 passed`
+- Manual user tasks:
+  - Wait for Railway to redeploy this fix commit.
+  - Refresh `/orderbook` and `/tradebook`.
+  - Confirm the prior Breeze `404 Not Found` errors are gone.
+- Remaining risks:
+  - Real broker order/trade payload shape may still vary by account state, but the REST paths are now aligned with the deployed Breeze API contract.
 
 ## Phase 8 Response Examples
 

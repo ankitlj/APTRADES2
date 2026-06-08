@@ -399,3 +399,21 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
 - Added response examples to `development.md`
 - Live broker cancel actions were implemented but not executed against the real account in this phase
+
+## Phase 8 Runtime Fix
+
+- Railway runtime showed live Breeze `404 Not Found` errors for:
+  - `/api/orders`
+  - `/api/trades`
+- Root cause:
+  - `BreezeGateway` used the wrong REST paths for live Breeze order/trade APIs.
+  - Local Phase 8 contract tests mocked the gateway and therefore did not catch the path mismatch.
+- Fixed:
+  - order list -> `/order`
+  - cancel order -> `DELETE /order`
+  - trade list -> `/trades`
+- Added gateway regression tests that assert those exact live Breeze endpoint paths.
+
+## Phase 8 Runtime Fix Verification
+
+- `python -m pytest` passed: `35 passed`
