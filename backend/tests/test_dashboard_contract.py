@@ -239,7 +239,7 @@ def test_dashboard_chart_endpoint_returns_normalized_points(tmp_path):
         assert instrument.exchange_code == "NFO"
         assert instrument.product_type == "futures"
         assert instrument.expiry_date.endswith("T06:00:00.000Z")
-        assert kwargs["interval"] == "1day"
+        assert kwargs["interval"] == "day"
         return [
             {"datetime": "2026-06-05T00:00:00.000Z", "open": 23210.0, "high": 23490.0, "low": 23180.0, "close": 23420.0, "volume": 1200},
             {"datetime": "2026-06-06T00:00:00.000Z", "open": 23420.0, "high": 23510.0, "low": 23320.0, "close": 23440.0, "volume": 1180},
@@ -255,6 +255,7 @@ def test_dashboard_chart_endpoint_returns_normalized_points(tmp_path):
     payload = response.get_json()
     assert payload["status"] == "ok"
     assert payload["symbol"] == "NIFTY"
+    assert payload["interval"] == "day"
     assert payload["resolved"]["broker_symbol"] == "NIFTY"
     assert len(payload["points"]) == 2
     assert payload["points"][1]["close"] == 23440.0

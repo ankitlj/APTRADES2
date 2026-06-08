@@ -484,6 +484,26 @@
     - chart panel no longer fails because of the wrong instrument path
     - alerts and positions no longer inherit chart errors when their own endpoints are healthy
 
+### 2026-06-08 - Phase 7: Breeze Chart Interval Fix
+- Goal: Close the final remaining Phase 7 dashboard error after summary and alerts were working but the chart still showed a Breeze validation message.
+- Root cause:
+  - Breeze historical charts rejected `interval = 1day`.
+  - The deployed backend needed Breeze's accepted daily interval token: `day`.
+- Backend changes:
+  - Updated dashboard chart requests from `1day` to `day`.
+  - Updated chart contract tests to assert the Breeze interval value and the API response interval.
+- Files changed:
+  - `backend/app/services/dashboard_service.py`
+  - `backend/tests/test_dashboard_contract.py`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - `python -m pytest` -> `28 passed`
+- Manual user tasks:
+  - Wait for Railway to deploy this final Phase 7 fix.
+  - Refresh `/dashboard`.
+  - Confirm the chart panel renders instead of the Breeze interval validation error.
+
 ## Manual Tasks Pending
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Verify the deployed Phase 7 dashboard page after Railway/Vercel finish deploying

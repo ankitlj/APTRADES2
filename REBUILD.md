@@ -362,3 +362,18 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 - `python -m pytest` passed: `28 passed`
 - `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+
+## Phase 7 Breeze Chart Interval Fix
+
+- After the chart resolution fix, Breeze still rejected the chart request with:
+  - `Interval should be either 'minute', '5minute', '30minute', or 'day'.`
+- Root cause:
+  - dashboard chart used `1day`
+  - Breeze expects `day`
+- Fixed:
+  - changed dashboard chart interval to `day`
+  - updated tests to lock in the Breeze interval contract
+
+## Phase 7 Breeze Chart Interval Verification
+
+- `python -m pytest` passed: `28 passed`

@@ -171,7 +171,7 @@ class DashboardService:
         try:
             candles = self.gateway.get_historical_charts(
                 QuoteService._to_breeze_instrument(resolved),
-                interval="1day",
+                interval="day",
                 from_date=from_date,
                 to_date=to_date,
             )
@@ -183,7 +183,7 @@ class DashboardService:
             "status": "ok",
             "symbol": normalized_symbol,
             "resolved": self._serialize_resolved(resolved),
-            "interval": "1day",
+            "interval": "day",
             "points": points,
         }
 
