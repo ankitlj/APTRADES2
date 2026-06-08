@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 6 - SymbolResolver and Quote Service
-- Last completed phase: Phase 5 - Master Contract Import
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, and Phase 6 quote APIs are implemented locally
+- Current phase: Phase 7 - Dashboard
+- Last completed phase: Phase 7 - Dashboard
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, and the Phase 7 dashboard contracts are implemented locally
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -353,11 +353,59 @@
   - Refresh the dashboard and verify NIFTY/BANKNIFTY show resolved June 2026 futures instead of expired/unresolved errors.
   - If Breeze still returns an error, use the resolved expiry/token shown in the response to determine whether the broker currently accepts that index future quote.
 
+### 2026-06-08 - Phase 7: Dashboard
+- Goal: Build the main APTRADES dashboard with real backend contracts instead of Phase 6 diagnostics cards.
+- Backend changes:
+  - Added `GET /api/dashboard/summary`.
+  - Added `GET /api/dashboard/alerts`.
+  - Added `GET /api/dashboard/chart?symbol=NIFTY`.
+  - Extended `BreezeGateway` with read-only `portfoliopositions` and `historicalcharts` calls.
+  - Added a minimal `PositionsService` for normalized active positions snapshots.
+  - Added a `DashboardService` that composes quote, positions, Breeze auth, master-contract, and chart data into one dashboard contract.
+- Frontend changes:
+  - Replaced the Phase 6 diagnostics-heavy dashboard with:
+    - four metric cards
+    - a chart panel
+    - an alerts panel
+    - an active positions table
+  - Added a dashboard-only topbar market ticker.
+  - Added a `/dashboard` route and redirected `/` to it.
+  - Preserved explicit loading, error, empty, and success states across all dashboard panels.
+- Files changed:
+  - `backend/app/factory.py`
+  - `backend/app/api/dashboard.py`
+  - `backend/app/services/breeze_gateway.py`
+  - `backend/app/services/dashboard_service.py`
+  - `backend/app/services/positions_service.py`
+  - `backend/tests/test_dashboard_contract.py`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/DashboardPage.tsx`
+  - `frontend/src/pages/PlaceholderPage.tsx`
+  - `frontend/src/index.css`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Re-read the Phase 7 dashboard section in the master playbook and the dashboard-related frontend design notes before coding.
+  - `python -m pytest` -> `27 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+  - Dashboard endpoint contract tests verify:
+    - summary metrics and active positions
+    - alerts payload
+    - normalized historical chart points
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this commit.
+  - Verify the deployed `/dashboard` visual layout.
+  - Confirm the topbar ticker appears only on the dashboard route.
+- Remaining risks:
+  - Dashboard positions depend on Breeze `portfoliopositions`; if Breeze returns no open positions, the table will correctly stay empty.
+  - The chart currently uses daily historical candles for `NIFTY`; intraday/live charting remains part of the later WebSocket/live-data phase.
+  - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` still cannot be updated from this workspace because it is outside the writable roots.
+
 ## Manual Tasks Pending
-- [ ] Retry the deployed master-contract import run after the HTTPS SecurityMaster deploy
-- [ ] Verify the deployed master-contract panel after import
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
-- [ ] Verify the deployed Phase 6 quote panel after Railway/Vercel finish deploying the current-futures fix
+- [ ] Verify the deployed Phase 7 dashboard page after Railway/Vercel finish deploying
 - [ ] Keep Breeze secrets and session token only in env vars
 - [ ] Provide approval if external `Claude_Code` workspace file updates are required
 
@@ -407,7 +455,22 @@
 - Response: `{ "status": "ok", "results": [{ "status": "ok", "symbol": "NIFTY", "resolved": { ... }, "quote": { ... } }] }`
 - Test command: `curl -X POST http://127.0.0.1:5000/api/quotes/batch -H "Content-Type: application/json" -d "{\"symbols\":[{\"symbol\":\"SBIN\",\"exchange\":\"NSE\"}]}" `
 
+- Endpoint: `GET /api/dashboard/summary`
+- Request: no body
+- Response: `{ "status": "ok", "metrics": [{ "key": "nifty", "label": "NIFTY futures", "value": 23440.0, ... }], "ticker": [{ "symbol": "NIFTY", "ltp": 23440.0, ... }], "positions": [{ "symbol": "SBIN", ... }] }`
+- Test command: `curl http://127.0.0.1:5000/api/dashboard/summary`
+
+- Endpoint: `GET /api/dashboard/alerts`
+- Request: no body
+- Response: `{ "status": "ok", "alerts": [{ "level": "success", "title": "Breeze session active", "message": "..." }] }`
+- Test command: `curl http://127.0.0.1:5000/api/dashboard/alerts`
+
+- Endpoint: `GET /api/dashboard/chart?symbol=NIFTY`
+- Request: query param `symbol`
+- Response: `{ "status": "ok", "symbol": "NIFTY", "resolved": { ... }, "interval": "1day", "points": [{ "time": "...", "close": 23440.0, ... }] }`
+- Test command: `curl "http://127.0.0.1:5000/api/dashboard/chart?symbol=NIFTY"`
+
 ## Deployment Notes
-- Last commit: pending phase 6 current-futures fix commit
+- Last commit: pending phase 7 dashboard commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 6 resolver and quote contracts are verified locally, including the expired-futures regression
+- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 7 dashboard contracts are verified locally through backend tests and a production frontend build

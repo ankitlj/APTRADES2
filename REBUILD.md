@@ -276,3 +276,32 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
   - `CNXBAN~F:30-JUN-2026`
 - `python -m pytest` passed: `24 passed`
 - `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial.
+
+## Phase 7 Dashboard
+
+- Built the first real dashboard page on top of backend contracts instead of diagnostic-only cards.
+- Added backend dashboard APIs:
+  - `GET /api/dashboard/summary`
+  - `GET /api/dashboard/alerts`
+  - `GET /api/dashboard/chart?symbol=NIFTY`
+- Added read-only Breeze gateway support for:
+  - `portfoliopositions`
+  - `historicalcharts`
+- Added a minimal `PositionsService` and a composed `DashboardService`.
+- Replaced the Phase 6 dashboard UI with:
+  - four metric cards
+  - market chart panel
+  - alerts panel
+  - active positions table
+- Added a dashboard-only topbar market ticker.
+- Added `/dashboard` route support with `/` redirecting there.
+
+## Phase 7 Verification
+
+- Re-read the Phase 7 playbook section and dashboard design constraints before implementation.
+- Added dashboard endpoint contract tests for:
+  - summary
+  - alerts
+  - chart
+- `python -m pytest` passed: `27 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial.

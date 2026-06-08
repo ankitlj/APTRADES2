@@ -6,6 +6,7 @@ from flask import Flask
 from flask.cli import AppGroup
 from flask_cors import CORS
 
+from .api.dashboard import dashboard_bp
 from .api.debug import debug_bp
 from .api.health import health_bp
 from .api.master_contract import master_contract_bp
@@ -48,5 +49,6 @@ def create_app() -> Flask:
     app.register_blueprint(debug_bp, url_prefix=config.api_prefix)
     app.register_blueprint(master_contract_bp, url_prefix=config.api_prefix)
     app.register_blueprint(quotes_bp, url_prefix=config.api_prefix)
+    app.register_blueprint(dashboard_bp, url_prefix=config.api_prefix)
     _register_cli(app)
     return app

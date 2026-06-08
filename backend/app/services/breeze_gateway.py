@@ -118,6 +118,38 @@ class BreezeGateway:
             raise BreezeGatewayError(response.get("Error") or "Breeze quotes response missing Success field")
         return success
 
+    def get_portfolio_positions(self) -> Any:
+        response = self._request("GET", "/portfoliopositions", {}, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze portfolio positions response missing Success field")
+        return success
+
+    def get_historical_charts(
+        self,
+        instrument: BreezeInstrument,
+        *,
+        interval: str,
+        from_date: datetime,
+        to_date: datetime,
+    ) -> Any:
+        payload = {
+            "stock_code": instrument.stock_code,
+            "exchange_code": instrument.exchange_code,
+            "product_type": instrument.product_type,
+            "expiry_date": instrument.expiry_date,
+            "right": instrument.right,
+            "strike_price": instrument.strike_price,
+            "interval": interval,
+            "from_date": self._format_datetime(from_date),
+            "to_date": self._format_datetime(to_date),
+        }
+        response = self._request("GET", "/historicalcharts", payload, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze historical charts response missing Success field")
+        return success
+
     def _request(self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool) -> dict[str, Any]:
         if requires_auth and not self.is_configured():
             raise BreezeGatewayError(f"Missing Breeze configuration: {', '.join(self._missing_fields())}")
@@ -176,7 +208,11 @@ class BreezeGateway:
 
     @staticmethod
     def _timestamp() -> str:
-        return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", ".000Z")
+        return BreezeGateway._format_datetime(datetime.now(timezone.utc))
+
+    @staticmethod
+    def _format_datetime(value: datetime) -> str:
+        return value.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", ".000Z")
 
     @staticmethod
     def _diagnostic_instruments() -> list[BreezeInstrument]:

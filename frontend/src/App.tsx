@@ -1,11 +1,11 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 
 const pages = [
-  { path: "/", title: "Dashboard", description: "Resolver-backed quotes and deployment checks start here." },
+  { path: "/dashboard", title: "Dashboard", description: "The main APTRADES dashboard now runs through backend contracts." },
   { path: "/orderbook", title: "Orderbook", description: "Compact Breeze-backed orders table lands in a later phase." },
   { path: "/tradebook", title: "Tradebook", description: "Normalized Breeze trades page starts after backend contracts." },
   { path: "/positions", title: "Positions", description: "Live quote enrichment begins after QuoteService exists." },
@@ -19,9 +19,10 @@ export default function App() {
   return (
     <AppShell>
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         {pages
-          .filter((page) => page.path !== "/")
+          .filter((page) => page.path !== "/dashboard")
           .map((page) => (
             <Route
               key={page.path}

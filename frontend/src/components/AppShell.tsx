@@ -1,8 +1,10 @@
+import { useEffect, useState, type PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import type { PropsWithChildren } from "react";
+
+import { getDashboardSummary, type DashboardSummaryResponse } from "../lib/api";
 
 const navigation = [
-  { to: "/", label: "Dashboard" },
+  { to: "/dashboard", label: "Dashboard" },
   { to: "/orderbook", label: "Orderbook" },
   { to: "/tradebook", label: "Tradebook" },
   { to: "/positions", label: "Positions" },
@@ -12,9 +14,46 @@ const navigation = [
   { to: "/tools", label: "Tools" },
 ];
 
+type TickerState = {
+  data: DashboardSummaryResponse | null;
+  loading: boolean;
+};
+
 export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation();
-  const currentPage = navigation.find((item) => item.to === location.pathname)?.label ?? "APTRADES v2";
+  const isDashboard = location.pathname === "/" || location.pathname === "/dashboard";
+  const currentPage = isDashboard
+    ? "Dashboard"
+    : navigation.find((item) => item.to === location.pathname)?.label ?? "APTRADES v2";
+  const [tickerState, setTickerState] = useState<TickerState>({ data: null, loading: isDashboard });
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!isDashboard) {
+      setTickerState({ data: null, loading: false });
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setTickerState({ data: null, loading: true });
+    getDashboardSummary()
+      .then((data) => {
+        if (isMounted) {
+          setTickerState({ data, loading: false });
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setTickerState({ data: null, loading: false });
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isDashboard]);
 
   return (
     <div className="app-shell">
@@ -39,13 +78,29 @@ export function AppShell({ children }: PropsWithChildren) {
       </aside>
       <div className="content-shell">
         <header className="topbar">
-          <div>
-            <p className="topbar-label">Current page</p>
-            <h2>{currentPage}</h2>
-          </div>
+          {isDashboard ? (
+            <div className="market-ticker" aria-label="Market ticker">
+              {tickerState.loading ? (
+                <span className="ticker-chip">Syncing market snapshot...</span>
+              ) : (
+                (tickerState.data?.ticker ?? []).map((item) => (
+                  <span key={item.symbol} className="ticker-chip">
+                    <strong>{item.symbol}</strong>
+                    <span>{item.ltp ?? "n/a"}</span>
+                    <em className={toneClassName(item.change_percent ?? 0)}>{item.change_percent ?? 0}%</em>
+                  </span>
+                ))
+              )}
+            </div>
+          ) : (
+            <div>
+              <p className="topbar-label">Current page</p>
+              <h2>{currentPage}</h2>
+            </div>
+          )}
           <div className="topbar-status">
             <span className="status-dot" />
-            Phase 6 quote service
+            Phase 7 dashboard
           </div>
         </header>
         <main className="main-content">{children}</main>
@@ -64,4 +119,14 @@ export function AppShell({ children }: PropsWithChildren) {
       </div>
     </div>
   );
+}
+
+function toneClassName(value: number) {
+  if (value > 0) {
+    return "tone-positive";
+  }
+  if (value < 0) {
+    return "tone-negative";
+  }
+  return "tone-neutral";
 }

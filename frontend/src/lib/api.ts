@@ -118,6 +118,90 @@ export interface MasterContractStatusResponse {
   verified_aliases?: MasterContractAlias[];
 }
 
+export interface DashboardMetric {
+  key: string;
+  label: string;
+  value: number | string | null;
+  change?: number | null;
+  previous_close?: number | null;
+  expiry_date?: string | null;
+  meta: string;
+  tone: string;
+  status?: string;
+}
+
+export interface DashboardTickerItem {
+  symbol: string;
+  broker_symbol?: string | null;
+  ltp: number | null;
+  change_percent: number | null;
+  status: string;
+}
+
+export interface DashboardPosition {
+  symbol: string;
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  quantity: number;
+  average_price: number | null;
+  ltp: number | null;
+  pnl: number | null;
+  expiry_date: string | null;
+  right: string | null;
+  strike_price: string | null;
+  segment: string | null;
+}
+
+export interface DashboardSummaryResponse {
+  status: string;
+  updated_at: string;
+  metrics: DashboardMetric[];
+  ticker: DashboardTickerItem[];
+  positions_status: string;
+  positions_error?: string | null;
+  positions: DashboardPosition[];
+}
+
+export interface DashboardAlert {
+  level: string;
+  title: string;
+  message: string;
+}
+
+export interface DashboardAlertsResponse {
+  status: string;
+  alerts: DashboardAlert[];
+}
+
+export interface DashboardChartResolved {
+  display_symbol: string;
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  token: string | null;
+  contract_code: string;
+  expiry_date: string | null;
+}
+
+export interface DashboardChartPoint {
+  time: string | null;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+}
+
+export interface DashboardChartResponse {
+  status: string;
+  symbol: string;
+  resolved: DashboardChartResolved;
+  interval: string;
+  points: DashboardChartPoint[];
+  error?: string;
+}
+
 const API_BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -182,4 +266,16 @@ export function getBatchQuotes(symbols: BatchQuoteRequestItem[]) {
     },
     body: JSON.stringify({ symbols }),
   });
+}
+
+export function getDashboardSummary() {
+  return requestJson<DashboardSummaryResponse>("/api/dashboard/summary");
+}
+
+export function getDashboardAlerts() {
+  return requestJson<DashboardAlertsResponse>("/api/dashboard/alerts");
+}
+
+export function getDashboardChart(symbol = "NIFTY") {
+  return requestJson<DashboardChartResponse>(`/api/dashboard/chart?symbol=${encodeURIComponent(symbol)}`);
 }
