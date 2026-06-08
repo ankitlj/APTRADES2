@@ -343,3 +343,22 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - Confirmed `/dashboard` is a client route in `frontend/src/App.tsx`
 - Confirmed the app mounts with `BrowserRouter` in `frontend/src/main.tsx`
 - Frontend build re-run pending for this config-only deploy fix
+
+## Phase 7 Chart Resolution and Panel Isolation Fix
+
+- After the routing fix, the dashboard shell loaded but:
+  - chart returned `400`
+  - alerts and positions showed the same `400` even though their backend endpoints were not necessarily failing
+- Root cause:
+  - chart resolved `NIFTY` through `NSE cash` instead of the verified `NFO futures` live quote path
+  - dashboard page used a single `Promise.all`, so one rejected request poisoned the other panel states
+  - frontend error handling only surfaced generic HTTP status text
+- Fixed:
+  - dashboard chart now resolves `NIFTY` and `BANKNIFTY` through `NFO futures`
+  - dashboard page now uses `Promise.allSettled` so each panel keeps its own success or failure state
+  - API client now reads backend JSON error payloads and surfaces the real message when available
+
+## Phase 7 Chart Resolution and Panel Isolation Verification
+
+- `python -m pytest` passed: `28 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial

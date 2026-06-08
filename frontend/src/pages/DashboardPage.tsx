@@ -215,27 +215,42 @@ export function DashboardPage() {
     let isMounted = true;
 
     async function load() {
-      try {
-        const [summary, alerts, chart] = await Promise.all([
-          getDashboardSummary(),
-          getDashboardAlerts(),
-          getDashboardChart("NIFTY"),
-        ]);
-        if (!isMounted) {
-          return;
-        }
-        setSummaryState({ data: summary, loading: false, error: null });
-        setAlertsState({ data: alerts, loading: false, error: null });
-        setChartState({ data: chart, loading: false, error: null });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Unknown error";
-        if (!isMounted) {
-          return;
-        }
-        setSummaryState({ data: null, loading: false, error: message });
-        setAlertsState({ data: null, loading: false, error: message });
-        setChartState({ data: null, loading: false, error: message });
+      const [summaryResult, alertsResult, chartResult] = await Promise.allSettled([
+        getDashboardSummary(),
+        getDashboardAlerts(),
+        getDashboardChart("NIFTY"),
+      ]);
+      if (!isMounted) {
+        return;
       }
+
+      setSummaryState(
+        summaryResult.status === "fulfilled"
+          ? { data: summaryResult.value, loading: false, error: null }
+          : {
+              data: null,
+              loading: false,
+              error: summaryResult.reason instanceof Error ? summaryResult.reason.message : "Unknown error",
+            },
+      );
+      setAlertsState(
+        alertsResult.status === "fulfilled"
+          ? { data: alertsResult.value, loading: false, error: null }
+          : {
+              data: null,
+              loading: false,
+              error: alertsResult.reason instanceof Error ? alertsResult.reason.message : "Unknown error",
+            },
+      );
+      setChartState(
+        chartResult.status === "fulfilled"
+          ? { data: chartResult.value, loading: false, error: null }
+          : {
+              data: null,
+              loading: false,
+              error: chartResult.reason instanceof Error ? chartResult.reason.message : "Unknown error",
+            },
+      );
     }
 
     void load();

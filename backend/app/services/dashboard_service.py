@@ -157,11 +157,12 @@ class DashboardService:
         return {"status": "ok", "alerts": alerts}
 
     def get_chart(self, symbol: str) -> dict[str, Any]:
-        if not symbol.strip():
+        normalized_symbol = symbol.strip().upper()
+        if not normalized_symbol:
             raise DashboardServiceError("symbol is required.")
 
         try:
-            resolved = self.quote_service.symbol_resolver.resolve(symbol, "NSE", product_type="cash")
+            resolved = self._resolve_chart_instrument(normalized_symbol)
         except Exception as error:  # noqa: BLE001
             raise DashboardServiceError(str(error)) from error
 
@@ -180,11 +181,16 @@ class DashboardService:
         points = [self._chart_point(candle) for candle in candles if isinstance(candle, dict)]
         return {
             "status": "ok",
-            "symbol": symbol.strip().upper(),
+            "symbol": normalized_symbol,
             "resolved": self._serialize_resolved(resolved),
             "interval": "1day",
             "points": points,
         }
+
+    def _resolve_chart_instrument(self, symbol: str) -> ResolvedInstrument:
+        if symbol in {"NIFTY", "BANKNIFTY"}:
+            return self.quote_service.symbol_resolver.resolve(symbol, "NFO", product_type="futures")
+        return self.quote_service.symbol_resolver.resolve(symbol, "NSE", product_type="cash")
 
     @staticmethod
     def _market_card(result: dict[str, Any]) -> dict[str, Any]:

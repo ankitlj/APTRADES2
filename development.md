@@ -451,6 +451,39 @@
   - Re-open `https://aptrades-2.vercel.app/dashboard`.
   - Confirm the Vercel 404 page is replaced by the React dashboard shell.
 
+### 2026-06-08 - Phase 7: Chart Resolution and Panel Isolation Fix
+- Goal: Finish the deployed Phase 7 dashboard after the shell loaded but chart, alerts, and positions still appeared broken.
+- Root cause:
+  - `GET /api/dashboard/chart?symbol=NIFTY` was resolving `NIFTY` through the `NSE cash` path, while the verified live Phase 6 quote path for `NIFTY` is `NFO futures`.
+  - The dashboard page used a single `Promise.all`, so one chart failure caused alerts and positions panels to show the same frontend error even when their backend endpoints were healthy.
+  - Frontend API errors only surfaced generic HTTP status text, hiding the actual backend message.
+- Backend changes:
+  - Updated dashboard chart resolution so index symbols like `NIFTY` and `BANKNIFTY` use the same `NFO futures` resolver path as the live quote service.
+  - Strengthened chart contract tests to assert the Breeze gateway receives:
+    - `exchange_code = NFO`
+    - `product_type = futures`
+    - a normalized expiry timestamp
+- Frontend changes:
+  - Switched dashboard data loading from one shared `Promise.all` failure path to independent `Promise.allSettled` handling.
+  - Updated API error parsing so JSON error payloads surface the real backend message instead of only `Request failed with status 400`.
+- Files changed:
+  - `backend/app/services/dashboard_service.py`
+  - `backend/tests/test_dashboard_contract.py`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/DashboardPage.tsx`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - `python -m pytest` -> `28 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this fix commit.
+  - Refresh `/dashboard`.
+  - Confirm:
+    - metric cards render from summary data
+    - chart panel no longer fails because of the wrong instrument path
+    - alerts and positions no longer inherit chart errors when their own endpoints are healthy
+
 ## Manual Tasks Pending
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
 - [ ] Verify the deployed Phase 7 dashboard page after Railway/Vercel finish deploying

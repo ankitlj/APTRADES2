@@ -208,7 +208,14 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, init);
 
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    let message = `Request failed with status ${response.status}`;
+    try {
+      const payload = (await response.json()) as { error?: string; message?: string; status?: string };
+      message = payload.error ?? payload.message ?? message;
+    } catch {
+      // Preserve generic HTTP status text when the response is not JSON.
+    }
+    throw new Error(message);
   }
 
   return (await response.json()) as T;
