@@ -206,7 +206,7 @@ class BreezeGateway:
             "right": instrument.right,
             "strike_price": instrument.strike_price,
         }
-        response = self._request("GET", "/optionchainquotes", payload, requires_auth=True)
+        response = self._request("GET", "/optionchain", payload, requires_auth=True)
         success = response.get("Success")
         if success is None:
             raise BreezeGatewayError(response.get("Error") or "Breeze option-chain response missing Success field")

@@ -145,3 +145,30 @@ def test_get_trade_list_calls_breeze_trades_endpoint():
         )
 
     assert request_mock.call_args_list[1].args[1].endswith("/trades")
+
+
+def test_get_option_chain_quotes_calls_breeze_optionchain_endpoint():
+    gateway = BreezeGateway(app_key="app-key", secret_key="secret-key", session_token="api-session")
+    instrument = BreezeInstrument(
+        display_symbol="NIFTY",
+        stock_code="NIFTY",
+        exchange_code="NFO",
+        product_type="options",
+        right="call",
+        strike_price="0",
+        expiry_date="2026-06-30T06:00:00.000Z",
+    )
+    customer_response = Mock()
+    customer_response.raise_for_status.return_value = None
+    customer_response.json.return_value = {"Success": {"session_token": "customer-session"}}
+    option_chain_response = Mock()
+    option_chain_response.raise_for_status.return_value = None
+    option_chain_response.json.return_value = {"Success": []}
+
+    with patch(
+        "app.services.breeze_gateway.requests.request",
+        side_effect=[customer_response, option_chain_response],
+    ) as request_mock:
+        gateway.get_option_chain_quotes(instrument)
+
+    assert request_mock.call_args_list[1].args[1].endswith("/optionchain")

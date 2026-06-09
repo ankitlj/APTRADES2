@@ -742,6 +742,30 @@
   - The exact live Breeze option-chain payload can vary by account/segment state, so Railway verification is still required after deployment.
   - If Breeze rejects the native option-chain call for a specific expiry or segment, the page will now surface the real backend message instead of hiding it.
 
+### 2026-06-09 - Phase 11 Runtime Fix: Breeze Option-Chain Path
+- Goal: Complete deployed Phase 11 after the frontend loaded but the broker returned a live `404` for the option-chain call even with a fresh session token.
+- Root cause:
+  - The first Phase 11 implementation used the wrong Breeze REST path: `/optionchainquotes`.
+  - The official Breeze docs use `/optionchain`, so the deployed broker rejected the request before auth or data logic mattered.
+- Backend changes:
+  - Updated `BreezeGateway.get_option_chain_quotes()` to call `/optionchain`.
+  - Added a regression test that locks the live Breeze path to `/optionchain`.
+- Files changed:
+  - `backend/app/services/breeze_gateway.py`
+  - `backend/tests/test_breeze_gateway.py`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Re-checked the official Breeze API docs for the option-chain endpoint path.
+  - `python -m pytest backend/tests/test_breeze_gateway.py` -> passed
+  - `python -m pytest backend` -> passed
+- Manual user tasks:
+  - Wait for Railway to redeploy this fix.
+  - Refresh `/optionchain`.
+  - Confirm the prior `404 ... /optionchainquotes` error is gone.
+- Remaining risks:
+  - After the endpoint-path fix, any next error will be the real broker payload/parameter issue, not a bad REST path.
+
 ## Phase 8 Response Examples
 
 - Endpoint: `GET /api/orders`

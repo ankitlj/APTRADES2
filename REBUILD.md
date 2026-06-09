@@ -490,3 +490,16 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - `python -m pytest backend\\tests\\test_option_chain_contract.py` passed: `2 passed`
 - `python -m pytest backend` passed: `41 passed`
 - `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+
+## Phase 11 Runtime Fix
+
+- Deployed `/optionchain` exposed a real Breeze `404` on:
+  - `/optionchainquotes`
+- Re-checked the official Breeze API docs and corrected the gateway path to:
+  - `/optionchain`
+- Added a regression test so the live option-chain endpoint path stays locked to the documented contract.
+
+## Phase 11 Runtime Fix Verification
+
+- `python -m pytest backend\\tests\\test_breeze_gateway.py` passed
+- `python -m pytest backend` passed
