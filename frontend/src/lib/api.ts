@@ -295,6 +295,43 @@ export interface TradesResponse {
   trades: TradeRecord[];
 }
 
+export interface PositionsStats {
+  open_positions: number;
+  long_positions: number;
+  short_positions: number;
+  total_pnl: number;
+}
+
+export interface PositionRecord {
+  symbol: string;
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  quantity: number;
+  average_price: number | null;
+  ltp: number | null;
+  pnl: number | null;
+  expiry_date: string | null;
+  right: string | null;
+  strike_price: string | null;
+  segment: string | null;
+  direction: string;
+  quote_status: string;
+  quote_error: string | null;
+  pnl_percent: number | null;
+  resolution_source: string | null;
+  token: string | null;
+}
+
+export interface PositionsResponse {
+  status: string;
+  quote_status: string;
+  close_actions_active: boolean;
+  positions: PositionRecord[];
+  totals: PositionsStats;
+  error?: string;
+}
+
 const API_BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -425,4 +462,8 @@ export function getTrades(params?: { exchange?: string; action?: string; product
   }
   const suffix = search.toString() ? `?${search.toString()}` : "";
   return requestJson<TradesResponse>(`/api/trades${suffix}`);
+}
+
+export function getPositions() {
+  return requestJson<PositionsResponse>("/api/positions");
 }

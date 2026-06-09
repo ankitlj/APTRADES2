@@ -29,7 +29,7 @@ class DashboardService:
     def __init__(self, dependencies: DashboardDependencies):
         self.dependencies = dependencies
         self.quote_service = QuoteService(dependencies.database_url, dependencies.gateway)
-        self.positions_service = PositionsService(dependencies.gateway)
+        self.positions_service = PositionsService(dependencies.gateway, dependencies.database_url)
         self.master_contract_service = MasterContractService(
             database_url=dependencies.database_url,
             stock_script_csv_path=dependencies.stock_script_csv_path,

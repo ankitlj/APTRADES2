@@ -417,3 +417,26 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 ## Phase 8 Runtime Fix Verification
 
 - `python -m pytest` passed: `35 passed`
+
+## Phase 9 Positions
+
+- Added backend positions API:
+  - `GET /api/positions`
+- Expanded the old dashboard-only positions helper into a real positions contract service.
+- Added normalization for Breeze portfolio rows and live quote enrichment through `QuoteService`.
+- Kept close actions intentionally read-only for this phase:
+  - frontend `Close All` and row `Close` controls are disabled
+  - no close-position API endpoint has been added yet
+- Replaced the `/positions` placeholder with a real page containing:
+  - `Live/Paused` badge
+  - toolbar with settings, refresh, export, close-all
+  - stats cards
+  - settings/filter panel
+  - positions table with `Qty`, `Avg`, `LTP`, `P&L`, and `P&L%`
+- Reused the same positions service in the dashboard so dashboard and positions stay on one live source of truth.
+
+## Phase 9 Verification
+
+- `curl http://127.0.0.1:5000/api/positions` returned `200` with a clean `not_configured` payload when Breeze env is absent
+- `python -m pytest` passed: `39 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial

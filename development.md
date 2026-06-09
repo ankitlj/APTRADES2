@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 8 - Orderbook and Tradebook
-- Last completed phase: Phase 8 - Orderbook and Tradebook
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, and Phase 8 orderbook/tradebook runtime fix is ready for redeploy
+- Current phase: Phase 9 - Positions
+- Last completed phase: Phase 9 - Positions
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, and the Phase 9 positions page is verified locally
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -597,6 +597,52 @@
 - Remaining risks:
   - Real broker order/trade payload shape may still vary by account state, but the REST paths are now aligned with the deployed Breeze API contract.
 
+### 2026-06-09 - Phase 9: Positions
+- Goal: Build the main positions page with live quote enrichment.
+- Backend changes:
+  - Added `GET /api/positions`.
+  - Expanded `PositionsService` from a dashboard helper into a real API contract service.
+  - Added position normalization for Breeze portfolio rows.
+  - Added live quote enrichment through `QuoteService` so rows can surface live `ltp`, recomputed `pnl`, `pnl_percent`, token, and resolution source.
+  - Preserved safe read-only behavior:
+    - `close_actions_active = false`
+    - no close-position endpoint yet
+  - Reused the same positions service in the dashboard summary/alerts path so Phase 7 and Phase 9 stay on one data source.
+- Frontend changes:
+  - Replaced `/positions` placeholder with a real Positions page.
+  - Added:
+    - header with `Live/Paused` badge
+    - toolbar with `Settings`, `Refresh`, `Export`, and disabled `Close All`
+    - stats cards for `Open Positions`, `Long`, `Short`, and `Total P&L`
+    - settings panel with grouping, product, direction, and exchange filters
+    - positions table with symbol, exchange, product, qty, avg, ltp, p&l, p&l%, and disabled close action
+  - Updated the app topbar phase label for Phase 9.
+- Files changed:
+  - `backend/app/api/positions.py`
+  - `backend/app/factory.py`
+  - `backend/app/services/dashboard_service.py`
+  - `backend/app/services/positions_service.py`
+  - `backend/tests/test_dashboard_contract.py`
+  - `backend/tests/test_positions_contract.py`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/index.css`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/PositionsPage.tsx`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - `curl http://127.0.0.1:5000/api/positions` -> `200` and a clean `not_configured` payload without Breeze env
+  - `python -m pytest` -> `39 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the same known sandbox filesystem denial
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this phase after push.
+  - Verify `/positions` loads with live rows if the broker has open positions.
+  - Do not test `Close All` unless explicitly ready in a later action phase.
+- Remaining risks:
+  - Close-position actions are intentionally disabled in this phase.
+  - Real open-position payloads may vary by broker account state, so the first deployed validation should confirm the live row shape and quote enrichment quality.
+
 ## Phase 8 Response Examples
 
 - Endpoint: `GET /api/orders`
@@ -618,6 +664,12 @@
 - Endpoint: `GET /api/trades`
 - Response example:
   - `{ "status": "ok", "exchange_code": "NFO", "stats": { "total": 2, "buy": 1, "sell": 1 }, "trades": [{ "trade_id": "T1", "order_id": "1001", "symbol": "NIFTY", "action": "BUY", "quantity": 50.0, "price": 23270.5 }] }`
+
+## Phase 9 Response Examples
+
+- Endpoint: `GET /api/positions`
+- Response example:
+  - `{ "status": "ok", "quote_status": "ok", "close_actions_active": false, "totals": { "open_positions": 2, "long_positions": 1, "short_positions": 1, "total_pnl": 107.0 }, "positions": [{ "symbol": "SBIN", "broker_symbol": "STABAN", "exchange_code": "NSE", "product_type": "cash", "quantity": -10.0, "average_price": 980.0, "ltp": 977.7, "pnl": 23.0, "pnl_percent": 0.23, "quote_status": "ok", "resolution_source": "alias", "token": "3045" }] }`
 
 ## Manual Tasks Pending
 - [ ] Configure a daily Railway schedule for `flask master-contract import`
@@ -685,6 +737,11 @@
 - Request: query param `symbol`
 - Response: `{ "status": "ok", "symbol": "NIFTY", "resolved": { ... }, "interval": "1day", "points": [{ "time": "...", "close": 23440.0, ... }] }`
 - Test command: `curl "http://127.0.0.1:5000/api/dashboard/chart?symbol=NIFTY"`
+
+- Endpoint: `GET /api/positions`
+- Request: no body
+- Response: `{ "status": "ok|not_configured", "quote_status": "ok|partial|not_configured", "close_actions_active": false, "totals": { "open_positions": 0, "long_positions": 0, "short_positions": 0, "total_pnl": 0.0 }, "positions": [{ "symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "product_type": "futures", "quantity": 50.0, "average_price": 23200.0, "ltp": 23440.0, "pnl": 12000.0, "pnl_percent": 1.03, "direction": "long", "quote_status": "ok", "resolution_source": "broker_symbol", "token": "62329" }] }`
+- Test command: `curl http://127.0.0.1:5000/api/positions`
 
 ## Deployment Notes
 - Last commit: pending phase 7 dashboard commit

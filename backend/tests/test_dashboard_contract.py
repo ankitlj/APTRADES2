@@ -145,6 +145,8 @@ def _quote_response(instrument):
         return [{"ltp": 23440.0, "previous_close": 23451.7, "spot_price": 23366.7, "expiry_date": "30-Jun-2026"}]
     if instrument.stock_code == "CNXBAN":
         return [{"ltp": 54799.0, "previous_close": 54781.6, "spot_price": 54496.25, "expiry_date": "30-Jun-2026"}]
+    if instrument.stock_code == "STABAN":
+        return [{"ltp": 977.7, "previous_close": 979.25, "spot_price": 977.7, "expiry_date": None}]
     raise AssertionError(f"Unexpected stock code {instrument.stock_code}")
 
 

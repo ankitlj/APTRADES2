@@ -4,6 +4,7 @@ import { AppShell } from "./components/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
 import { OrderbookPage } from "./pages/OrderbookPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { PositionsPage } from "./pages/PositionsPage";
 import { TradebookPage } from "./pages/TradebookPage";
 
 const pages = [
@@ -23,8 +24,9 @@ export default function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/orderbook" element={<OrderbookPage />} />
         <Route path="/tradebook" element={<TradebookPage />} />
+        <Route path="/positions" element={<PositionsPage />} />
         {pages
-          .filter((page) => !["/dashboard", "/orderbook", "/tradebook"].includes(page.path))
+          .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions"].includes(page.path))
           .map((page) => (
             <Route
               key={page.path}
