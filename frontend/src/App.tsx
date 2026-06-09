@@ -8,6 +8,8 @@ import { OptionChainPage } from "./pages/OptionChainPage";
 import { OrderbookPage } from "./pages/OrderbookPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PositionsPage } from "./pages/PositionsPage";
+import { StrategyBuilderPage } from "./pages/StrategyBuilderPage";
+import { StrategyPortfolioPage } from "./pages/StrategyPortfolioPage";
 import { TradebookPage } from "./pages/TradebookPage";
 import { ToolsPage } from "./pages/ToolsPage";
 
@@ -34,6 +36,8 @@ export default function App() {
         <Route path="/optionchain" element={<OptionChainPage />} />
         <Route path="/oi-tracker" element={<OITrackerPage />} />
         <Route path="/oi-profile" element={<OIProfilePage />} />
+        <Route path="/strategy-builder" element={<StrategyBuilderPage />} />
+        <Route path="/strategy-portfolio" element={<StrategyPortfolioPage />} />
         {pages
           .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions", "/tools", "/optionchain"].includes(page.path))
           .map((page) => (

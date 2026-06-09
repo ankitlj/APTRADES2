@@ -26,6 +26,8 @@ export function AppShell({ children }: PropsWithChildren) {
     "/optionchain": "Option Chain",
     "/oi-tracker": "OI Tracker",
     "/oi-profile": "OI Profile",
+    "/strategy-builder": "Strategy Builder",
+    "/strategy-portfolio": "Strategy Portfolio",
   };
   const currentPage = isDashboard
     ? "Dashboard"
@@ -105,7 +107,7 @@ export function AppShell({ children }: PropsWithChildren) {
           )}
           <div className="topbar-status">
             <span className="status-dot" />
-            Phase 13 OI tools
+            Phase 14 strategy tools
           </div>
         </header>
         <main className="main-content">{children}</main>

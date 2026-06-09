@@ -15,6 +15,7 @@ from .api.options import options_bp
 from .api.orders import orders_bp
 from .api.positions import positions_bp
 from .api.quotes import quotes_bp
+from .api.strategy import strategy_bp
 from .config import load_config
 from .services.master_contract_service import MasterContractImportError, MasterContractService
 
@@ -57,6 +58,7 @@ def create_app() -> Flask:
     app.register_blueprint(orders_bp, url_prefix=config.api_prefix)
     app.register_blueprint(positions_bp, url_prefix=config.api_prefix)
     app.register_blueprint(quotes_bp, url_prefix=config.api_prefix)
+    app.register_blueprint(strategy_bp, url_prefix=config.api_prefix)
     app.register_blueprint(dashboard_bp, url_prefix=config.api_prefix)
     _register_cli(app)
     return app

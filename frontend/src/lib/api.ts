@@ -583,3 +583,80 @@ export function getOIProfile(params: { underlying: string; expiry: string; excha
   }
   return requestJson<OIProfileResponse>(`/api/oi/profile?${search.toString()}`);
 }
+
+export interface StrategyLeg {
+  action: string;
+  right: string;
+  strike: number;
+  quantity: number;
+  premium: number;
+}
+
+export interface StrategyRecord {
+  id: number;
+  name: string;
+  underlying: string;
+  exchange_code: string;
+  expiry: string;
+  legs: StrategyLeg[];
+  net_premium: number;
+  created_at: string;
+}
+
+export interface StrategyListResponse {
+  status: string;
+  strategies: StrategyRecord[];
+}
+
+export interface StrategyCreateRequest {
+  name: string;
+  underlying: string;
+  exchange_code?: string;
+  expiry: string;
+  legs: StrategyLeg[];
+}
+
+export interface StrategyCreateResponse {
+  status: string;
+  strategy: StrategyRecord;
+}
+
+export interface PayoffPoint {
+  spot: number;
+  pnl: number;
+}
+
+export interface PayoffResponse {
+  status: string;
+  net_premium: number;
+  max_profit: number;
+  max_loss: number;
+  breakevens: number[];
+  curve: PayoffPoint[];
+}
+
+export function getStrategies() {
+  return requestJson<StrategyListResponse>("/api/strategies");
+}
+
+export function createStrategy(body: StrategyCreateRequest) {
+  return requestJson<StrategyCreateResponse>("/api/strategies", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteStrategy(strategyId: number) {
+  return requestJson<{ status: string; deleted_id: number }>(`/api/strategies/${strategyId}`, {
+    method: "DELETE",
+  });
+}
+
+export function getStrategyPayoff(legs: StrategyLeg[]) {
+  return requestJson<PayoffResponse>("/api/strategies/payoff", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ legs }),
+  });
+}

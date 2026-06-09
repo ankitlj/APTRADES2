@@ -3,17 +3,17 @@ import { Link } from "react-router-dom";
 const tools = [
   {
     title: "Strategy Builder",
-    subtitle: "Strategy design",
-    description: "Build multi-leg option and futures structures after the core market-data tools are live.",
-    status: "planned",
-    href: null,
+    subtitle: "Phase 14 live",
+    description: "Build multi-leg option structures, preview payoff diagrams, and save to your portfolio.",
+    status: "next",
+    href: "/strategy-builder",
   },
   {
     title: "Strategy Portfolio",
-    subtitle: "Portfolio tracking",
-    description: "Track saved structures, grouped payoffs, and deployment status from one reduced-scope portfolio view.",
-    status: "planned",
-    href: null,
+    subtitle: "Phase 14 live",
+    description: "View saved strategies with on-demand payoff calculation, metrics, and delete controls.",
+    status: "next",
+    href: "/strategy-portfolio",
   },
   {
     title: "Option Chain",

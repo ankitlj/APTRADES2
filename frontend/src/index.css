@@ -856,6 +856,171 @@ select {
   margin-left: auto;
 }
 
+.strategy-name-field input {
+  min-width: 200px;
+}
+
+.strategy-leg-table {
+  min-width: 520px;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.leg-action-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.leg-buy {
+  background: rgba(21, 128, 61, 0.12);
+  color: var(--positive);
+}
+
+.leg-sell {
+  background: rgba(220, 38, 38, 0.10);
+  color: var(--negative);
+}
+
+.leg-remove-btn {
+  padding: 2px 10px;
+  font-size: 0.78rem;
+  background: none;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.leg-remove-btn:hover {
+  background: var(--surface-strong);
+  color: var(--negative);
+  border-color: var(--negative);
+}
+
+.toolbar-button-primary {
+  background: #1d4ed8;
+  color: #fff;
+  border-color: #1d4ed8;
+}
+
+.toolbar-button-primary:hover:not(:disabled) {
+  background: #1e40af;
+  border-color: #1e40af;
+}
+
+.strategy-action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.payoff-chart-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 8px;
+  overflow: hidden;
+}
+
+.payoff-svg {
+  display: block;
+  max-height: 260px;
+}
+
+.strategy-portfolio-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  background: var(--surface-muted);
+}
+
+.strategy-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.strategy-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.strategy-card-name {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.strategy-card-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.strategy-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.strategy-net-premium {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--surface-strong);
+  white-space: nowrap;
+}
+
+.strategy-legs-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.strategy-leg-tag {
+  font-size: 0.72rem;
+  font-family: "IBM Plex Mono", monospace;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.leg-tag-buy {
+  background: rgba(21, 128, 61, 0.10);
+  color: var(--positive);
+}
+
+.leg-tag-sell {
+  background: rgba(220, 38, 38, 0.09);
+  color: var(--negative);
+}
+
+.leg-tag-call {
+  border-left: 2px solid rgba(21, 128, 61, 0.5);
+}
+
+.leg-tag-put {
+  border-left: 2px solid rgba(220, 38, 38, 0.5);
+}
+
+.strategy-payoff-inline {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
 .mobile-nav {
   display: none;
 }

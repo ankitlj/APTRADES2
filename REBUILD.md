@@ -531,3 +531,29 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 - `python -m pytest` passed: `46 passed`
 - `npm.cmd run build` passed: `52 modules`
+
+## Phase 14 Strategy Builder and Strategy Portfolio
+
+- Added `Strategy` SQLAlchemy model to `models.py` with id, name, underlying, exchange_code, expiry_date (Date), legs_json (Text), created_at, updated_at. Auto-created via existing `ensure_tables()` — no Alembic migration.
+- Added `StrategyService`:
+  - `list_strategies()` — all strategies ordered by created_at desc
+  - `create_strategy()` — saves and returns strategy dict with computed `net_premium`
+  - `delete_strategy()` — raises `StrategyServiceError` if not found
+  - `compute_payoff()` — 50-point curve, CE/PE intrinsic math, linear-interpolated breakevens
+- Added `strategy_bp` with 4 routes:
+  - `GET /api/strategies`
+  - `POST /api/strategies/payoff` (registered before `<int:id>` route)
+  - `POST /api/strategies`
+  - `DELETE /api/strategies/<int:strategy_id>`
+- Registered `strategy_bp` in `factory.py`.
+- Added 7 contract tests in `backend/tests/test_strategy_contract.py`.
+- Added shared `PayoffChart` component — pure SVG, no chart library, green/red fills via clipPath, breakeven markers.
+- Added `StrategyBuilderPage` at `/strategy-builder` — exchange/underlying/expiry controls, strategy name, leg builder (action/right/strike/qty/premium, max 8), legs table with remove-per-row, preview payoff (4 stat cards + SVG diagram), save strategy.
+- Added `StrategyPortfolioPage` at `/strategy-portfolio` — list saved strategies, strategy cards with leg tags, net premium badge, toggle inline payoff, delete.
+- Updated `ToolsPage.tsx` — Strategy Builder and Portfolio cards changed from planned to live hrefs.
+- Updated `AppShell.tsx` — extraPages map includes new routes, topbar label changed to Phase 14 strategy tools.
+
+## Phase 14 Verification
+
+- `python -m pytest` passed: `53 passed`
+- `npm.cmd run build` passed: `55 modules`

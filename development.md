@@ -1,10 +1,10 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 13 - OI Tracker and OI Profile
-- Last completed phase: Phase 13 - OI Tracker and OI Profile
+- Current phase: Phase 14 - Strategy Builder and Strategy Portfolio
+- Last completed phase: Phase 14 - Strategy Builder and Strategy Portfolio
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -819,6 +819,86 @@
 - Remaining risks:
   - Full-chain fetch (strike_count=0) pulls all available strikes from Breeze. On a live session with many strikes, response time may be higher than the windowed option chain. Redis caching (15s TTL inherited from OptionChainService) reduces repeat load.
   - The max_ce_oi_strike and max_pe_oi_strike identify resistance/support by OI concentration only — not a financial recommendation.
+
+### 2026-06-10 - Phase 14: Strategy Builder and Strategy Portfolio
+- Goal: Build a multi-leg option strategy builder with payoff calculation and a portfolio page to manage saved strategies.
+- Note: Phase 12 (Option Greeks) was intentionally skipped. No Breeze dependency in this phase — strategies are stored in PostgreSQL; payoff is pure math.
+- Backend changes:
+  - Added `Strategy` SQLAlchemy model in `backend/app/models.py`:
+    - Columns: id, name, underlying, exchange_code, expiry_date (Date), legs_json (Text), created_at, updated_at
+    - Auto-created on first request via existing `ensure_tables()` / `Base.metadata.create_all()` — no Alembic migration needed
+  - Added `StrategyService` in `backend/app/services/strategy_service.py`:
+    - `list_strategies()` — returns all strategies ordered by created_at desc
+    - `create_strategy()` — validates and saves; returns serialized strategy dict with computed `net_premium`
+    - `delete_strategy()` — raises `StrategyServiceError` if not found
+    - `compute_payoff()` — 50-point curve over min_strike×0.85 to max_strike×1.15; CE/PE intrinsic math; linear-interpolated breakevens; returns net_premium, max_profit, max_loss, breakevens, curve
+  - Added `strategy_bp` blueprint in `backend/app/api/strategy.py`:
+    - `GET /api/strategies` — list (200)
+    - `POST /api/strategies/payoff` — registered before `<int:strategy_id>` so "payoff" is never matched by the integer converter
+    - `POST /api/strategies` — create (201)
+    - `DELETE /api/strategies/<int:strategy_id>` — delete (200 / 404)
+  - Registered `strategy_bp` in `backend/app/factory.py`.
+- Frontend changes:
+  - Added `StrategyLeg`, `StrategyRecord`, `StrategyListResponse`, `StrategyCreateRequest`, `StrategyCreateResponse`, `PayoffPoint`, `PayoffResponse` types in `frontend/src/lib/api.ts`.
+  - Added `getStrategies()`, `createStrategy()`, `deleteStrategy()`, `getStrategyPayoff()` in `frontend/src/lib/api.ts`.
+  - Added shared `PayoffChart` component in `frontend/src/components/PayoffChart.tsx`:
+    - Pure SVG, no chart library dependency
+    - Green fill above zero / red fill below zero using SVG clipPath
+    - Dashed zero reference line
+    - Amber breakeven markers with spot-price labels
+    - X-axis min/mid/max spot labels
+    - Unique `uid` prop prevents clipPath collisions when multiple charts render on one page
+  - Added `StrategyBuilderPage` at `/strategy-builder`:
+    - Exchange / underlying / expiry control bar (reuses `getOptionExpiries`)
+    - Strategy name input
+    - Leg builder: action, right, strike, quantity, premium; max 8 legs
+    - Legs table with remove-per-row
+    - "Preview Payoff" → calls `POST /api/strategies/payoff` → renders 4 stat cards + SVG payoff diagram
+    - "Save Strategy" → calls `POST /api/strategies` → confirmation message
+  - Added `StrategyPortfolioPage` at `/strategy-portfolio`:
+    - Loads saved strategies from `GET /api/strategies`
+    - Strategy card per row: name, underlying/exchange/expiry metadata, net premium badge, leg tags
+    - "View Payoff" toggle → calls `POST /api/strategies/payoff` with stored legs → inline stat cards + payoff diagram
+    - "Delete" per strategy → calls `DELETE /api/strategies/<id>` → removes from list
+  - Added strategy CSS utilities to `index.css`: strategy-name-field, strategy-leg-table, leg-action-badge, leg-buy/sell, leg-remove-btn, toolbar-button-primary, strategy-action-row, payoff-chart-wrap, payoff-svg, strategy-portfolio-card, strategy-card-*, strategy-net-premium, strategy-legs-row, strategy-leg-tag, leg-tag-*, strategy-payoff-inline classes.
+  - Updated `App.tsx` with `/strategy-builder` and `/strategy-portfolio` routes.
+  - Updated `ToolsPage.tsx` — Strategy Builder and Strategy Portfolio cards changed from `status: planned` to `status: next` with live hrefs.
+  - Updated `AppShell.tsx` — added `/strategy-builder` and `/strategy-portfolio` to extraPages map, updated topbar label to Phase 14 strategy tools.
+- Files changed:
+  - `backend/app/models.py`
+  - `backend/app/services/strategy_service.py`
+  - `backend/app/api/strategy.py`
+  - `backend/app/factory.py`
+  - `backend/tests/test_strategy_contract.py`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/components/PayoffChart.tsx`
+  - `frontend/src/pages/StrategyBuilderPage.tsx`
+  - `frontend/src/pages/StrategyPortfolioPage.tsx`
+  - `frontend/src/index.css`
+  - `frontend/src/App.tsx`
+  - `frontend/src/pages/ToolsPage.tsx`
+  - `frontend/src/components/AppShell.tsx`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - No new Breeze endpoints used — confirmed strategies are DB-only; payoff is pure math.
+  - `python -m pytest` -> `53 passed`
+  - `npm.cmd run build` -> passed, 55 modules
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this commit.
+  - Open `/tools` — verify Strategy Builder and Strategy Portfolio cards are now live links.
+  - Open `/strategy-builder`:
+    - Select underlying/expiry, enter a strategy name
+    - Add 2+ legs (e.g. sell NIFTY 23300 CE @100, buy NIFTY 23400 CE @50)
+    - Click "Preview Payoff" — verify green/red payoff diagram, 4 stat cards, breakeven marker
+    - Click "Save Strategy" — verify confirmation message
+  - Open `/strategy-portfolio`:
+    - Verify saved strategy appears with correct metadata and leg tags
+    - Click "View Payoff" — verify inline payoff chart loads
+    - Click "Delete" — verify strategy is removed
+- Remaining risks:
+  - Payoff curve uses a 50-point approximation; breakeven is linearly interpolated between adjacent curve points. For strategies with flat payoff regions or near-horizontal segments, breakeven precision is ±step_size (~50–100 points depending on strikes).
+  - The strategy table is auto-created via SQLAlchemy `create_all()` on first use. On Railway this runs against the live PostgreSQL database on first POST/GET to `/api/strategies`.
 
 ## Phase 13 Response Examples
 
