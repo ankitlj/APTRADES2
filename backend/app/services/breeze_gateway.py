@@ -197,6 +197,21 @@ class BreezeGateway:
             raise BreezeGatewayError(response.get("Error") or "Breeze historical charts response missing Success field")
         return success
 
+    def get_option_chain_quotes(self, instrument: BreezeInstrument) -> Any:
+        payload = {
+            "stock_code": instrument.stock_code,
+            "exchange_code": instrument.exchange_code,
+            "product_type": instrument.product_type,
+            "expiry_date": instrument.expiry_date,
+            "right": instrument.right,
+            "strike_price": instrument.strike_price,
+        }
+        response = self._request("GET", "/optionchainquotes", payload, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze option-chain response missing Success field")
+        return success
+
     def _request(self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool) -> dict[str, Any]:
         if requires_auth and not self.is_configured():
             raise BreezeGatewayError(f"Missing Breeze configuration: {', '.join(self._missing_fields())}")

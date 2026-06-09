@@ -332,6 +332,45 @@ export interface PositionsResponse {
   error?: string;
 }
 
+export interface OptionExpiriesResponse {
+  status: string;
+  underlying: string;
+  broker_symbol: string;
+  exchange_code: string;
+  expiries: string[];
+}
+
+export interface OptionChainLeg {
+  ltp: number | null;
+  bid: number | null;
+  ask: number | null;
+  oi: number | null;
+  volume: number | null;
+}
+
+export interface OptionChainRow {
+  strike_price: number;
+  ce: OptionChainLeg | null;
+  pe: OptionChainLeg | null;
+}
+
+export interface OptionChainResponse {
+  status: string;
+  underlying: string;
+  broker_symbol: string;
+  exchange_code: string;
+  expiry: string;
+  updated_at: string;
+  underlying_ltp: number | null;
+  previous_close: number | null;
+  atm_strike: number;
+  pcr: number | null;
+  total_call_oi: number;
+  total_put_oi: number;
+  total_oi: number;
+  rows: OptionChainRow[];
+}
+
 const API_BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -466,4 +505,26 @@ export function getTrades(params?: { exchange?: string; action?: string; product
 
 export function getPositions() {
   return requestJson<PositionsResponse>("/api/positions");
+}
+
+export function getOptionExpiries(params: { underlying: string; exchange?: string }) {
+  const search = new URLSearchParams({ underlying: params.underlying });
+  if (params.exchange) {
+    search.set("exchange", params.exchange);
+  }
+  return requestJson<OptionExpiriesResponse>(`/api/options/expiries?${search.toString()}`);
+}
+
+export function getOptionChain(params: { underlying: string; expiry: string; exchange?: string; strike_count?: number }) {
+  const search = new URLSearchParams({
+    underlying: params.underlying,
+    expiry: params.expiry,
+  });
+  if (params.exchange) {
+    search.set("exchange", params.exchange);
+  }
+  if (params.strike_count) {
+    search.set("strike_count", String(params.strike_count));
+  }
+  return requestJson<OptionChainResponse>(`/api/option-chain?${search.toString()}`);
 }

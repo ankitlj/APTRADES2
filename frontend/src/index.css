@@ -595,6 +595,15 @@ select {
   gap: 18px;
 }
 
+.tool-card-link {
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.tool-card-link:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 34px rgba(15, 23, 42, 0.1);
+}
+
 .tool-card-top {
   display: flex;
   align-items: center;
@@ -692,6 +701,84 @@ select {
   margin: 8px 0 12px;
 }
 
+.route-title-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(180deg, #ffffff 0%, #e8eef6 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
+}
+
+.option-chain-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.option-chain-error-card {
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(180, 83, 9, 0.22);
+  background: rgba(251, 191, 36, 0.08);
+  color: var(--warning);
+}
+
+.option-chain-error-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1rem;
+}
+
+.option-chain-table {
+  min-width: 1180px;
+}
+
+.option-chain-table th,
+.option-chain-table td {
+  font-family: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.option-chain-head {
+  text-align: center !important;
+}
+
+.option-chain-head-calls {
+  background: rgba(21, 128, 61, 0.08);
+  color: var(--positive) !important;
+}
+
+.option-chain-head-puts {
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--negative) !important;
+}
+
+.option-chain-head-strike,
+.option-chain-strike-cell {
+  background: rgba(232, 238, 246, 0.78);
+}
+
+.option-chain-strike-cell {
+  font-weight: 700;
+}
+
+.option-chain-strike-atm {
+  color: #111827;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+
+.option-chain-cell {
+  white-space: nowrap;
+}
+
 .mobile-nav {
   display: none;
 }
@@ -706,6 +793,10 @@ select {
   }
 
   .tools-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .option-chain-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -738,6 +829,10 @@ select {
   }
 
   .tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .option-chain-summary-grid {
     grid-template-columns: 1fr;
   }
 

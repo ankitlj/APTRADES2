@@ -22,9 +22,12 @@ type TickerState = {
 export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation();
   const isDashboard = location.pathname === "/" || location.pathname === "/dashboard";
+  const extraPages: Record<string, string> = {
+    "/optionchain": "Option Chain",
+  };
   const currentPage = isDashboard
     ? "Dashboard"
-    : navigation.find((item) => item.to === location.pathname)?.label ?? "APTRADES v2";
+    : navigation.find((item) => item.to === location.pathname)?.label ?? extraPages[location.pathname] ?? "APTRADES v2";
   const [tickerState, setTickerState] = useState<TickerState>({ data: null, loading: isDashboard });
 
   useEffect(() => {
@@ -100,7 +103,7 @@ export function AppShell({ children }: PropsWithChildren) {
           )}
           <div className="topbar-status">
             <span className="status-dot" />
-            Phase 10 tools scope
+            Phase 11 option chain
           </div>
         </header>
         <main className="main-content">{children}</main>

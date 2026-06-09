@@ -1,39 +1,47 @@
+import { Link } from "react-router-dom";
+
 const tools = [
   {
     title: "Strategy Builder",
     subtitle: "Strategy design",
     description: "Build multi-leg option and futures structures after the core market-data tools are live.",
     status: "planned",
+    href: null,
   },
   {
     title: "Strategy Portfolio",
     subtitle: "Portfolio tracking",
     description: "Track saved structures, grouped payoffs, and deployment status from one reduced-scope portfolio view.",
     status: "planned",
+    href: null,
   },
   {
     title: "Option Chain",
-    subtitle: "Phase 11 next",
-    description: "Core strike grid, expiries, ATM context, and normalized CE/PE rows land in the next phase.",
+    subtitle: "Phase 11 live",
+    description: "Open the first live option-chain tool with expiry control, ATM context, and normalized CE/PE rows.",
     status: "next",
+    href: "/optionchain",
   },
   {
     title: "Option Greeks",
     subtitle: "Manual calc later",
     description: "Reserved in the MVP grid, but real Greeks logic stays deferred until an explicit calculation phase.",
     status: "deferred",
+    href: null,
   },
   {
     title: "OI Tracker",
     subtitle: "Open-interest trend",
     description: "Watch directional open-interest shifts across strikes once option-chain data is stable.",
     status: "planned",
+    href: null,
   },
   {
     title: "OI Profile",
     subtitle: "Open-interest structure",
     description: "Review where open interest is concentrated and how the profile changes through the session.",
     status: "planned",
+    href: null,
   },
 ];
 
@@ -68,24 +76,34 @@ export function ToolsPage() {
         </div>
 
         <div className="tools-grid">
-          {tools.map((tool) => (
-            <article key={tool.title} className="tool-card">
-              <div className="tool-card-top">
-                <div className="tool-icon-tile" aria-hidden="true">
-                  {tool.title
-                    .split(" ")
-                    .map((word) => word[0])
-                    .join("")
-                    .slice(0, 2)}
+          {tools.map((tool) => {
+            const card = (
+              <article key={tool.title} className={`tool-card ${tool.href ? "tool-card-link" : ""}`}>
+                <div className="tool-card-top">
+                  <div className="tool-icon-tile" aria-hidden="true">
+                    {tool.title
+                      .split(" ")
+                      .map((word) => word[0])
+                      .join("")
+                      .slice(0, 2)}
+                  </div>
+                  <span className={`tool-status ${toneClassName(tool.status)}`}>{tool.subtitle}</span>
                 </div>
-                <span className={`tool-status ${toneClassName(tool.status)}`}>{tool.subtitle}</span>
-              </div>
-              <div className="tool-card-body">
-                <strong>{tool.title}</strong>
-                <p className="panel-message">{tool.description}</p>
-              </div>
-            </article>
-          ))}
+                <div className="tool-card-body">
+                  <strong>{tool.title}</strong>
+                  <p className="panel-message">{tool.description}</p>
+                </div>
+              </article>
+            );
+
+            return tool.href ? (
+              <Link key={tool.title} to={tool.href}>
+                {card}
+              </Link>
+            ) : (
+              card
+            );
+          })}
         </div>
 
         <p className="panel-message">

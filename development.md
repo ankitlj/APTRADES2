@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 10 - Tools Reduced Scope
-- Last completed phase: Phase 10 - Tools Reduced Scope
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, and the Phase 10 reduced tools page is verified locally
+- Current phase: Phase 11 - Option Chain
+- Last completed phase: Phase 11 - Option Chain
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, and Phase 11 option-chain contracts are verified locally
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -686,6 +686,62 @@
 - Remaining risks:
   - This phase is intentionally scope-reduction only; the individual tools themselves are still built in later phases.
 
+### 2026-06-09 - Phase 11: Option Chain
+- Goal: Build the first core options data page with Breeze-backed expiries, normalized chain rows, and a live `/optionchain` route.
+- Backend changes:
+  - Added `GET /api/options/expiries?underlying=NIFTY`.
+  - Added `GET /api/option-chain?underlying=NIFTY&expiry=<iso-date>&strike_count=<n>`.
+  - Added `OptionChainService` backed by:
+    - imported master-contract expiries from PostgreSQL
+    - Breeze option-chain quotes for `call` and `put`
+    - normalized CE/PE strike-grid rows
+    - brief Redis caching when `REDIS_URL` is configured
+  - Extended `BreezeGateway` with `get_option_chain_quotes()`.
+- Frontend changes:
+  - Added a real `/optionchain` page.
+  - Added:
+    - header with trend icon
+    - control bar for exchange, underlying, expiry, strike count, refresh
+    - summary cards for `Spot`, `ATM Strike`, `PCR`, and `Total OI`
+    - option-chain table with:
+      - green calls header
+      - muted strike column
+      - red puts header
+      - mono compact rows
+    - amber real-error card when the backend returns a broker/runtime message
+  - Updated `/tools` so the `Option Chain` card links to `/optionchain`.
+  - Updated the global topbar phase label to Phase 11.
+- Files changed:
+  - `backend/app/api/options.py`
+  - `backend/app/factory.py`
+  - `backend/app/services/breeze_gateway.py`
+  - `backend/app/services/option_chain_service.py`
+  - `backend/tests/test_option_chain_contract.py`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/index.css`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/OptionChainPage.tsx`
+  - `frontend/src/pages/ToolsPage.tsx`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Re-read the Phase 11 section in `APTRADES_v2_master_development_playbook.md`.
+  - Re-checked the official Breeze docs surface for option-chain support and the `breeze-connect` `get_option_chain_quotes(...)` helper before wiring the gateway.
+  - `python -m pytest backend\\tests\\test_option_chain_contract.py` -> `2 passed`
+  - `python -m pytest backend` -> `41 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+- Manual user tasks:
+  - After push/deploy, open `/optionchain`.
+  - Verify:
+    - NIFTY expiries load
+    - selecting an expiry loads CE/PE rows
+    - ATM strike and PCR populate
+    - BANKNIFTY also loads from the same controls
+- Remaining risks:
+  - The exact live Breeze option-chain payload can vary by account/segment state, so Railway verification is still required after deployment.
+  - If Breeze rejects the native option-chain call for a specific expiry or segment, the page will now surface the real backend message instead of hiding it.
+
 ## Phase 8 Response Examples
 
 - Endpoint: `GET /api/orders`
@@ -786,7 +842,17 @@
 - Response: `{ "status": "ok|not_configured", "quote_status": "ok|partial|not_configured", "close_actions_active": false, "totals": { "open_positions": 0, "long_positions": 0, "short_positions": 0, "total_pnl": 0.0 }, "positions": [{ "symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "product_type": "futures", "quantity": 50.0, "average_price": 23200.0, "ltp": 23440.0, "pnl": 12000.0, "pnl_percent": 1.03, "direction": "long", "quote_status": "ok", "resolution_source": "broker_symbol", "token": "62329" }] }`
 - Test command: `curl http://127.0.0.1:5000/api/positions`
 
+- Endpoint: `GET /api/options/expiries?underlying=NIFTY`
+- Request: query params `underlying`, optional `exchange`
+- Response: `{ "status": "ok", "underlying": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "expiries": ["2026-06-30"] }`
+- Test command: `curl "http://127.0.0.1:5000/api/options/expiries?underlying=NIFTY"`
+
+- Endpoint: `GET /api/option-chain?underlying=NIFTY&expiry=2026-06-30&strike_count=12`
+- Request: query params `underlying`, `expiry`, optional `exchange`, optional `strike_count`
+- Response: `{ "status": "ok", "underlying": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "expiry": "2026-06-30", "underlying_ltp": 23268.8, "previous_close": 23451.7, "atm_strike": 23300.0, "pcr": 0.9659, "rows": [{ "strike_price": 23300.0, "ce": { "ltp": 92.8, "bid": 92.2, "ask": 93.1, "oi": 115000.0, "volume": 16000.0 }, "pe": { "ltp": 165.4, "bid": 164.8, "ask": 166.1, "oi": 132000.0, "volume": 21000.0 } }] }`
+- Test command: `curl "http://127.0.0.1:5000/api/option-chain?underlying=NIFTY&expiry=2026-06-30&strike_count=12"`
+
 ## Deployment Notes
-- Last commit: pending phase 7 dashboard commit
+- Last commit: pending Phase 11 option-chain commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 7 dashboard contracts are verified locally through backend tests and a production frontend build
+- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 11 option-chain contracts are verified locally through backend tests and a production frontend build

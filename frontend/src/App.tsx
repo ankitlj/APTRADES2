@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
+import { OptionChainPage } from "./pages/OptionChainPage";
 import { OrderbookPage } from "./pages/OrderbookPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PositionsPage } from "./pages/PositionsPage";
@@ -10,6 +11,7 @@ import { ToolsPage } from "./pages/ToolsPage";
 
 const pages = [
   { path: "/dashboard", title: "Dashboard", description: "The main APTRADES dashboard now runs through backend contracts." },
+  { path: "/optionchain", title: "Option Chain", description: "The core option chain grid now loads live Breeze-backed rows." },
   { path: "/positions", title: "Positions", description: "Live quote enrichment begins after QuoteService exists." },
   { path: "/action-centre", title: "Action Centre", description: "Approval and review workflow comes after trading pages." },
   { path: "/strategy", title: "Strategy", description: "Strategy Builder and Strategy Portfolio stay under Tools in MVP." },
@@ -27,8 +29,9 @@ export default function App() {
         <Route path="/tradebook" element={<TradebookPage />} />
         <Route path="/positions" element={<PositionsPage />} />
         <Route path="/tools" element={<ToolsPage />} />
+        <Route path="/optionchain" element={<OptionChainPage />} />
         {pages
-          .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions", "/tools"].includes(page.path))
+          .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions", "/tools", "/optionchain"].includes(page.path))
           .map((page) => (
             <Route
               key={page.path}

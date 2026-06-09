@@ -467,3 +467,26 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 ## Phase 10 Verification
 
 - `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+
+## Phase 11 Option Chain
+
+- Added backend option-chain contracts:
+  - `GET /api/options/expiries`
+  - `GET /api/option-chain`
+- Added `OptionChainService` on top of:
+  - PostgreSQL master-contract expiries
+  - Breeze native option-chain quotes
+  - short Redis caching for repeated refreshes
+- Extended `BreezeGateway` with a dedicated option-chain request path.
+- Added a real frontend `/optionchain` page with:
+  - exchange / underlying / expiry / strike-count controls
+  - summary cards for spot, ATM strike, PCR, and total OI
+  - CE/PE strike grid
+  - real backend error surfacing
+- Updated the Tools page so the `Option Chain` card opens the live route.
+
+## Phase 11 Verification
+
+- `python -m pytest backend\\tests\\test_option_chain_contract.py` passed: `2 passed`
+- `python -m pytest backend` passed: `41 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
