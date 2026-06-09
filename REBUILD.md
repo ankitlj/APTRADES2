@@ -503,3 +503,31 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 - `python -m pytest backend\\tests\\test_breeze_gateway.py` passed
 - `python -m pytest backend` passed
+
+## Phase 12 Skip Note
+
+- Phase 12 (Option Greeks) was intentionally deferred.
+- Greeks will be computed inline in strategy code when needed (Black-Scholes / Heston / Monte Carlo).
+- No backend endpoints, no frontend pages were added for Phase 12.
+- Phase 13 has no dependency on Phase 12.
+
+## Phase 13 OI Tracker and OI Profile
+
+- Added `OIService` wrapping `OptionChainService` with full-chain fetch (strike_count=0).
+  - `get_tracker()` returns all strikes sorted by total OI descending with max_ce_oi_strike and max_pe_oi_strike.
+  - `get_profile()` returns all strikes sorted by strike_price ascending.
+  - No new Breeze endpoint — both reuse `/optionchain` via the existing Phase 11 gateway call.
+- Added backend endpoints:
+  - `GET /api/oi/tracker`
+  - `GET /api/oi/profile`
+- Registered `oi_bp` in `factory.py`.
+- Added 4 contract tests in `backend/tests/test_oi_contract.py`.
+- Added `OITrackerPage` at `/oi-tracker` — control bar, 4 stat cards (ATM, PCR, resistance strike, support strike), table sorted by total OI descending with inline CE/PE split bar.
+- Added `OIProfilePage` at `/oi-profile` — same control bar, 4 stat cards (spot, ATM, PCR, total OI), table sorted by strike ascending with ATM highlight and proportional CE/PE bars.
+- Updated `ToolsPage.tsx` — OI Tracker and OI Profile cards are now live links.
+- Updated `AppShell.tsx` — topbar label changed to Phase 13 OI tools, extraPages map includes new routes.
+
+## Phase 13 Verification
+
+- `python -m pytest` passed: `46 passed`
+- `npm.cmd run build` passed: `52 modules`

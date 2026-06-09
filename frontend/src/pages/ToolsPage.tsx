@@ -31,17 +31,17 @@ const tools = [
   },
   {
     title: "OI Tracker",
-    subtitle: "Open-interest trend",
-    description: "Watch directional open-interest shifts across strikes once option-chain data is stable.",
-    status: "planned",
-    href: null,
+    subtitle: "Phase 13 live",
+    description: "Strikes ranked by total OI. Spot resistance at max CE OI strike, support at max PE OI strike.",
+    status: "next",
+    href: "/oi-tracker",
   },
   {
     title: "OI Profile",
-    subtitle: "Open-interest structure",
-    description: "Review where open interest is concentrated and how the profile changes through the session.",
-    status: "planned",
-    href: null,
+    subtitle: "Phase 13 live",
+    description: "Full OI distribution across all strikes sorted by price with proportional CE/PE bars.",
+    status: "next",
+    href: "/oi-profile",
   },
 ];
 

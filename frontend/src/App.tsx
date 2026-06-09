@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
+import { OIProfilePage } from "./pages/OIProfilePage";
+import { OITrackerPage } from "./pages/OITrackerPage";
 import { OptionChainPage } from "./pages/OptionChainPage";
 import { OrderbookPage } from "./pages/OrderbookPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
@@ -30,6 +32,8 @@ export default function App() {
         <Route path="/positions" element={<PositionsPage />} />
         <Route path="/tools" element={<ToolsPage />} />
         <Route path="/optionchain" element={<OptionChainPage />} />
+        <Route path="/oi-tracker" element={<OITrackerPage />} />
+        <Route path="/oi-profile" element={<OIProfilePage />} />
         {pages
           .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions", "/tools", "/optionchain"].includes(page.path))
           .map((page) => (

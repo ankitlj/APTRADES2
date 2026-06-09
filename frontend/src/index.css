@@ -779,6 +779,83 @@ select {
   white-space: nowrap;
 }
 
+.oi-tracker-table,
+.oi-profile-table {
+  min-width: 680px;
+}
+
+.oi-tracker-table th,
+.oi-tracker-table td,
+.oi-profile-table th,
+.oi-profile-table td {
+  font-family: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.oi-row-atm td {
+  background: rgba(232, 238, 246, 0.78);
+  font-weight: 700;
+}
+
+.oi-bar-wrap {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(220, 38, 38, 0.18);
+  overflow: hidden;
+  min-width: 80px;
+}
+
+.oi-bar-ce {
+  height: 100%;
+  border-radius: 4px;
+  background: rgba(21, 128, 61, 0.55);
+  transition: width 0.3s ease;
+}
+
+.oi-profile-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.oi-profile-bar-cell-pe {
+  flex-direction: row-reverse;
+}
+
+.oi-profile-value {
+  min-width: 72px;
+  display: inline-block;
+  text-align: right;
+}
+
+.oi-profile-bar-cell-pe .oi-profile-value {
+  text-align: left;
+}
+
+.oi-profile-bar-bg {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-strong);
+  overflow: hidden;
+  min-width: 60px;
+}
+
+.oi-profile-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.oi-profile-bar-ce {
+  background: rgba(21, 128, 61, 0.55);
+}
+
+.oi-profile-bar-pe {
+  background: rgba(220, 38, 38, 0.45);
+  margin-left: auto;
+}
+
 .mobile-nav {
   display: none;
 }

@@ -371,6 +371,45 @@ export interface OptionChainResponse {
   rows: OptionChainRow[];
 }
 
+export interface OIRow {
+  strike_price: number;
+  ce_oi: number;
+  pe_oi: number;
+  total_oi: number;
+  ce_ltp: number | null;
+  pe_ltp: number | null;
+}
+
+export interface OITrackerResponse {
+  status: string;
+  underlying: string;
+  exchange_code: string;
+  expiry: string;
+  underlying_ltp: number | null;
+  atm_strike: number;
+  pcr: number | null;
+  total_call_oi: number;
+  total_put_oi: number;
+  max_ce_oi_strike: number | null;
+  max_pe_oi_strike: number | null;
+  updated_at: string;
+  rows: OIRow[];
+}
+
+export interface OIProfileResponse {
+  status: string;
+  underlying: string;
+  exchange_code: string;
+  expiry: string;
+  underlying_ltp: number | null;
+  atm_strike: number;
+  pcr: number | null;
+  total_call_oi: number;
+  total_put_oi: number;
+  updated_at: string;
+  rows: OIRow[];
+}
+
 const API_BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -527,4 +566,20 @@ export function getOptionChain(params: { underlying: string; expiry: string; exc
     search.set("strike_count", String(params.strike_count));
   }
   return requestJson<OptionChainResponse>(`/api/option-chain?${search.toString()}`);
+}
+
+export function getOITracker(params: { underlying: string; expiry: string; exchange?: string }) {
+  const search = new URLSearchParams({ underlying: params.underlying, expiry: params.expiry });
+  if (params.exchange) {
+    search.set("exchange", params.exchange);
+  }
+  return requestJson<OITrackerResponse>(`/api/oi/tracker?${search.toString()}`);
+}
+
+export function getOIProfile(params: { underlying: string; expiry: string; exchange?: string }) {
+  const search = new URLSearchParams({ underlying: params.underlying, expiry: params.expiry });
+  if (params.exchange) {
+    search.set("exchange", params.exchange);
+  }
+  return requestJson<OIProfileResponse>(`/api/oi/profile?${search.toString()}`);
 }

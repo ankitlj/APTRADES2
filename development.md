@@ -1,9 +1,10 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 11 - Option Chain
-- Last completed phase: Phase 11 - Option Chain
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, and Phase 11 option-chain contracts are verified locally
+- Current phase: Phase 13 - OI Tracker and OI Profile
+- Last completed phase: Phase 13 - OI Tracker and OI Profile
+- Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -765,6 +766,69 @@
   - Confirm the prior `404 ... /optionchainquotes` error is gone.
 - Remaining risks:
   - After the endpoint-path fix, any next error will be the real broker payload/parameter issue, not a bad REST path.
+
+### 2026-06-10 - Phase 13: OI Tracker and OI Profile
+- Goal: Build the OI Tracker and OI Profile tool pages backed by full-chain option data from Breeze via the existing Phase 11 OptionChainService.
+- Note: Phase 12 (Option Greeks) was intentionally skipped. Greeks are deferred and will be computed inline in strategy code when needed (Black-Scholes / Heston / Monte Carlo). Phase 13 has no dependency on Phase 12.
+- Backend changes:
+  - Added `OIService` in `backend/app/services/oi_service.py`.
+    - `get_tracker()` — fetches full chain (strike_count=0), flattens rows to {strike_price, ce_oi, pe_oi, total_oi, ce_ltp, pe_ltp}, sorts by total_oi descending, computes max_ce_oi_strike and max_pe_oi_strike.
+    - `get_profile()` — same flatten, rows stay sorted by strike_price ascending (natural order from OptionChainService).
+    - Both reuse `OptionChainService.get_option_chain()` — no new Breeze endpoint needed.
+  - Added `oi_bp` blueprint in `backend/app/api/oi.py`:
+    - `GET /api/oi/tracker?underlying=NIFTY&expiry=<iso-date>&exchange=NFO`
+    - `GET /api/oi/profile?underlying=NIFTY&expiry=<iso-date>&exchange=NFO`
+  - Registered `oi_bp` in `backend/app/factory.py`.
+- Frontend changes:
+  - Added `OIRow`, `OITrackerResponse`, `OIProfileResponse` types and `getOITracker()`, `getOIProfile()` fetch functions in `frontend/src/lib/api.ts`.
+  - Added `OITrackerPage` at `/oi-tracker`:
+    - Exchange/underlying/expiry control bar (reuses `getOptionExpiries`)
+    - 4 stat cards: ATM Strike, PCR, Resistance (max CE OI strike), Support (max PE OI strike)
+    - Table sorted by total OI descending with inline CE/PE split bar
+  - Added `OIProfilePage` at `/oi-profile`:
+    - Same control bar
+    - 4 stat cards: Spot, ATM Strike, PCR, Total OI
+    - Table sorted by strike price ascending, ATM row highlighted, proportional CE/PE bar chart columns
+  - Added OI CSS utilities to `index.css`: oi-tracker-table, oi-profile-table, oi-row-atm, oi-bar-*, oi-profile-bar-* classes.
+  - Updated `App.tsx` with `/oi-tracker` and `/oi-profile` routes.
+  - Updated `ToolsPage.tsx` — OI Tracker and OI Profile cards changed from `status: planned` to `status: next` with live hrefs.
+  - Updated `AppShell.tsx` — added `/oi-tracker` and `/oi-profile` to extraPages map, updated topbar label to Phase 13 OI tools.
+- Files changed:
+  - `backend/app/services/oi_service.py`
+  - `backend/app/api/oi.py`
+  - `backend/app/factory.py`
+  - `backend/tests/test_oi_contract.py`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/OITrackerPage.tsx`
+  - `frontend/src/pages/OIProfilePage.tsx`
+  - `frontend/src/index.css`
+  - `frontend/src/App.tsx`
+  - `frontend/src/pages/ToolsPage.tsx`
+  - `frontend/src/components/AppShell.tsx`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - No new Breeze endpoints used — confirmed both OI tools use `/optionchain` via the existing `OptionChainService`.
+  - `python -m pytest` -> `46 passed`
+  - `npm.cmd run build` -> passed, 52 modules
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this commit.
+  - Open `/tools` — verify OI Tracker and OI Profile cards are now live links.
+  - Open `/oi-tracker` — select NIFTY, choose an expiry, verify rows sort by total OI descending and max CE/PE OI strikes appear.
+  - Open `/oi-profile` — verify rows sort by strike ascending, ATM row is highlighted, CE/PE bars are proportional.
+- Remaining risks:
+  - Full-chain fetch (strike_count=0) pulls all available strikes from Breeze. On a live session with many strikes, response time may be higher than the windowed option chain. Redis caching (15s TTL inherited from OptionChainService) reduces repeat load.
+  - The max_ce_oi_strike and max_pe_oi_strike identify resistance/support by OI concentration only — not a financial recommendation.
+
+## Phase 13 Response Examples
+
+- Endpoint: `GET /api/oi/tracker?underlying=NIFTY&expiry=2026-06-30`
+- Response example:
+  - `{ "status": "ok", "underlying": "NIFTY", "exchange_code": "NFO", "expiry": "2026-06-30", "underlying_ltp": 23268.8, "atm_strike": 23300.0, "pcr": 0.9659, "total_call_oi": 235000.0, "total_put_oi": 227000.0, "max_ce_oi_strike": 23200.0, "max_pe_oi_strike": 23300.0, "rows": [{ "strike_price": 23300.0, "ce_oi": 115000.0, "pe_oi": 132000.0, "total_oi": 247000.0, "ce_ltp": 92.8, "pe_ltp": 165.4 }] }`
+
+- Endpoint: `GET /api/oi/profile?underlying=NIFTY&expiry=2026-06-30`
+- Response example:
+  - `{ "status": "ok", "underlying": "NIFTY", "exchange_code": "NFO", "expiry": "2026-06-30", "underlying_ltp": 23268.8, "atm_strike": 23300.0, "pcr": 0.9659, "total_call_oi": 235000.0, "total_put_oi": 227000.0, "rows": [{ "strike_price": 23200.0, "ce_oi": 120000.0, "pe_oi": 95000.0, "total_oi": 215000.0, "ce_ltp": 145.5, "pe_ltp": 118.2 }, { "strike_price": 23300.0, "ce_oi": 115000.0, "pe_oi": 132000.0, "total_oi": 247000.0, "ce_ltp": 92.8, "pe_ltp": 165.4 }] }`
 
 ## Phase 8 Response Examples
 

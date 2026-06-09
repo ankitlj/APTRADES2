@@ -24,6 +24,8 @@ export function AppShell({ children }: PropsWithChildren) {
   const isDashboard = location.pathname === "/" || location.pathname === "/dashboard";
   const extraPages: Record<string, string> = {
     "/optionchain": "Option Chain",
+    "/oi-tracker": "OI Tracker",
+    "/oi-profile": "OI Profile",
   };
   const currentPage = isDashboard
     ? "Dashboard"
@@ -103,7 +105,7 @@ export function AppShell({ children }: PropsWithChildren) {
           )}
           <div className="topbar-status">
             <span className="status-dot" />
-            Phase 11 option chain
+            Phase 13 OI tools
           </div>
         </header>
         <main className="main-content">{children}</main>

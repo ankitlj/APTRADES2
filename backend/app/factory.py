@@ -10,6 +10,7 @@ from .api.dashboard import dashboard_bp
 from .api.debug import debug_bp
 from .api.health import health_bp
 from .api.master_contract import master_contract_bp
+from .api.oi import oi_bp
 from .api.options import options_bp
 from .api.orders import orders_bp
 from .api.positions import positions_bp
@@ -51,6 +52,7 @@ def create_app() -> Flask:
     app.register_blueprint(health_bp, url_prefix=config.api_prefix)
     app.register_blueprint(debug_bp, url_prefix=config.api_prefix)
     app.register_blueprint(master_contract_bp, url_prefix=config.api_prefix)
+    app.register_blueprint(oi_bp, url_prefix=config.api_prefix)
     app.register_blueprint(options_bp, url_prefix=config.api_prefix)
     app.register_blueprint(orders_bp, url_prefix=config.api_prefix)
     app.register_blueprint(positions_bp, url_prefix=config.api_prefix)
