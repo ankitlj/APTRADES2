@@ -6,6 +6,7 @@ import { OrderbookPage } from "./pages/OrderbookPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
 import { PositionsPage } from "./pages/PositionsPage";
 import { TradebookPage } from "./pages/TradebookPage";
+import { ToolsPage } from "./pages/ToolsPage";
 
 const pages = [
   { path: "/dashboard", title: "Dashboard", description: "The main APTRADES dashboard now runs through backend contracts." },
@@ -25,8 +26,9 @@ export default function App() {
         <Route path="/orderbook" element={<OrderbookPage />} />
         <Route path="/tradebook" element={<TradebookPage />} />
         <Route path="/positions" element={<PositionsPage />} />
+        <Route path="/tools" element={<ToolsPage />} />
         {pages
-          .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions"].includes(page.path))
+          .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions", "/tools"].includes(page.path))
           .map((page) => (
             <Route
               key={page.path}

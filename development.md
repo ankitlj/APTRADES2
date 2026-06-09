@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 9 - Positions
-- Last completed phase: Phase 9 - Positions
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, and the Phase 9 positions page is verified locally
+- Current phase: Phase 10 - Tools Reduced Scope
+- Last completed phase: Phase 10 - Tools Reduced Scope
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, and the Phase 10 reduced tools page is verified locally
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -642,6 +642,49 @@
 - Remaining risks:
   - Close-position actions are intentionally disabled in this phase.
   - Real open-position payloads may vary by broker account state, so the first deployed validation should confirm the live row shape and quote enrichment quality.
+
+### 2026-06-09 - Phase 10: Tools Reduced Scope
+- Goal: Show only the six approved MVP tools and keep unused tools out of the visible product flow.
+- Backend changes:
+  - None. The current repo does not have a backend tools-route registry that needs cleanup in this phase.
+- Frontend changes:
+  - Replaced the `/tools` placeholder with a real reduced-scope Tools page.
+  - Added a responsive tools grid:
+    - 1 column on mobile
+    - 2 columns on medium widths
+    - 3 columns on large widths
+    - 24px gap
+  - Added only the six approved MVP tools:
+    - Strategy Builder
+    - Strategy Portfolio
+    - Option Chain
+    - Option Greeks
+    - OI Tracker
+    - OI Profile
+  - Added 40x40 icon tiles and kept card heights inside the intended compact range.
+  - Updated the topbar phase label for Phase 10.
+  - Explicitly kept these tools out of the visible MVP tools flow:
+    - Max Pain
+    - Straddle Chart
+    - Straddle P&L
+    - Vol Surface
+    - GEX
+    - IV Smile
+- Files changed:
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/index.css`
+  - `frontend/src/pages/ToolsPage.tsx`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the same known sandbox filesystem denial
+- Manual user tasks:
+  - Wait for Vercel to deploy this phase after push.
+  - Open `/tools`.
+  - Verify only the six approved tools are visible.
+- Remaining risks:
+  - This phase is intentionally scope-reduction only; the individual tools themselves are still built in later phases.
 
 ## Phase 8 Response Examples
 

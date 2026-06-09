@@ -579,6 +579,60 @@ select {
   min-width: 980px;
 }
 
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.tool-card {
+  min-height: 190px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-muted);
+  display: grid;
+  gap: 18px;
+}
+
+.tool-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tool-icon-tile {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  background: linear-gradient(180deg, #ffffff 0%, #e8eef6 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #111827;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.tool-status {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.tool-card-body {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.tool-card-body strong {
+  font-size: 1.05rem;
+}
+
 .settings-panel {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -650,6 +704,10 @@ select {
   .dashboard-split {
     grid-template-columns: 1fr;
   }
+
+  .tools-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -676,6 +734,10 @@ select {
 
   .settings-panel,
   .stats-grid-positions {
+    grid-template-columns: 1fr;
+  }
+
+  .tools-grid {
     grid-template-columns: 1fr;
   }
 

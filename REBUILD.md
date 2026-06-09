@@ -440,3 +440,30 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - `curl http://127.0.0.1:5000/api/positions` returned `200` with a clean `not_configured` payload when Breeze env is absent
 - `python -m pytest` passed: `39 passed`
 - `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+
+## Phase 10 Tools Reduced Scope
+
+- Replaced the `/tools` placeholder with a real reduced-scope Tools page.
+- Added only the six approved MVP tools:
+  - Strategy Builder
+  - Strategy Portfolio
+  - Option Chain
+  - Option Greeks
+  - OI Tracker
+  - OI Profile
+- Kept the non-MVP tools out of the visible tools flow:
+  - Max Pain
+  - Straddle Chart
+  - Straddle P&L
+  - Vol Surface
+  - GEX
+  - IV Smile
+- Added responsive grid behavior:
+  - 1 column mobile
+  - 2 columns medium
+  - 3 columns large
+- Added 40x40 icon tiles and compact cards consistent with the playbook.
+
+## Phase 10 Verification
+
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
