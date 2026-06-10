@@ -3,6 +3,7 @@
 ## Current Status
 - Current phase: Phase 17 - Production Hardening (code complete; two manual deploy tasks deferred: Railway master-contract cron and the daily Breeze token-refresh decision)
 - Last completed phase: Phase 17 - Production Hardening
+- Planned next: Phase 18 - Performance and Caching (latency reduction) — detailed spec in the Phase Log below, NOT started
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
 - Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally, Phase 15 action-centre/logs contracts are verified locally, Phase 16 websocket live market data is verified locally, Phase 17 production hardening (rate limiting, structured errors, enriched readiness, shared error/empty UX, mobile pass) is verified locally (73 backend tests, 91-module frontend build, live HTTP smoke test)
 - Known blockers:
@@ -1074,6 +1075,30 @@
   - Rate-limit thresholds tuned for a single-user dashboard; revisit if more clients are added (would also need a Redis message queue for multi-worker Socket.IO).
   - The live-429 path is exercised in production rather than unit tests (the global limiter keeps its first default across test apps); the 429 response shape is covered by the shared 404/405 structured-error tests.
 - Next step: MVP is feature-complete through Phase 17. Remaining optional work is the deferred Phase 12 Option Greeks (to be computed inline in strategy code when needed) and the two manual deploy tasks above.
+
+### PLANNED - Phase 18: Performance and Caching (Latency Reduction) [NOT STARTED]
+- Status: SPEC ONLY. Nothing in this section is implemented yet. This is the plan to make the dashboard fast.
+- Problem (root cause, grounded in current code):
+  1. A new SQLAlchemy engine is built on every call. `SymbolResolver.resolve()` runs for every symbol and calls BOTH `ensure_tables()` and `create_session_factory()`; each calls `create_engine(...)` in `backend/app/db.py` -> a brand-new engine + pool + DB handshake every time, and `ensure_tables()` re-runs `create_all()` (a schema round-trip) each call. An option chain resolving ~20 strikes = ~40 fresh engines + 20 schema checks.
+  2. Breeze re-authenticates on every request. Each blueprint builds a fresh `BreezeGateway` in its `_gateway()` factory (see `backend/app/api/quotes.py`, `dashboard.py`, `positions.py`, `orders.py`, `options.py`, `oi.py`, `action_centre.py`). The `customerdetails` token exchange is cached only on that instance, which is discarded each request, so every quote does TWO ICICI round-trips (token exchange + quote) instead of one.
+  3. REST reads ignore the live cache. The market-data worker writes ticks to Redis (`md:tick:<exchange>:<token>`), but `QuoteService` / positions / option-chain call Breeze REST synchronously every time and never read Redis. `get_batch_quotes` loops sequentially (N round-trips in series).
+  4. Frontend refetches from zero on every navigation / filter change (no shared cache), replaying the whole slow chain.
+  - Note: there is NO literal market-hours gate causing this; the slowness is the synchronous Breeze-REST path on every read. It is the same whether the market is open or closed. Live websocket ticks (ticker, position LTP) already stream fast for subscribed symbols; option-chain and initial page loads are the slow REST paths.
+
+- Tier 1 (backend, quick wins, highest impact, lowest risk):
+  - `backend/app/db.py`: cache one engine per normalized DB URL (e.g. `@lru_cache` or module dict). Postgres pool config: `pool_size=5, max_overflow=10, pool_recycle=1800, pool_pre_ping=True`; branch for SQLite (no pool args). Cache the `sessionmaker` per URL. Make `ensure_tables()` idempotent via a module-level `set` of prepared URLs; stop calling `engine.dispose()` on the shared engine.
+  - `backend/app/services/symbol_resolver.py`: remove `ensure_tables()` from the `resolve()` hot path; add an in-memory TTL cache keyed by (symbol, exchange, product_type, expiry, right, strike) -> ResolvedInstrument (default TTL ~3600s, lock-guarded). Master-contract import clears it or rely on TTL.
+  - Shared BreezeGateway: one process-wide instance reused across requests so the customer-session token is exchanged once. Add `get_gateway()` stored in `app.extensions` keyed by (app_key, secret, token); rebuild when that tuple changes (covers daily token refresh on redeploy). Lock the lazy token fields; on a Breeze auth/session-expired error, clear the cached customer-session token and retry once. Point all blueprint `_gateway()` factories at it.
+- Tier 2 (backend, live data as primary read path):
+  - Redis-first quotes: in `QuoteService.get_quote`, after resolving, read `md:tick:<exchange>:<token>`; if fresh, return it (source `live_cache`) instead of calling Breeze; auto-subscribe the token on the worker so reads stay warm. Add a 1-2s short-TTL Redis cache for cold REST quotes to coalesce rapid clicks.
+  - Option-chain streaming: subscribe visible CE/PE strikes around ATM to the websocket while the chain page is open; overlay live LTP from Redis, keep a periodic `/optionchain` REST refresh for OI (OI is not in exchange-quote ticks).
+  - Parallelize `get_batch_quotes` with a bounded `ThreadPoolExecutor` (respect Breeze rate limits; reuse the shared thread-safe gateway; preserve order).
+- Tier 3 (frontend perceived speed):
+  - `useCachedResource(key, fetcher)` hook backed by a module Map (no new dependency): stale-while-revalidate so revisiting a page renders last data instantly and refreshes in the background.
+  - Live-first rendering: render the cached `useLiveQuote` tick immediately on dashboard/positions/option-chain; show loading only on a true cold start.
+- Testing: engine reused for same URL; `ensure_tables` idempotent; resolution cache hit + TTL expiry; shared gateway reused + token-cache invalidation on auth error; `get_quote` returns `live_cache` when Redis has a fresh tick (mock redis); batch quotes parallel preserves order. All existing tests stay green; `npm run build` passes.
+- Done when: a single quote does at most one Breeze round-trip and creates no new engine per request; a full option chain does not create dozens of engines; during market hours ticker/positions/option-chain LTP update from Redis/websocket without per-read Breeze REST; page navigation shows last data instantly; cold-start and degraded (Redis/DB/Breeze down) paths still work.
+- Risks: shared singletons across gunicorn threads need locks (gateway token cache, resolution cache); token expiry mid-session must invalidate the cached customer-session token and rebuild the gateway; SQLite vs Postgres engine args differ; cap parallel-batch concurrency for Breeze rate limits; keep quote cache TTL 1-2s and refresh OI periodically.
 
 ## Phase 13 Response Examples
 
