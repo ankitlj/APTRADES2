@@ -596,3 +596,25 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - `python -m pytest backend\\tests\\test_action_logs_contract.py` passed: `2 passed`
 - `python -m pytest` passed: `55 passed`
 - `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known workspace filesystem denial
+
+## Phase 16 WebSocket Live Market Data
+
+- Re-read the official Breeze WebSocket docs and the `breeze-connect` `ws_connect` / `subscribe_feeds` / `on_ticks` reference before implementation (stock-token `X.Y!token` format, exchange-quote and OHLCV tick shapes).
+- Architecture: Flask-SocketIO in `threading` async mode (no eventlet/gevent monkey-patching) so the existing REST stack, psycopg, and SQLAlchemy are untouched; the browser negotiates websocket or long-polling transport. All Breeze streaming logic is isolated in one `MarketDataWorker`, mirroring the BreezeGateway rule for REST.
+- Added `MarketDataWorker` (`backend/app/services/market_data_worker.py`):
+  - Lazy `breeze-connect` import; degrades safely (non-live state, REST keeps serving) if the library is missing, Breeze is unconfigured, or the connection fails.
+  - Subscribes by Breeze stock-token built from exchange prefix (NSE/NFO=4, BSE=1, BFO=8) plus the master-contract token; reverse map drives tick normalization.
+  - Normalizes ticks to `symbol/broker_symbol/exchange_code/token/ltp/open/high/low/close/change/change_percent/volume/oi/ts`.
+  - Writes latest tick per token to Redis (`md:tick:<exchange>:<token>`, 60s TTL) and keeps an in-memory snapshot for the REST fallback.
+  - Supervisor thread with exponential reconnect backoff and states `offline / connecting / live / degraded`; publishes ticks and status through an injected Socket.IO emit callback.
+- Added `backend/app/realtime.py` (single `SocketIO(async_mode="threading")` server, `init_realtime`, default NIFTY/BANKNIFTY watchlist, `connect/subscribe/unsubscribe` handlers resolving symbols to tokens via `SymbolResolver`).
+- Added `backend/app/api/market_data.py` REST endpoints: `/api/market-data/status`, `/api/market-data/snapshot`, `/api/market-data/watchlist` (always 200, REST degraded fallback).
+- Wired `init_realtime` + blueprint into `factory.py`; `run.py` uses `socketio.run`; `Procfile` switched to single gthread gunicorn worker; added `flask-socketio`, `simple-websocket`, `breeze-connect` to requirements/pyproject.
+- Frontend: added `socket.io-client`, `lib/realtime.ts`, `hooks/useLiveMarketData.tsx` (provider + `useLiveQuote` / `useLiveSubscribe`), wrapped `main.tsx`, added `/socket.io` vite proxy, topbar live/degraded/offline badge, live ticker + live LTP/P&L overlay on Dashboard and Positions, live badge on Option Chain, market-data REST clients/types, and live-state CSS.
+
+## Phase 16 Verification
+
+- `python -m pytest` passed: `68 passed` (55 prior + 13 new market-data tests)
+- `npm.cmd run build` passed: `88 modules`
+- Live `socketio.run` boot smoke test: `/api/market-data/status` returns `offline` cleanly without Breeze config, `/watchlist` and `/snapshot` return 200, the Socket.IO handshake `GET /socket.io/?EIO=4&transport=polling` returns a session id with a websocket upgrade, and `/api/health` still returns 200 (no REST regression).
+- Remaining: live broker tick shape and token-based subscription still need one deployed confirmation with a fresh Breeze session token (this workspace holds no Breeze secrets).

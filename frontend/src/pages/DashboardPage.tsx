@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   getDashboardAlerts,
@@ -10,6 +10,8 @@ import {
   type DashboardPosition,
   type DashboardSummaryResponse,
 } from "../lib/api";
+import { useLiveMarketData, useLiveSubscribe } from "../hooks/useLiveMarketData";
+import type { LiveTick, SubscriptionRequest } from "../lib/realtime";
 
 type AsyncState<T> = {
   data: T | null;
@@ -145,6 +147,18 @@ function ChartPanel({ state }: { state: AsyncState<DashboardChartResponse> }) {
   );
 }
 
+function applyLiveTick(position: DashboardPosition, tick: LiveTick | undefined): DashboardPosition {
+  if (!tick || tick.ltp === null || tick.ltp === undefined) {
+    return position;
+  }
+  const ltp = tick.ltp;
+  const pnl =
+    position.average_price !== null && position.average_price !== undefined
+      ? Number(((ltp - position.average_price) * position.quantity).toFixed(2))
+      : position.pnl;
+  return { ...position, ltp, pnl };
+}
+
 function PositionsTable({
   positions,
   status,
@@ -154,6 +168,8 @@ function PositionsTable({
   status: string | undefined;
   error: string | null | undefined;
 }) {
+  const { ticks } = useLiveMarketData();
+
   if (error) {
     return <p className="panel-message panel-error">Positions unavailable: {error}</p>;
   }
@@ -182,24 +198,28 @@ function PositionsTable({
           </tr>
         </thead>
         <tbody>
-          {positions.map((position) => (
-            <tr key={`${position.symbol}-${position.exchange_code}-${position.product_type}`}>
-              <td>
-                <div className="table-symbol">
-                  <strong>{position.symbol}</strong>
-                  <span>{position.broker_symbol}</span>
-                </div>
-              </td>
-              <td>{position.exchange_code}</td>
-              <td>{position.product_type}</td>
-              <td className="numeric">{formatNumber(position.quantity, 0)}</td>
-              <td className="numeric">{formatNumber(position.average_price)}</td>
-              <td className="numeric">{formatNumber(position.ltp)}</td>
-              <td className={`numeric ${toneClassName((position.pnl ?? 0) > 0 ? "positive" : (position.pnl ?? 0) < 0 ? "negative" : "neutral")}`}>
-                {formatNumber(position.pnl)}
-              </td>
-            </tr>
-          ))}
+          {positions.map((rawPosition) => {
+            const position = applyLiveTick(rawPosition, ticks[rawPosition.symbol.toUpperCase()]);
+            const isLive = Boolean(ticks[rawPosition.symbol.toUpperCase()]);
+            return (
+              <tr key={`${position.symbol}-${position.exchange_code}-${position.product_type}`}>
+                <td>
+                  <div className="table-symbol">
+                    <strong>{position.symbol}</strong>
+                    <span>{position.broker_symbol}</span>
+                  </div>
+                </td>
+                <td>{position.exchange_code}</td>
+                <td>{position.product_type}</td>
+                <td className="numeric">{formatNumber(position.quantity, 0)}</td>
+                <td className="numeric">{formatNumber(position.average_price)}</td>
+                <td className={`numeric ${isLive ? "cell-live" : ""}`}>{formatNumber(position.ltp)}</td>
+                <td className={`numeric ${toneClassName((position.pnl ?? 0) > 0 ? "positive" : (position.pnl ?? 0) < 0 ? "negative" : "neutral")}`}>
+                  {formatNumber(position.pnl)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -210,6 +230,19 @@ export function DashboardPage() {
   const [summaryState, setSummaryState] = useState<AsyncState<DashboardSummaryResponse>>(createInitialState);
   const [alertsState, setAlertsState] = useState<AsyncState<DashboardAlertsResponse>>(createInitialState);
   const [chartState, setChartState] = useState<AsyncState<DashboardChartResponse>>(createInitialState);
+
+  const positionSubscriptions = useMemo<SubscriptionRequest[]>(
+    () =>
+      (summaryState.data?.positions ?? [])
+        .filter((position) => position.exchange_code)
+        .map((position) => ({
+          symbol: position.symbol,
+          exchange: position.exchange_code,
+          product_type: position.product_type,
+        })),
+    [summaryState.data],
+  );
+  useLiveSubscribe(positionSubscriptions);
 
   useEffect(() => {
     let isMounted = true;

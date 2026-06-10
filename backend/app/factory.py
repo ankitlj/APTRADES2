@@ -12,6 +12,7 @@ from .api.dashboard import dashboard_bp
 from .api.debug import debug_bp
 from .api.health import health_bp
 from .api.logs import logs_bp
+from .api.market_data import market_data_bp
 from .api.master_contract import master_contract_bp
 from .api.oi import oi_bp
 from .api.options import options_bp
@@ -20,6 +21,7 @@ from .api.positions import positions_bp
 from .api.quotes import quotes_bp
 from .api.strategy import strategy_bp
 from .config import load_config
+from .realtime import init_realtime
 from .services.master_contract_service import MasterContractImportError, MasterContractService
 from .services.logs_service import LogsService
 
@@ -66,6 +68,7 @@ def create_app() -> Flask:
     app.register_blueprint(dashboard_bp, url_prefix=config.api_prefix)
     app.register_blueprint(action_centre_bp, url_prefix=config.api_prefix)
     app.register_blueprint(logs_bp, url_prefix=config.api_prefix)
+    app.register_blueprint(market_data_bp, url_prefix=config.api_prefix)
 
     @app.before_request
     def _capture_request_started_at() -> None:
@@ -91,4 +94,5 @@ def create_app() -> Flask:
         return response
 
     _register_cli(app)
+    init_realtime(app)
     return app

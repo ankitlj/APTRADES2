@@ -1,6 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { getPositions, type PositionRecord, type PositionsResponse } from "../lib/api";
+import { useLiveMarketData, useLiveSubscribe } from "../hooks/useLiveMarketData";
+import type { LiveTick, SubscriptionRequest } from "../lib/realtime";
+
+function applyLiveTick(position: PositionRecord, tick: LiveTick | undefined): PositionRecord {
+  if (!tick || tick.ltp === null || tick.ltp === undefined) {
+    return position;
+  }
+  const ltp = tick.ltp;
+  let pnl = position.pnl;
+  let pnlPercent = position.pnl_percent;
+  if (position.average_price !== null && position.average_price !== undefined) {
+    pnl = Number(((ltp - position.average_price) * position.quantity).toFixed(2));
+    const base = Math.abs(position.quantity) * position.average_price;
+    pnlPercent = base ? Number(((pnl / base) * 100).toFixed(2)) : position.pnl_percent;
+  }
+  return { ...position, ltp, pnl, pnl_percent: pnlPercent };
+}
 
 type PositionsState = {
   data: PositionsResponse | null;
@@ -71,21 +88,38 @@ export function PositionsPage() {
     void load();
   }, []);
 
+  const { ticks, connectionState } = useLiveMarketData();
+
+  const subscriptions = useMemo<SubscriptionRequest[]>(
+    () =>
+      (state.data?.positions ?? [])
+        .filter((position) => position.exchange_code)
+        .map((position) => ({
+          symbol: position.symbol,
+          exchange: position.exchange_code,
+          product_type: position.product_type,
+        })),
+    [state.data],
+  );
+  useLiveSubscribe(subscriptions);
+
   const positions = useMemo(() => {
     const rows = state.data?.positions ?? [];
-    return rows.filter((position) => {
-      if (productFilter !== "all" && position.product_type !== productFilter) {
-        return false;
-      }
-      if (directionFilter !== "all" && position.direction !== directionFilter) {
-        return false;
-      }
-      if (exchangeFilter !== "all" && position.exchange_code !== exchangeFilter) {
-        return false;
-      }
-      return true;
-    });
-  }, [directionFilter, exchangeFilter, productFilter, state.data]);
+    return rows
+      .filter((position) => {
+        if (productFilter !== "all" && position.product_type !== productFilter) {
+          return false;
+        }
+        if (directionFilter !== "all" && position.direction !== directionFilter) {
+          return false;
+        }
+        if (exchangeFilter !== "all" && position.exchange_code !== exchangeFilter) {
+          return false;
+        }
+        return true;
+      })
+      .map((position) => applyLiveTick(position, ticks[position.symbol.toUpperCase()]));
+  }, [directionFilter, exchangeFilter, productFilter, state.data, ticks]);
 
   const stats = useMemo(() => {
     const openPositions = positions.length;
@@ -126,12 +160,18 @@ export function PositionsPage() {
   }, [groupBy, positions]);
 
   const quoteBadge = state.data?.status === "ok" ? "Live" : "Paused";
+  const liveFeedMessage =
+    connectionState === "live"
+      ? "Streaming live LTP and P&L over the Breeze websocket."
+      : connectionState === "connecting"
+        ? "Connecting to the live websocket feed; showing REST values until ticks arrive."
+        : "Live websocket feed is unavailable; showing REST quote values.";
   const quoteMessage =
     state.data?.status === "not_configured"
       ? "Breeze positions are not configured yet."
       : state.data?.quote_status === "partial"
-        ? "Some rows are using raw Breeze position values because quote enrichment failed."
-        : "Live quote enrichment is active.";
+        ? `Some rows are using raw Breeze position values because quote enrichment failed. ${liveFeedMessage}`
+        : `Live quote enrichment is active. ${liveFeedMessage}`;
 
   return (
     <section className="route-page">
@@ -260,7 +300,7 @@ export function PositionsPage() {
                         <td>{position.product_type}</td>
                         <td className="numeric">{formatNumber(position.quantity, 0)}</td>
                         <td className="numeric">{formatNumber(position.average_price)}</td>
-                        <td className="numeric">{formatNumber(position.ltp)}</td>
+                        <td className={`numeric ${ticks[position.symbol.toUpperCase()] ? "cell-live" : ""}`}>{formatNumber(position.ltp)}</td>
                         <td className={`numeric ${(position.pnl ?? 0) > 0 ? "tone-positive" : (position.pnl ?? 0) < 0 ? "tone-negative" : "tone-neutral"}`}>
                           {formatNumber(position.pnl)}
                         </td>

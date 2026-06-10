@@ -773,3 +773,51 @@ export function getStrategyPayoff(legs: StrategyLeg[]) {
     body: JSON.stringify({ legs }),
   });
 }
+
+export interface MarketDataStatusPayload {
+  state: "offline" | "connecting" | "live" | "degraded";
+  configured: boolean;
+  subscriptions: number;
+  symbols: string[];
+  last_tick_at: string | null;
+  error: string | null;
+}
+
+export interface MarketDataStatusResponse {
+  status: string;
+  timestamp: string;
+  market_data: MarketDataStatusPayload;
+}
+
+export interface MarketDataTick {
+  symbol: string;
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  token: string;
+  stock_token: string;
+  ltp: number | null;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  change: number | null;
+  change_percent: number | null;
+  volume: number | null;
+  oi: number | null;
+  ts: string;
+}
+
+export interface MarketDataSnapshotResponse {
+  status: string;
+  timestamp: string;
+  ticks: MarketDataTick[];
+}
+
+export function getMarketDataStatus() {
+  return requestJson<MarketDataStatusResponse>("/api/market-data/status");
+}
+
+export function getMarketDataSnapshot() {
+  return requestJson<MarketDataSnapshotResponse>("/api/market-data/snapshot");
+}

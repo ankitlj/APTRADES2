@@ -2,6 +2,8 @@ import { useEffect, useState, type PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { getDashboardSummary, type DashboardSummaryResponse } from "../lib/api";
+import { useLiveMarketData } from "../hooks/useLiveMarketData";
+import type { MarketDataState } from "../lib/realtime";
 
 const navigation = [
   { to: "/dashboard", label: "Dashboard" },
@@ -33,6 +35,7 @@ export function AppShell({ children }: PropsWithChildren) {
     ? "Dashboard"
     : navigation.find((item) => item.to === location.pathname)?.label ?? extraPages[location.pathname] ?? "APTRADES v2";
   const [tickerState, setTickerState] = useState<TickerState>({ data: null, loading: isDashboard });
+  const { connectionState, ticks } = useLiveMarketData();
 
   useEffect(() => {
     let isMounted = true;
@@ -90,13 +93,18 @@ export function AppShell({ children }: PropsWithChildren) {
               {tickerState.loading ? (
                 <span className="ticker-chip">Syncing market snapshot...</span>
               ) : (
-                (tickerState.data?.ticker ?? []).map((item) => (
-                  <span key={item.symbol} className="ticker-chip">
-                    <strong>{item.symbol}</strong>
-                    <span>{item.ltp ?? "n/a"}</span>
-                    <em className={toneClassName(item.change_percent ?? 0)}>{item.change_percent ?? 0}%</em>
-                  </span>
-                ))
+                (tickerState.data?.ticker ?? []).map((item) => {
+                  const live = ticks[item.symbol.toUpperCase()];
+                  const ltp = live?.ltp ?? item.ltp;
+                  const changePercent = live?.change_percent ?? item.change_percent ?? 0;
+                  return (
+                    <span key={item.symbol} className={`ticker-chip${live ? " ticker-chip-live" : ""}`}>
+                      <strong>{item.symbol}</strong>
+                      <span>{ltp ?? "n/a"}</span>
+                      <em className={toneClassName(changePercent)}>{changePercent}%</em>
+                    </span>
+                  );
+                })
               )}
             </div>
           ) : (
@@ -105,9 +113,9 @@ export function AppShell({ children }: PropsWithChildren) {
               <h2>{currentPage}</h2>
             </div>
           )}
-          <div className="topbar-status">
-            <span className="status-dot" />
-            Phase 15 action centre and logs
+          <div className={`topbar-status topbar-status-${connectionState}`} title={liveStatusLabel(connectionState)}>
+            <span className={`status-dot status-dot-${connectionState}`} />
+            {liveStatusLabel(connectionState)}
           </div>
         </header>
         <main className="main-content">{children}</main>
@@ -136,4 +144,17 @@ function toneClassName(value: number) {
     return "tone-negative";
   }
   return "tone-neutral";
+}
+
+function liveStatusLabel(state: MarketDataState): string {
+  switch (state) {
+    case "live":
+      return "Live market data";
+    case "connecting":
+      return "Connecting live feed";
+    case "degraded":
+      return "Live degraded - REST fallback";
+    default:
+      return "Live offline - REST fallback";
+  }
 }

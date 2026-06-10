@@ -6,6 +6,17 @@ import {
   type OptionChainResponse,
   type OptionChainRow,
 } from "../lib/api";
+import { useLiveMarketData } from "../hooks/useLiveMarketData";
+
+function liveBadgeLabel(state: string): string {
+  if (state === "live") {
+    return "Live feed";
+  }
+  if (state === "connecting") {
+    return "Connecting";
+  }
+  return "REST only";
+}
 
 type OptionChainState = {
   expiries: string[];
@@ -151,6 +162,8 @@ export function OptionChainPage() {
     void loadChain();
   }, [selectedExpiry, strikeCount]);
 
+  const { connectionState } = useLiveMarketData();
+
   const previousCloseDelta = useMemo(() => {
     if (!state.data?.underlying_ltp || !state.data.previous_close) {
       return null;
@@ -171,6 +184,10 @@ export function OptionChainPage() {
           </h3>
           <p className="panel-message">Live Breeze chain normalized into a strike grid with expiry control, ATM context, and real broker errors.</p>
         </div>
+        <span className={`section-pill live-pill live-pill-${connectionState}`} title={`Market data: ${connectionState}`}>
+          <span className={`status-dot status-dot-${connectionState}`} />
+          {liveBadgeLabel(connectionState)}
+        </span>
       </div>
 
       <article className="panel route-panel">

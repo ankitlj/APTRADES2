@@ -687,6 +687,81 @@ select {
   color: var(--warning);
 }
 
+/* Live market-data connection states (topbar badge, dots, pills) */
+.status-dot-live {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+.status-dot-connecting {
+  background: var(--warning);
+}
+
+.status-dot-degraded {
+  background: var(--warning);
+}
+
+.status-dot-offline {
+  background: #9ca3af;
+}
+
+.topbar-status-live {
+  color: var(--positive);
+}
+
+.topbar-status-connecting,
+.topbar-status-degraded {
+  color: var(--warning);
+}
+
+.topbar-status-offline {
+  color: var(--text-muted);
+}
+
+.ticker-chip-live {
+  border-color: rgba(22, 163, 74, 0.45);
+  box-shadow: 0 0 0 1px rgba(22, 163, 74, 0.25), 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.cell-live {
+  position: relative;
+  color: var(--positive);
+  transition: background 0.4s ease;
+}
+
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-pill-live {
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--positive);
+}
+
+.live-pill-connecting {
+  background: rgba(180, 83, 9, 0.12);
+  color: var(--warning);
+}
+
+.live-pill-degraded,
+.live-pill-offline {
+  background: var(--surface-strong);
+  color: var(--text-muted);
+}
+
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .table-symbol strong {
   font-size: 0.95rem;
 }

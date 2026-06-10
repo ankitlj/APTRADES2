@@ -6,3 +6,6 @@ SQLAlchemy>=2.0,<3.0
 alembic>=1.13,<2.0
 psycopg[binary]>=3.2,<4.0
 redis>=5.0,<6.0
+flask-socketio>=5.3,<6.0
+simple-websocket>=1.0,<2.0
+breeze-connect>=1.0.59

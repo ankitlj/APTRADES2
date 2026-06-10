@@ -1,12 +1,13 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 15 - Action Centre and Logs
-- Last completed phase: Phase 15 - Action Centre and Logs
+- Current phase: Phase 16 - WebSocket Live Market Data
+- Last completed phase: Phase 16 - WebSocket Live Market Data
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally, Phase 15 action-centre/logs contracts are verified locally
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally, Phase 15 action-centre/logs contracts are verified locally, Phase 16 websocket live market data is verified locally (worker unit tests, REST contracts, and a live socket.io handshake smoke test)
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
+  - Live Breeze websocket numbers still need deployed verification with a fresh session token; this workspace has no Breeze secrets, so streaming was proven end-to-end with mocked Breeze plus a real socket.io transport handshake.
 
 ## Environment
 - Backend: Flask 3 skeleton
@@ -966,6 +967,69 @@
   - Pending rows are currently sourced from live cancellable broker orders. Additional future action types should feed the same queue instead of creating a parallel system.
   - Approve is a real broker-side cancel request, so use it only on orders you intend to cancel.
 
+### 2026-06-10 - Phase 16: WebSocket Live Market Data
+- Goal: Add low-latency Breeze WebSocket streaming after the REST pages are stable, with a safe degraded fallback to REST.
+- Architecture decision: Flask-SocketIO runs in `threading` async mode (no eventlet/gevent monkey-patching), so the existing REST stack, psycopg, and SQLAlchemy are untouched. The browser negotiates websocket or long-polling transport transparently. All Breeze *streaming* logic is isolated in one `MarketDataWorker`, mirroring the BreezeGateway rule for REST.
+- Backend changes:
+  - Added `MarketDataWorker` in `backend/app/services/market_data_worker.py`:
+    - Lazy `breeze-connect` import — if the library is missing, Breeze is not configured, or the connection fails, the worker reports a non-live state and REST keeps serving (degraded mode).
+    - Subscribes by Breeze stock-token `X.Y!token` (built from exchange prefix NSE/NFO=4, BSE=1, BFO=8 and the master-contract token); keeps a reverse map for tick normalization.
+    - Normalizes Breeze exchange-quote ticks into a stable shape: `symbol, broker_symbol, exchange_code, token, ltp, open, high, low, close, change, change_percent, volume, oi, ts`.
+    - Writes the latest tick per token to Redis (`md:tick:<exchange>:<token>`, 60s TTL) and keeps an in-memory snapshot for the REST fallback.
+    - Publishes normalized ticks and status changes through an injected publish callback (Socket.IO emit).
+    - Supervisor thread with exponential reconnect backoff (5s -> 60s) and lifecycle states `offline / connecting / live / degraded`.
+  - Added `backend/app/realtime.py`: the single `SocketIO(async_mode="threading")` server, `init_realtime(app)`, default dashboard watchlist (NIFTY, BANKNIFTY futures), and `connect / subscribe / unsubscribe` handlers that resolve display symbols to broker tokens via `SymbolResolver` before subscribing.
+  - Added `backend/app/api/market_data.py`: `GET /api/market-data/status`, `GET /api/market-data/snapshot`, `GET /api/market-data/watchlist` (REST status + degraded fallback, always 200).
+  - Wired `init_realtime(app)` and the market-data blueprint into `factory.py`; updated `run.py` to use `socketio.run(...)` for local dev.
+  - Updated `Procfile` to `gunicorn --worker-class gthread --threads 8 --workers 1` so a single worker owns the websocket connection while REST stays multi-threaded.
+  - Added `flask-socketio`, `simple-websocket`, and `breeze-connect` to `requirements.txt` and `pyproject.toml`.
+- Frontend changes:
+  - Added `socket.io-client` dependency, `frontend/src/lib/realtime.ts` (typed socket factory + `LiveTick` / `MarketDataStatus` types), and `frontend/src/hooks/useLiveMarketData.tsx` (provider + `useLiveQuote`, `useLiveSubscribe`, `useLiveMarketData`).
+  - Wrapped the app in `LiveMarketDataProvider` (`main.tsx`) and added a `/socket.io` websocket proxy to `vite.config.ts`.
+  - Topbar now shows a live/connecting/degraded/offline badge with a pulsing status dot; the dashboard ticker overlays live LTP and % change.
+  - Dashboard and Positions overlay live LTP and recompute P&L from ticks (with a `cell-live` highlight) and subscribe to their position symbols; Option Chain shows a live/REST refresh badge.
+  - Added market-data REST clients/types to `lib/api.ts` and live-state styles to `index.css`.
+- Files changed:
+  - `backend/app/services/market_data_worker.py`
+  - `backend/app/realtime.py`
+  - `backend/app/api/market_data.py`
+  - `backend/app/factory.py`
+  - `backend/run.py`
+  - `backend/requirements.txt`
+  - `backend/pyproject.toml`
+  - `Procfile`
+  - `backend/tests/test_market_data_worker.py`
+  - `backend/tests/test_market_data_contract.py`
+  - `frontend/package.json`
+  - `frontend/src/lib/realtime.ts`
+  - `frontend/src/hooks/useLiveMarketData.tsx`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/main.tsx`
+  - `frontend/vite.config.ts`
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/pages/DashboardPage.tsx`
+  - `frontend/src/pages/PositionsPage.tsx`
+  - `frontend/src/pages/OptionChainPage.tsx`
+  - `frontend/src/index.css`
+  - `.gitignore`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - Re-read the official Breeze WebSocket docs and the `breeze-connect` `ws_connect` / `subscribe_feeds` / `on_ticks` reference (stock-token format, exchange-quote and OHLCV tick shapes) before implementation.
+  - `python -m pytest` -> `68 passed` (55 prior + 13 new market-data tests).
+  - New worker tests cover stock-token building, subscribe/unsubscribe registry, tick normalization + symbol mapping, fallback without subscription, Redis write, and the not-configured/offline path.
+  - `npm.cmd run build` -> passed, 88 modules.
+  - Live boot smoke test (`socketio.run` dev server): `/api/market-data/status` returns `offline` cleanly without Breeze config, `/watchlist` and `/snapshot` return 200, the Socket.IO handshake `GET /socket.io/?EIO=4&transport=polling` returns a session id with a websocket upgrade, and `/api/health` still returns 200 (no REST regression).
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this commit.
+  - Confirm Railway uses the new gthread Procfile worker (single worker) and that `BREEZE_SESSION_TOKEN` is fresh.
+  - Open `/dashboard` and confirm the topbar badge turns "Live", the ticker streams NIFTY/BANKNIFTY, and position LTP/P&L update live.
+  - Open `/positions` and `/optionchain` and confirm the live badge plus live LTP overlay.
+- Remaining risks:
+  - Streaming was validated with mocked Breeze plus a real socket.io transport; the live broker tick shape and token-based subscription still need one deployed confirmation with real credentials.
+  - Threading async mode under gunicorn favors a single worker; scaling out later would need a Redis message queue for Socket.IO. Acceptable for this single-user dashboard.
+  - Next phase: Phase 17 - Production Hardening (rate limits, structured errors, readiness incl. websocket status, daily master-contract cron, mobile final pass, full smoke test).
+
 ## Phase 13 Response Examples
 
 - Endpoint: `GET /api/oi/tracker?underlying=NIFTY&expiry=2026-06-30`
@@ -1111,7 +1175,26 @@
 - Response: `{ "status": "ok", "rows": [{ "id": "app-4", "kind": "app", "level": "warning", "source": "action-centre", "event_type": "reject", "message": "Rejected action 4 for order 12345." }], "lines": ["[2026-06-10T...] WARNING APP action-centre reject Rejected action 4 for order 12345."] }`
 - Test command: `curl http://127.0.0.1:5000/api/logs/live`
 
+- Endpoint: `GET /api/market-data/status`
+- Request: no body
+- Response: `{ "status": "ok", "timestamp": "<UTC ISO8601>", "market_data": { "state": "offline|connecting|live|degraded", "configured": false, "subscriptions": 0, "symbols": [], "last_tick_at": null, "error": null } }`
+- Test command: `curl http://127.0.0.1:5000/api/market-data/status`
+
+- Endpoint: `GET /api/market-data/snapshot`
+- Request: no body
+- Response: `{ "status": "ok", "timestamp": "<UTC ISO8601>", "ticks": [{ "symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "token": "62329", "stock_token": "4.1!62329", "ltp": 23440.0, "close": 23451.7, "change": -11.7, "change_percent": -0.05, "volume": 100.0, "oi": 4763100.0, "ts": "<UTC ISO8601>" }] }`
+- Test command: `curl http://127.0.0.1:5000/api/market-data/snapshot`
+
+- Endpoint: `GET /api/market-data/watchlist`
+- Request: no body
+- Response: `{ "status": "ok", "watchlist": [{ "symbol": "NIFTY", "exchange": "NFO", "product_type": "futures" }, { "symbol": "BANKNIFTY", "exchange": "NFO", "product_type": "futures" }] }`
+- Test command: `curl http://127.0.0.1:5000/api/market-data/watchlist`
+
+- Socket.IO: connect to `/socket.io` (websocket or polling). On connect the server streams the default watchlist and emits `status` (MarketDataStatus) plus `tick` events. Client may emit `subscribe` / `unsubscribe` with `{ "symbols": [{ "symbol": "SBIN", "exchange": "NSE", "product_type": "cash" }] }`.
+- Test command: `curl "http://127.0.0.1:5000/socket.io/?EIO=4&transport=polling"`
+
 ## Deployment Notes
-- Last commit: pending Phase 15 action-centre/logs commit
+- Last commit: pending Phase 16 websocket live market data commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 15 action-centre/logs contracts are verified locally through backend tests and a production frontend build
+- Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
+- Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded

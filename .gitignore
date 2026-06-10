@@ -211,6 +211,11 @@ frontend/vite.config.d.ts
 !frontend/src/lib/
 !frontend/src/lib/**
 
+# Local SQLite artifacts from test/dev runs
+backend/*.db
+*.sqlite
+*.sqlite3
+
 # Ruff stuff:
 .ruff_cache/
 
