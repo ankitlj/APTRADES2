@@ -1,10 +1,10 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 16 - WebSocket Live Market Data
-- Last completed phase: Phase 16 - WebSocket Live Market Data
+- Current phase: Phase 17 - Production Hardening (code complete; two manual deploy tasks deferred: Railway master-contract cron and the daily Breeze token-refresh decision)
+- Last completed phase: Phase 17 - Production Hardening
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally, Phase 15 action-centre/logs contracts are verified locally, Phase 16 websocket live market data is verified locally (worker unit tests, REST contracts, and a live socket.io handshake smoke test)
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally, Phase 15 action-centre/logs contracts are verified locally, Phase 16 websocket live market data is verified locally, Phase 17 production hardening (rate limiting, structured errors, enriched readiness, shared error/empty UX, mobile pass) is verified locally (73 backend tests, 91-module frontend build, live HTTP smoke test)
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
   - Live Breeze websocket numbers still need deployed verification with a fresh session token; this workspace has no Breeze secrets, so streaming was proven end-to-end with mocked Breeze plus a real socket.io transport handshake.
@@ -1030,6 +1030,51 @@
   - Threading async mode under gunicorn favors a single worker; scaling out later would need a Redis message queue for Socket.IO. Acceptable for this single-user dashboard.
   - Next phase: Phase 17 - Production Hardening (rate limits, structured errors, readiness incl. websocket status, daily master-contract cron, mobile final pass, full smoke test).
 
+### 2026-06-11 - Phase 17: Production Hardening
+- Goal: Make the system stable enough for daily use — rate limits, structured errors, richer readiness, consistent error/empty/retry UX, and a mobile pass. Two deploy-only tasks (Railway master-contract cron, daily Breeze token-refresh decision) are intentionally deferred to the user.
+- Backend changes:
+  - Added structured error handlers (`backend/app/errors.py`): every `/api/*` failure returns one shape `{ "status": "error", "error": { "code", "message" } }` (covers 400/404/405/429 via the HTTPException handler and a safety-net 500 that never leaks internals).
+  - Added rate limiting (`backend/app/rate_limit.py`, `flask-limiter`): default `600 per minute` per client, Redis storage when `REDIS_URL` is set else in-memory; `/api/health*`, `/api/market-data*`, and `/socket.io` are exempt so health checks and the live feed are never throttled. Tunable via `RATELIMIT_DEFAULT` / `RATELIMIT_ENABLED`.
+  - Enriched health: `/api/health/readiness` now reports `breeze` (config-only, no network) and `websocket` (live worker state); `/api/health/deployment` adds `master_contract` status and `websocket`. All checks are failure-safe and never raise.
+  - Wired `register_error_handlers` + `init_rate_limiting` into `factory.py`; added `flask-limiter` to requirements/pyproject.
+- Frontend changes:
+  - Added shared `ErrorState` (with optional retry), `EmptyState`, and a top-level `ErrorBoundary` (recoverable fallback instead of a white screen).
+  - Applied the shared components and consistent retry buttons to Dashboard (chart, alerts, positions), Positions, Orderbook, Tradebook, and Option Chain; refactored the dashboard loader into a reusable `loadDashboard` callback for retry.
+  - Mobile final pass in `index.css`: route headers/toolbars stack, order/trade stat grids reflow, tables scroll, and state-card styles.
+- Files changed:
+  - `backend/app/errors.py`
+  - `backend/app/rate_limit.py`
+  - `backend/app/api/health.py`
+  - `backend/app/factory.py`
+  - `backend/requirements.txt`
+  - `backend/pyproject.toml`
+  - `backend/tests/test_hardening_contract.py`
+  - `frontend/src/components/ErrorState.tsx`
+  - `frontend/src/components/EmptyState.tsx`
+  - `frontend/src/components/ErrorBoundary.tsx`
+  - `frontend/src/main.tsx`
+  - `frontend/src/pages/DashboardPage.tsx`
+  - `frontend/src/pages/PositionsPage.tsx`
+  - `frontend/src/pages/OrderbookPage.tsx`
+  - `frontend/src/pages/TradebookPage.tsx`
+  - `frontend/src/pages/OptionChainPage.tsx`
+  - `frontend/src/index.css`
+  - `OPERATIONS.md` (new runbook: token refresh, cron, rate limits, health)
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - `python -m pytest` -> `73 passed` (68 prior + 5 new hardening tests: structured 404/405, rate-limit header present, readiness websocket+breeze, deployment master_contract+websocket).
+  - `npm.cmd run build` -> passed, 91 modules.
+  - Live HTTP smoke test: readiness shows `breeze`+`websocket`, deployment shows `master_contract`+`websocket`, an unknown `/api/*` route returns the structured 404 shape, `/api/debug/breeze-auth` carries `X-RateLimit-Limit: 600`, and `/api/health` is exempt from the limit.
+- Manual user tasks (deferred by request):
+  - Set the Railway daily master-contract cron (see OPERATIONS.md section 2).
+  - Decide the daily Breeze token-refresh workflow (see OPERATIONS.md section 1).
+  - After deploy, run the final smoke checklist across all MVP routes with a fresh Breeze token.
+- Remaining risks:
+  - Rate-limit thresholds tuned for a single-user dashboard; revisit if more clients are added (would also need a Redis message queue for multi-worker Socket.IO).
+  - The live-429 path is exercised in production rather than unit tests (the global limiter keeps its first default across test apps); the 429 response shape is covered by the shared 404/405 structured-error tests.
+- Next step: MVP is feature-complete through Phase 17. Remaining optional work is the deferred Phase 12 Option Greeks (to be computed inline in strategy code when needed) and the two manual deploy tasks above.
+
 ## Phase 13 Response Examples
 
 - Endpoint: `GET /api/oi/tracker?underlying=NIFTY&expiry=2026-06-30`
@@ -1082,8 +1127,11 @@
 
 - Endpoint: `GET /api/health/readiness`
 - Request: no body
-- Response: `{ "status": "ok", "checks": { "api": "online", "postgres": "not_configured", "redis": "not_configured", "breeze": "not_configured" }, "timestamp": "<UTC ISO8601>" }`
+- Response: `{ "status": "ok", "checks": { "api": "online", "postgres": "not_configured", "redis": "not_configured", "breeze": "configured|not_configured", "websocket": "offline|connecting|live|degraded" }, "timestamp": "<UTC ISO8601>" }`
 - Test command: `curl http://127.0.0.1:5000/api/health/readiness`
+
+- Structured error shape (all `/api/*` failures): `{ "status": "error", "error": { "code": 404, "message": "..." } }`. Applies to 400/404/405/429/500. Rate limiting: default `600 per minute` per client (env `RATELIMIT_DEFAULT` / `RATELIMIT_ENABLED`); `/api/health*`, `/api/market-data*`, and `/socket.io` are exempt.
+- Test command: `curl -i http://127.0.0.1:5000/api/does-not-exist`
 
 - Endpoint: `GET /api/health/deployment`
 - Request: no body
@@ -1194,7 +1242,7 @@
 - Test command: `curl "http://127.0.0.1:5000/socket.io/?EIO=4&transport=polling"`
 
 ## Deployment Notes
-- Last commit: pending Phase 16 websocket live market data commit
+- Last commit: pending Phase 17 production hardening commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
 - Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded

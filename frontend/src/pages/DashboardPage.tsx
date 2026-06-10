@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   getDashboardAlerts,
@@ -12,6 +12,7 @@ import {
 } from "../lib/api";
 import { useLiveMarketData, useLiveSubscribe } from "../hooks/useLiveMarketData";
 import type { LiveTick, SubscriptionRequest } from "../lib/realtime";
+import { ErrorState } from "../components/ErrorState";
 
 type AsyncState<T> = {
   data: T | null;
@@ -101,9 +102,9 @@ function chartPath(points: DashboardChartPoint[]) {
     .join(" ");
 }
 
-function ChartPanel({ state }: { state: AsyncState<DashboardChartResponse> }) {
+function ChartPanel({ state, onRetry }: { state: AsyncState<DashboardChartResponse>; onRetry: () => void }) {
   if (state.error) {
-    return <p className="panel-message panel-error">Chart unavailable: {state.error}</p>;
+    return <ErrorState title="Chart unavailable" message={state.error} onRetry={onRetry} />;
   }
   if (state.loading) {
     return <p className="panel-message">Loading chart data...</p>;
@@ -163,15 +164,17 @@ function PositionsTable({
   positions,
   status,
   error,
+  onRetry,
 }: {
   positions: DashboardPosition[];
   status: string | undefined;
   error: string | null | undefined;
+  onRetry: () => void;
 }) {
   const { ticks } = useLiveMarketData();
 
   if (error) {
-    return <p className="panel-message panel-error">Positions unavailable: {error}</p>;
+    return <ErrorState title="Positions unavailable" message={error} onRetry={onRetry} />;
   }
   if (!positions.length) {
     return (
@@ -244,53 +247,49 @@ export function DashboardPage() {
   );
   useLiveSubscribe(positionSubscriptions);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadDashboard = useCallback(async () => {
+    setSummaryState((current) => ({ ...current, loading: true, error: null }));
+    setAlertsState((current) => ({ ...current, loading: true, error: null }));
+    setChartState((current) => ({ ...current, loading: true, error: null }));
 
-    async function load() {
-      const [summaryResult, alertsResult, chartResult] = await Promise.allSettled([
-        getDashboardSummary(),
-        getDashboardAlerts(),
-        getDashboardChart("NIFTY"),
-      ]);
-      if (!isMounted) {
-        return;
-      }
+    const [summaryResult, alertsResult, chartResult] = await Promise.allSettled([
+      getDashboardSummary(),
+      getDashboardAlerts(),
+      getDashboardChart("NIFTY"),
+    ]);
 
-      setSummaryState(
-        summaryResult.status === "fulfilled"
-          ? { data: summaryResult.value, loading: false, error: null }
-          : {
-              data: null,
-              loading: false,
-              error: summaryResult.reason instanceof Error ? summaryResult.reason.message : "Unknown error",
-            },
-      );
-      setAlertsState(
-        alertsResult.status === "fulfilled"
-          ? { data: alertsResult.value, loading: false, error: null }
-          : {
-              data: null,
-              loading: false,
-              error: alertsResult.reason instanceof Error ? alertsResult.reason.message : "Unknown error",
-            },
-      );
-      setChartState(
-        chartResult.status === "fulfilled"
-          ? { data: chartResult.value, loading: false, error: null }
-          : {
-              data: null,
-              loading: false,
-              error: chartResult.reason instanceof Error ? chartResult.reason.message : "Unknown error",
-            },
-      );
-    }
-
-    void load();
-    return () => {
-      isMounted = false;
-    };
+    setSummaryState(
+      summaryResult.status === "fulfilled"
+        ? { data: summaryResult.value, loading: false, error: null }
+        : {
+            data: null,
+            loading: false,
+            error: summaryResult.reason instanceof Error ? summaryResult.reason.message : "Unknown error",
+          },
+    );
+    setAlertsState(
+      alertsResult.status === "fulfilled"
+        ? { data: alertsResult.value, loading: false, error: null }
+        : {
+            data: null,
+            loading: false,
+            error: alertsResult.reason instanceof Error ? alertsResult.reason.message : "Unknown error",
+          },
+    );
+    setChartState(
+      chartResult.status === "fulfilled"
+        ? { data: chartResult.value, loading: false, error: null }
+        : {
+            data: null,
+            loading: false,
+            error: chartResult.reason instanceof Error ? chartResult.reason.message : "Unknown error",
+          },
+    );
   }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   return (
     <section className="dashboard-page">
@@ -314,7 +313,7 @@ export function DashboardPage() {
             </div>
             <span className="section-pill">{chartState.loading ? "Loading" : chartState.data?.interval ?? "1day"}</span>
           </div>
-          <ChartPanel state={chartState} />
+          <ChartPanel state={chartState} onRetry={() => void loadDashboard()} />
         </article>
 
         <article className="panel alerts-card">
@@ -326,7 +325,7 @@ export function DashboardPage() {
             <span className="section-pill">{alertsState.loading ? "Syncing" : `${alertsState.data?.alerts.length ?? 0} items`}</span>
           </div>
           {alertsState.error ? (
-            <p className="panel-message panel-error">Alerts unavailable: {alertsState.error}</p>
+            <ErrorState title="Alerts unavailable" message={alertsState.error} onRetry={() => void loadDashboard()} />
           ) : (
             <div className="alerts-stack">
               {(alertsState.data?.alerts ?? []).map((alert) => (
@@ -355,6 +354,7 @@ export function DashboardPage() {
           positions={summaryState.data?.positions ?? []}
           status={summaryState.data?.positions_status}
           error={summaryState.error ?? summaryState.data?.positions_error}
+          onRetry={() => void loadDashboard()}
         />
       </article>
     </section>

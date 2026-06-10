@@ -1186,6 +1186,88 @@ select {
   }
 }
 
+/* Shared error / empty / boundary state cards (Phase 17 hardening) */
+.state-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.state-error {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.state-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.state-error .state-title {
+  color: var(--negative);
+}
+
+.state-message {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.state-retry {
+  margin-top: 4px;
+}
+
+.app-error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 24px;
+}
+
+/* Mobile final pass (Phase 17) */
+@media (max-width: 720px) {
+  .main-content {
+    padding: 12px 12px 96px;
+  }
+
+  .route-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .route-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .route-toolbar .toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .stats-grid-orders,
+  .stats-grid-trades {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .market-ticker {
+    gap: 6px;
+  }
+}
+
 @media (max-width: 900px) {
   .sidebar {
     display: none;

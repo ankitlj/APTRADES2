@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { getTrades, type TradeRecord, type TradesResponse } from "../lib/api";
+import { ErrorState } from "../components/ErrorState";
+import { EmptyState } from "../components/EmptyState";
 
 type TradebookState = {
   data: TradesResponse | null;
@@ -119,9 +121,11 @@ export function TradebookPage() {
           </article>
         </div>
 
-        {state.error ? <p className="panel-message panel-error">Trades unavailable: {state.error}</p> : null}
+        {state.error ? <ErrorState title="Trades unavailable" message={state.error} onRetry={() => void load()} /> : null}
         {state.loading ? <p className="panel-message">Loading tradebook...</p> : null}
-        {!state.loading && !state.error && !trades.length ? <p className="panel-message">No trades returned for this filter window.</p> : null}
+        {!state.loading && !state.error && !trades.length ? (
+          <EmptyState title="No trades" message="No trades returned for this filter window." />
+        ) : null}
 
         {!state.loading && !state.error && trades.length ? (
           <div className="table-wrap">

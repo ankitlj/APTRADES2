@@ -7,6 +7,8 @@ import {
   type OrderRecord,
   type OrdersResponse,
 } from "../lib/api";
+import { ErrorState } from "../components/ErrorState";
+import { EmptyState } from "../components/EmptyState";
 
 type OrderbookState = {
   data: OrdersResponse | null;
@@ -176,9 +178,11 @@ export function OrderbookPage() {
         </div>
 
         {state.actionMessage ? <p className="panel-message">{state.actionMessage}</p> : null}
-        {state.error ? <p className="panel-message panel-error">Orders unavailable: {state.error}</p> : null}
+        {state.error ? <ErrorState title="Orders unavailable" message={state.error} onRetry={() => void load()} /> : null}
         {state.loading ? <p className="panel-message">Loading orderbook...</p> : null}
-        {!state.loading && !state.error && !orders.length ? <p className="panel-message">No orders returned for this filter window.</p> : null}
+        {!state.loading && !state.error && !orders.length ? (
+          <EmptyState title="No orders" message="No orders returned for this filter window." />
+        ) : null}
 
         {!state.loading && !state.error && orders.length ? (
           <div className="table-wrap">

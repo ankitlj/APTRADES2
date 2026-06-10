@@ -7,6 +7,7 @@ import {
   type OptionChainRow,
 } from "../lib/api";
 import { useLiveMarketData } from "../hooks/useLiveMarketData";
+import { ErrorState } from "../components/ErrorState";
 
 function liveBadgeLabel(state: string): string {
   if (state === "live") {
@@ -262,11 +263,7 @@ export function OptionChainPage() {
         </div>
 
         {state.error ? (
-          <div className="option-chain-error-card">
-            <p className="metric-label">Broker offline</p>
-            <strong>Option chain unavailable</strong>
-            <p className="panel-message">{state.error}</p>
-          </div>
+          <ErrorState title="Option chain unavailable" message={state.error} onRetry={() => void loadChain()} />
         ) : null}
 
         {state.loadingChain && !state.data ? <p className="panel-message">Loading option chain...</p> : null}

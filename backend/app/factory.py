@@ -21,6 +21,8 @@ from .api.positions import positions_bp
 from .api.quotes import quotes_bp
 from .api.strategy import strategy_bp
 from .config import load_config
+from .errors import register_error_handlers
+from .rate_limit import init_rate_limiting
 from .realtime import init_realtime
 from .services.master_contract_service import MasterContractImportError, MasterContractService
 from .services.logs_service import LogsService
@@ -93,6 +95,8 @@ def create_app() -> Flask:
         )
         return response
 
+    register_error_handlers(app)
+    init_rate_limiting(app)
     _register_cli(app)
     init_realtime(app)
     return app

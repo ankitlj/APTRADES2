@@ -618,3 +618,19 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - `npm.cmd run build` passed: `88 modules`
 - Live `socketio.run` boot smoke test: `/api/market-data/status` returns `offline` cleanly without Breeze config, `/watchlist` and `/snapshot` return 200, the Socket.IO handshake `GET /socket.io/?EIO=4&transport=polling` returns a session id with a websocket upgrade, and `/api/health` still returns 200 (no REST regression).
 - Remaining: live broker tick shape and token-based subscription still need one deployed confirmation with a fresh Breeze session token (this workspace holds no Breeze secrets).
+
+## Phase 17 Production Hardening
+
+- Structured error handlers (`backend/app/errors.py`): every `/api/*` failure returns `{ "status": "error", "error": { "code", "message" } }` (400/404/405/429 via the HTTPException handler, plus a safety-net 500 that logs server-side and never leaks internals).
+- Rate limiting (`backend/app/rate_limit.py`, `flask-limiter`): default `600 per minute` per client, Redis storage when `REDIS_URL` is set else memory; `/api/health*`, `/api/market-data*`, and `/socket.io` exempt so health and the live feed are never throttled. Tunable via `RATELIMIT_DEFAULT` / `RATELIMIT_ENABLED`.
+- Enriched health: readiness adds `breeze` (config-only, no network) and `websocket` (live worker state); deployment adds `master_contract` and `websocket`. All checks failure-safe.
+- Wired `register_error_handlers` + `init_rate_limiting` into `factory.py`; added `flask-limiter` to requirements/pyproject.
+- Frontend: shared `ErrorState` (with retry), `EmptyState`, top-level `ErrorBoundary`; applied with consistent retry buttons to Dashboard, Positions, Orderbook, Tradebook, Option Chain; dashboard loader refactored into a reusable callback; mobile final pass in `index.css`.
+- Added `OPERATIONS.md` runbook (Breeze token refresh, master-contract cron, rate-limit env vars, health endpoints).
+- Deferred to user (manual deploy tasks): Railway daily master-contract cron, and the daily Breeze token-refresh workflow decision.
+
+## Phase 17 Verification
+
+- `python -m pytest` passed: `73 passed` (68 prior + 5 new hardening tests)
+- `npm.cmd run build` passed: `91 modules`
+- Live HTTP smoke test: enriched readiness/deployment fields present, structured 404 shape, `X-RateLimit-Limit: 600` on a limited route, `/api/health` exempt from the limit.

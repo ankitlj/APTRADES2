@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { getPositions, type PositionRecord, type PositionsResponse } from "../lib/api";
 import { useLiveMarketData, useLiveSubscribe } from "../hooks/useLiveMarketData";
 import type { LiveTick, SubscriptionRequest } from "../lib/realtime";
+import { ErrorState } from "../components/ErrorState";
+import { EmptyState } from "../components/EmptyState";
 
 function applyLiveTick(position: PositionRecord, tick: LiveTick | undefined): PositionRecord {
   if (!tick || tick.ltp === null || tick.ltp === undefined) {
@@ -255,9 +257,11 @@ export function PositionsPage() {
         </div>
 
         <p className="panel-message">{quoteMessage}</p>
-        {state.error ? <p className="panel-message panel-error">Positions unavailable: {state.error}</p> : null}
+        {state.error ? <ErrorState title="Positions unavailable" message={state.error} onRetry={() => void load()} /> : null}
         {state.loading ? <p className="panel-message">Loading positions...</p> : null}
-        {!state.loading && !state.error && !positions.length ? <p className="panel-message">No open positions returned for this filtered view.</p> : null}
+        {!state.loading && !state.error && !positions.length ? (
+          <EmptyState title="No open positions" message="No open positions returned for this filtered view." />
+        ) : null}
 
         {!state.loading && !state.error && positions.length ? (
           <div className="table-wrap">
