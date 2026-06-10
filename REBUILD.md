@@ -557,3 +557,42 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 - `python -m pytest` passed: `53 passed`
 - `npm.cmd run build` passed: `55 modules`
+
+## Phase 15 Action Centre and Logs
+
+- Added SQLAlchemy tables for:
+  - `pending_actions`
+  - `api_logs`
+  - `app_event_logs`
+- Implemented `ActionCentreService`:
+  - syncs pending rows from live cancellable Breeze orders
+  - persists approve/reject state changes
+  - approve sends the linked Breeze cancel request
+  - reject preserves the audit row without touching the broker
+- Implemented `LogsService`:
+  - stores API request rows
+  - stores app event rows
+  - filters by level / source / time
+  - returns a merged live-tail payload
+- Added backend endpoints:
+  - `GET /api/action-centre`
+  - `POST /api/action-centre/:id/approve`
+  - `POST /api/action-centre/:id/reject`
+  - `GET /api/logs`
+  - `GET /api/logs/live`
+- Registered global API request logging in `factory.py` for `/api/*` responses when `DATABASE_URL` is configured.
+- Replaced frontend placeholders with real pages:
+  - `/action-centre`
+  - `/logs`
+- Added:
+  - status tabs
+  - stats cards
+  - action table with expanded detail row
+  - live monospace log viewer
+- Updated `AppShell.tsx` topbar label to Phase 15 wording.
+
+## Phase 15 Verification
+
+- `python -m pytest backend\\tests\\test_action_logs_contract.py` passed: `2 passed`
+- `python -m pytest` passed: `55 passed`
+- `npm.cmd run build` passed after rerunning outside the sandbox because Vite/esbuild hit the known workspace filesystem denial

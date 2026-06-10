@@ -642,6 +642,24 @@ select {
   font-size: 1.05rem;
 }
 
+.info-banner {
+  padding: 16px;
+  border: 1px solid rgba(3, 105, 161, 0.18);
+  border-radius: 10px;
+  background: rgba(14, 116, 144, 0.06);
+  display: grid;
+  gap: 6px;
+}
+
+.info-banner strong {
+  color: var(--info);
+}
+
+.info-banner span {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
 .settings-panel {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -679,6 +697,52 @@ select {
 
 .panel-error {
   color: var(--warning);
+}
+
+.row-actions-inline {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.expanded-row td {
+  background: rgba(246, 248, 251, 0.8);
+}
+
+.expanded-panel {
+  display: grid;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.expanded-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.logs-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+  gap: 16px;
+}
+
+.logs-live-panel {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.monospace-viewer {
+  margin: 0;
+  max-height: 460px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "IBM Plex Mono", "Cascadia Mono", Consolas, monospace;
+  font-size: 0.77rem;
+  line-height: 1.6;
 }
 
 .tone-positive {
@@ -1041,6 +1105,10 @@ select {
   .option-chain-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .logs-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
@@ -1066,7 +1134,8 @@ select {
   }
 
   .settings-panel,
-  .stats-grid-positions {
+  .stats-grid-positions,
+  .expanded-meta-grid {
     grid-template-columns: 1fr;
   }
 

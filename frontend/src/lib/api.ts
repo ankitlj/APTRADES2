@@ -332,6 +332,84 @@ export interface PositionsResponse {
   error?: string;
 }
 
+export interface ActionCentreRecord {
+  id: number;
+  action_type: string;
+  status: string;
+  title: string;
+  symbol: string;
+  broker_symbol: string | null;
+  exchange_code: string;
+  product_type: string | null;
+  order_id: string;
+  quantity: number | null;
+  requested_by: string;
+  created_from: string;
+  requested_at: string | null;
+  reviewed_at: string | null;
+  resolution_note: string | null;
+  request_payload: Record<string, unknown> | null;
+  broker_result: Record<string, unknown> | null;
+  can_approve: boolean;
+  can_reject: boolean;
+}
+
+export interface ActionCentreStats {
+  pending: number;
+  approved: number;
+  rejected: number;
+  all: number;
+}
+
+export interface ActionCentreResponse {
+  status: string;
+  filter_status: string;
+  stats: ActionCentreStats;
+  actions: ActionCentreRecord[];
+}
+
+export interface ActionCentreMutationResponse {
+  status: string;
+  action: ActionCentreRecord;
+}
+
+export interface LogRow {
+  id: string;
+  kind: string;
+  level: string;
+  source: string;
+  event_type: string;
+  message: string;
+  method: string | null;
+  path: string | null;
+  status_code: number | null;
+  context: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
+export interface LogsSummary {
+  api_count: number;
+  app_count: number;
+  total_count: number;
+}
+
+export interface LogsResponse {
+  status: string;
+  filters: {
+    level: string;
+    source: string;
+    time_window: string;
+  };
+  summary: LogsSummary;
+  rows: LogRow[];
+}
+
+export interface LiveLogsResponse {
+  status: string;
+  rows: LogRow[];
+  lines: string[];
+}
+
 export interface OptionExpiriesResponse {
   status: string;
   underlying: string;
@@ -544,6 +622,41 @@ export function getTrades(params?: { exchange?: string; action?: string; product
 
 export function getPositions() {
   return requestJson<PositionsResponse>("/api/positions");
+}
+
+export function getActionCentre(status = "pending") {
+  return requestJson<ActionCentreResponse>(`/api/action-centre?status=${encodeURIComponent(status)}`);
+}
+
+export function approveAction(actionId: number) {
+  return requestJson<ActionCentreMutationResponse>(`/api/action-centre/${actionId}/approve`, {
+    method: "POST",
+  });
+}
+
+export function rejectAction(actionId: number) {
+  return requestJson<ActionCentreMutationResponse>(`/api/action-centre/${actionId}/reject`, {
+    method: "POST",
+  });
+}
+
+export function getLogs(params?: { level?: string; source?: string; time?: string }) {
+  const search = new URLSearchParams();
+  if (params?.level) {
+    search.set("level", params.level);
+  }
+  if (params?.source) {
+    search.set("source", params.source);
+  }
+  if (params?.time) {
+    search.set("time", params.time);
+  }
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return requestJson<LogsResponse>(`/api/logs${suffix}`);
+}
+
+export function getLiveLogs() {
+  return requestJson<LiveLogsResponse>("/api/logs/live");
 }
 
 export function getOptionExpiries(params: { underlying: string; exchange?: string }) {

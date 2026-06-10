@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { AppShell } from "./components/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
+import { ActionCentrePage } from "./pages/ActionCentrePage";
+import { LogsPage } from "./pages/LogsPage";
 import { OIProfilePage } from "./pages/OIProfilePage";
 import { OITrackerPage } from "./pages/OITrackerPage";
 import { OptionChainPage } from "./pages/OptionChainPage";
@@ -17,9 +19,7 @@ const pages = [
   { path: "/dashboard", title: "Dashboard", description: "The main APTRADES dashboard now runs through backend contracts." },
   { path: "/optionchain", title: "Option Chain", description: "The core option chain grid now loads live Breeze-backed rows." },
   { path: "/positions", title: "Positions", description: "Live quote enrichment begins after QuoteService exists." },
-  { path: "/action-centre", title: "Action Centre", description: "Approval and review workflow comes after trading pages." },
   { path: "/strategy", title: "Strategy", description: "Strategy Builder and Strategy Portfolio stay under Tools in MVP." },
-  { path: "/logs", title: "Logs", description: "Operational logs arrive after core trading flows are stable." },
   { path: "/tools", title: "Tools", description: "Reduced six-tool grid will replace this placeholder in a later phase." },
 ];
 
@@ -32,6 +32,8 @@ export default function App() {
         <Route path="/orderbook" element={<OrderbookPage />} />
         <Route path="/tradebook" element={<TradebookPage />} />
         <Route path="/positions" element={<PositionsPage />} />
+        <Route path="/action-centre" element={<ActionCentrePage />} />
+        <Route path="/logs" element={<LogsPage />} />
         <Route path="/tools" element={<ToolsPage />} />
         <Route path="/optionchain" element={<OptionChainPage />} />
         <Route path="/oi-tracker" element={<OITrackerPage />} />
@@ -39,7 +41,7 @@ export default function App() {
         <Route path="/strategy-builder" element={<StrategyBuilderPage />} />
         <Route path="/strategy-portfolio" element={<StrategyPortfolioPage />} />
         {pages
-          .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions", "/tools", "/optionchain"].includes(page.path))
+          .filter((page) => !["/dashboard", "/orderbook", "/tradebook", "/positions", "/action-centre", "/logs", "/tools", "/optionchain"].includes(page.path))
           .map((page) => (
             <Route
               key={page.path}

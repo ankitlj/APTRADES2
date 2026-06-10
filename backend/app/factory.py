@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import time
 
-from flask import Flask
+from flask import Flask, g, request
 from flask.cli import AppGroup
 from flask_cors import CORS
 
+from .api.action_centre import action_centre_bp
 from .api.dashboard import dashboard_bp
 from .api.debug import debug_bp
 from .api.health import health_bp
+from .api.logs import logs_bp
 from .api.master_contract import master_contract_bp
 from .api.oi import oi_bp
 from .api.options import options_bp
@@ -18,6 +21,7 @@ from .api.quotes import quotes_bp
 from .api.strategy import strategy_bp
 from .config import load_config
 from .services.master_contract_service import MasterContractImportError, MasterContractService
+from .services.logs_service import LogsService
 
 
 def _register_cli(app: Flask) -> None:
@@ -60,5 +64,31 @@ def create_app() -> Flask:
     app.register_blueprint(quotes_bp, url_prefix=config.api_prefix)
     app.register_blueprint(strategy_bp, url_prefix=config.api_prefix)
     app.register_blueprint(dashboard_bp, url_prefix=config.api_prefix)
+    app.register_blueprint(action_centre_bp, url_prefix=config.api_prefix)
+    app.register_blueprint(logs_bp, url_prefix=config.api_prefix)
+
+    @app.before_request
+    def _capture_request_started_at() -> None:
+        g.request_started_at = time.perf_counter()
+
+    @app.after_request
+    def _record_api_log(response):
+        if not request.path.startswith(config.api_prefix):
+            return response
+        if not app.config.get("DATABASE_URL"):
+            return response
+        started_at = getattr(g, "request_started_at", None)
+        elapsed_ms = round((time.perf_counter() - started_at) * 1000, 2) if started_at else None
+        source = request.endpoint.split(".")[0] if request.endpoint else "api"
+        LogsService(app.config.get("DATABASE_URL")).safe_record_api_log(
+            method=request.method,
+            path=request.path,
+            status_code=response.status_code,
+            source=source,
+            message=f"{request.method} {request.path} completed with {response.status_code}",
+            context={"elapsed_ms": elapsed_ms, "query_string": request.query_string.decode("utf-8", errors="ignore")},
+        )
+        return response
+
     _register_cli(app)
     return app

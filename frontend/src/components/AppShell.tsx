@@ -107,7 +107,7 @@ export function AppShell({ children }: PropsWithChildren) {
           )}
           <div className="topbar-status">
             <span className="status-dot" />
-            Phase 14 strategy tools
+            Phase 15 action centre and logs
           </div>
         </header>
         <main className="main-content">{children}</main>

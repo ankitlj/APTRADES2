@@ -1,10 +1,10 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 14 - Strategy Builder and Strategy Portfolio
-- Last completed phase: Phase 14 - Strategy Builder and Strategy Portfolio
+- Current phase: Phase 15 - Action Centre and Logs
+- Last completed phase: Phase 15 - Action Centre and Logs
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally
+- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally, Phase 15 action-centre/logs contracts are verified locally
 - Known blockers:
   - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
 
@@ -900,6 +900,72 @@
   - Payoff curve uses a 50-point approximation; breakeven is linearly interpolated between adjacent curve points. For strategies with flat payoff regions or near-horizontal segments, breakeven precision is ±step_size (~50–100 points depending on strikes).
   - The strategy table is auto-created via SQLAlchemy `create_all()` on first use. On Railway this runs against the live PostgreSQL database on first POST/GET to `/api/strategies`.
 
+### 2026-06-10 - Phase 15: Action Centre and Logs
+- Goal: Build operational review pages with persisted backend rows, real approve/reject actions, and searchable logs.
+- Backend changes:
+  - Added SQLAlchemy tables:
+    - `pending_actions`
+    - `api_logs`
+    - `app_event_logs`
+  - Implemented `ActionCentreService`:
+    - syncs pending action rows from live cancellable Breeze orders across `NFO`, `NSE`, `BFO`, and `BSE`
+    - persists action state transitions
+    - approves by sending the linked Breeze cancel request
+    - rejects without mutating the broker
+  - Implemented `LogsService`:
+    - stores API request rows
+    - stores app event rows
+    - filters by level, source, and time window
+    - returns a merged live-tail payload
+  - Added endpoints:
+    - `GET /api/action-centre`
+    - `POST /api/action-centre/:id/approve`
+    - `POST /api/action-centre/:id/reject`
+    - `GET /api/logs`
+    - `GET /api/logs/live`
+  - Registered global `/api/*` request logging in the Flask app factory when `DATABASE_URL` is configured.
+- Frontend changes:
+  - Replaced the `/action-centre` placeholder with a real Action Centre page:
+    - info alert
+    - pending / approved / rejected / all tabs
+    - stats cards
+    - backend action table
+    - expanded detail row
+  - Replaced the `/logs` placeholder with a real Logs page:
+    - filters by level / source / time
+    - summary cards
+    - backend log table
+    - live monospace viewer
+  - Updated the topbar phase label to Phase 15 wording.
+- Files changed:
+  - `backend/app/models.py`
+  - `backend/app/factory.py`
+  - `backend/app/api/action_centre.py`
+  - `backend/app/api/logs.py`
+  - `backend/app/services/action_centre_service.py`
+  - `backend/app/services/logs_service.py`
+  - `backend/tests/test_action_logs_contract.py`
+  - `frontend/src/App.tsx`
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/ActionCentrePage.tsx`
+  - `frontend/src/pages/LogsPage.tsx`
+  - `frontend/src/index.css`
+  - `development.md`
+  - `REBUILD.md`
+- Verification:
+  - `python -m pytest` -> `55 passed`
+  - `python -m pytest backend/tests/test_action_logs_contract.py` -> `2 passed`
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the same known workspace filesystem denial
+- Manual user tasks:
+  - Wait for Railway and Vercel to deploy this commit.
+  - Open `/action-centre` and verify pending broker rows load.
+  - Approve a row only if you want a real Breeze cancel-order request sent for that order.
+  - Open `/logs` and verify API rows plus the live monospace tail render.
+- Remaining risks:
+  - Pending rows are currently sourced from live cancellable broker orders. Additional future action types should feed the same queue instead of creating a parallel system.
+  - Approve is a real broker-side cancel request, so use it only on orders you intend to cancel.
+
 ## Phase 13 Response Examples
 
 - Endpoint: `GET /api/oi/tracker?underlying=NIFTY&expiry=2026-06-30`
@@ -1020,7 +1086,32 @@
 - Response: `{ "status": "ok", "underlying": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "expiry": "2026-06-30", "underlying_ltp": 23268.8, "previous_close": 23451.7, "atm_strike": 23300.0, "pcr": 0.9659, "rows": [{ "strike_price": 23300.0, "ce": { "ltp": 92.8, "bid": 92.2, "ask": 93.1, "oi": 115000.0, "volume": 16000.0 }, "pe": { "ltp": 165.4, "bid": 164.8, "ask": 166.1, "oi": 132000.0, "volume": 21000.0 } }] }`
 - Test command: `curl "http://127.0.0.1:5000/api/option-chain?underlying=NIFTY&expiry=2026-06-30&strike_count=12"`
 
+- Endpoint: `GET /api/action-centre`
+- Request: optional query param `status=pending|approved|rejected|all`
+- Response: `{ "status": "ok", "filter_status": "pending", "stats": { "pending": 2, "approved": 1, "rejected": 0, "all": 3 }, "actions": [{ "id": 1, "action_type": "cancel_order", "status": "pending", "symbol": "NIFTY", "order_id": "12345", "exchange_code": "NFO", "can_approve": true, "can_reject": true }] }`
+- Test command: `curl "http://127.0.0.1:5000/api/action-centre?status=pending"`
+
+- Endpoint: `POST /api/action-centre/:id/approve`
+- Request: no body
+- Response: `{ "status": "ok", "action": { "id": 1, "status": "approved", "broker_result": { "message": "Order cancellation requested" } } }`
+- Test command: `curl -X POST http://127.0.0.1:5000/api/action-centre/1/approve`
+
+- Endpoint: `POST /api/action-centre/:id/reject`
+- Request: no body
+- Response: `{ "status": "ok", "action": { "id": 1, "status": "rejected", "resolution_note": "User rejected the pending broker action." } }`
+- Test command: `curl -X POST http://127.0.0.1:5000/api/action-centre/1/reject`
+
+- Endpoint: `GET /api/logs`
+- Request: optional query params `level`, `source`, `time`
+- Response: `{ "status": "ok", "filters": { "level": "all", "source": "all", "time_window": "24h" }, "summary": { "api_count": 25, "app_count": 6, "total_count": 31 }, "rows": [{ "id": "api-1", "kind": "api", "level": "info", "source": "dashboard", "message": "GET /api/dashboard/summary completed with 200", "path": "/api/dashboard/summary", "status_code": 200 }] }`
+- Test command: `curl "http://127.0.0.1:5000/api/logs?time=24h"`
+
+- Endpoint: `GET /api/logs/live`
+- Request: no body
+- Response: `{ "status": "ok", "rows": [{ "id": "app-4", "kind": "app", "level": "warning", "source": "action-centre", "event_type": "reject", "message": "Rejected action 4 for order 12345." }], "lines": ["[2026-06-10T...] WARNING APP action-centre reject Rejected action 4 for order 12345."] }`
+- Test command: `curl http://127.0.0.1:5000/api/logs/live`
+
 ## Deployment Notes
-- Last commit: pending Phase 11 option-chain commit
+- Last commit: pending Phase 15 action-centre/logs commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
-- Smoke test result: deployed readiness and Breeze diagnostics are verified; Phase 11 option-chain contracts are verified locally through backend tests and a production frontend build
+- Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 15 action-centre/logs contracts are verified locally through backend tests and a production frontend build

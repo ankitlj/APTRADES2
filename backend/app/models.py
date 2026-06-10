@@ -92,3 +92,54 @@ class Strategy(Base):
     legs_json: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class PendingAction(Base):
+    __tablename__ = "pending_actions"
+    __table_args__ = (UniqueConstraint("action_type", "order_id", name="uq_pending_actions_type_order"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    action_type: Mapped[str] = mapped_column(String(32), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(160))
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    broker_symbol: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    exchange_code: Mapped[str] = mapped_column(String(16), index=True)
+    product_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    order_id: Mapped[str] = mapped_column(String(64), index=True)
+    quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    requested_by: Mapped[str] = mapped_column(String(32), default="system")
+    created_from: Mapped[str] = mapped_column(String(32), default="breeze_order_sync")
+    request_payload_json: Mapped[str] = mapped_column(Text, default="{}")
+    broker_result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+
+class ApiLog(Base):
+    __tablename__ = "api_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    level: Mapped[str] = mapped_column(String(16), index=True)
+    source: Mapped[str] = mapped_column(String(64), index=True)
+    method: Mapped[str] = mapped_column(String(12))
+    path: Mapped[str] = mapped_column(String(256), index=True)
+    status_code: Mapped[int] = mapped_column(Integer, index=True)
+    message: Mapped[str] = mapped_column(String(256))
+    context_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+
+
+class AppEventLog(Base):
+    __tablename__ = "app_event_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    level: Mapped[str] = mapped_column(String(16), index=True)
+    source: Mapped[str] = mapped_column(String(64), index=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    message: Mapped[str] = mapped_column(String(256))
+    context_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
