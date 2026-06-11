@@ -1,6 +1,7 @@
 # APTRADES v2 Development Log
 
 ## Current Status
+- Current UI track: APTRADES shell alignment pass 1 completed - APTRADES2 now uses the old APTRADES brand/logo treatment, denser left navigation, utility section, live-status footer, and old-style top header chrome instead of the interim rebuild shell.
 - Current phase: Phase 18 - Performance and Caching (Tier 1 implemented; Tiers 2-3 still planned)
 - Last completed phase: Phase 18 Tier 1 - backend caching (engine/sessionmaker singletons, idempotent ensure_tables, in-memory symbol-resolution TTL cache, shared process-wide BreezeGateway). Motivated by the live-stream live<->offline flicker: per-request engine rebuilds + per-request Breeze token exchange blocked the single gthread worker and starved the Socket.IO heartbeat.
 - Planned next: Phase 18 Tier 2 (Redis-first quote reads, option-chain strike streaming, parallel batch) and Tier 3 (frontend stale-while-revalidate / live-first render); then Phase 19 - Live-stream stability (Redis message_queue + background-task emit + ping tuning + frontend grace period + tick/gap recorder)
@@ -19,6 +20,37 @@
 - Deployment: Railway + Vercel live
 
 ## Phase Log
+
+### 2026-06-11 - UI Alignment Pass 1: Old APTRADES Shell Port
+- Goal: Replace the temporary APTRADES2 app chrome with the older APTRADES shell vocabulary without disturbing the Phase 1-18 backend/data contracts.
+- Root cause:
+  - APTRADES2 was still rendering through a lightweight interim shell (`AppShell.tsx` + custom CSS) that only approximated the old product.
+  - The old `APTRADES` repo uses a more established shell language: logo-led sidebar, stronger navigation hierarchy, utility links, persistent live-status treatment, and tighter topbar chrome.
+  - The user specifically wanted the older `ankitlj/APTRADES.git` frontend/UI reflected in `APTRADES2`, not a fresh redesign.
+- Frontend changes:
+  - Reworked the shared app shell to mirror the old APTRADES structure more closely:
+    - logo image in sidebar header
+    - primary + utility navigation split
+    - nav icon tiles / denser navigation rows
+    - top-right live status pill + avatar chip
+    - sidebar live-status footer
+    - mobile nav trimmed to the main five routes
+  - Updated global frontend styling to shift APTRADES2 away from the interim flat scaffold and toward the old APTRADES visual language:
+    - wider sidebar
+    - glass topbar
+    - stronger card radius/shadows
+    - denser content spacing
+    - updated brand typography and pill treatments
+  - Added the old APTRADES `logo.png` into the new frontend public assets so branding matches the legacy shell.
+- Files changed:
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/index.css`
+  - `frontend/public/logo.png`
+- Verification:
+  - `npm.cmd run build` -> passed after rerunning outside the sandbox because Vite/esbuild hit the known sandbox filesystem denial
+- Remaining risks:
+  - This pass ports the shared shell/chrome first; it does not yet make every individual page a 1:1 copy of the old APTRADES page internals.
+  - External `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md` still cannot be updated from this workspace because it is outside the writable roots.
 
 ### 2026-06-07 - Phase 1: Clean Project Skeleton
 - Goal: Create a Breeze-only APTRADES v2 monorepo skeleton with backend health endpoints and a frontend app shell.

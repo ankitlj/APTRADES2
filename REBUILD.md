@@ -3,6 +3,29 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
+## 2026-06-11 - Old APTRADES UI Alignment Pass 1
+
+- User clarified that APTRADES2 should use the older `ankitlj/APTRADES.git` frontend/UI directly as the visual source, not a new redesign.
+- Root cause:
+  - APTRADES2 still used the temporary rebuild shell, so even though the Phase 1-18 pages were functional, the app did not look like the older APTRADES product.
+- Changes made:
+  - Ported the old APTRADES shell cues into APTRADES2:
+    - logo-led sidebar
+    - denser navigation hierarchy
+    - utility navigation block
+    - top-right live-status chip
+    - sidebar footer live badge
+  - Updated the global CSS so cards, topbar, spacing, sidebar width, pills, and brand treatment move closer to the old APTRADES frontend.
+  - Added legacy `logo.png` to the frontend public assets.
+- Files changed:
+  - `frontend/src/components/AppShell.tsx`
+  - `frontend/src/index.css`
+  - `frontend/public/logo.png`
+- Verification:
+  - `npm.cmd run build` passed after rerunning outside the sandbox due to the known Vite/esbuild filesystem restriction.
+- Remaining note:
+  - This is the shared-shell migration pass. If a stricter page-by-page 1:1 legacy visual port is still needed, that should continue as a focused follow-up on the page internals.
+
 ## Phase 1 Skeleton
 
 - Read and followed:

@@ -1,20 +1,35 @@
-import { useEffect, useState, type PropsWithChildren } from "react";
+import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { getDashboardSummary, type DashboardSummaryResponse } from "../lib/api";
 import { useLiveMarketData } from "../hooks/useLiveMarketData";
 import type { MarketDataState } from "../lib/realtime";
 
-const navigation = [
+const primaryNavigation = [
+  { to: "/dashboard", label: "Dashboard", short: "DB" },
+  { to: "/orderbook", label: "Orderbook", short: "OB" },
+  { to: "/tradebook", label: "Tradebook", short: "TB" },
+  { to: "/positions", label: "Positions", short: "PS" },
+  { to: "/action-centre", label: "Action Centre", short: "AC" },
+  { to: "/logs", label: "Logs", short: "LG" },
+  { to: "/tools", label: "Tools", short: "TL" },
+] as const;
+
+const utilityNavigation = [
+  { to: "/optionchain", label: "Option Chain", short: "OC" },
+  { to: "/oi-tracker", label: "OI Tracker", short: "OI" },
+  { to: "/oi-profile", label: "OI Profile", short: "OP" },
+  { to: "/strategy-builder", label: "Strategy Builder", short: "SB" },
+  { to: "/strategy-portfolio", label: "Strategy Portfolio", short: "SP" },
+] as const;
+
+const mobileNavigation = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/orderbook", label: "Orderbook" },
   { to: "/tradebook", label: "Tradebook" },
   { to: "/positions", label: "Positions" },
-  { to: "/action-centre", label: "Action Centre" },
-  { to: "/strategy", label: "Strategy" },
-  { to: "/logs", label: "Logs" },
   { to: "/tools", label: "Tools" },
-];
+] as const;
 
 type TickerState = {
   data: DashboardSummaryResponse | null;
@@ -24,16 +39,10 @@ type TickerState = {
 export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation();
   const isDashboard = location.pathname === "/" || location.pathname === "/dashboard";
-  const extraPages: Record<string, string> = {
-    "/optionchain": "Option Chain",
-    "/oi-tracker": "OI Tracker",
-    "/oi-profile": "OI Profile",
-    "/strategy-builder": "Strategy Builder",
-    "/strategy-portfolio": "Strategy Portfolio",
-  };
+  const allNavigation = useMemo(() => [...primaryNavigation, ...utilityNavigation], []);
   const currentPage = isDashboard
     ? "Dashboard"
-    : navigation.find((item) => item.to === location.pathname)?.label ?? extraPages[location.pathname] ?? "APTRADES v2";
+    : allNavigation.find((item) => item.to === location.pathname)?.label ?? "APTRADES v2";
   const [tickerState, setTickerState] = useState<TickerState>({ data: null, loading: isDashboard });
   const { connectionState, ticks } = useLiveMarketData();
 
@@ -69,22 +78,58 @@ export function AppShell({ children }: PropsWithChildren) {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand-block">
-          <p className="brand-kicker">Breeze only</p>
-          <h1>APTRADES</h1>
-          <p className="brand-caption">Track. Trade. Triumph.</p>
+          <NavLink to="/dashboard" className="brand-link">
+            <img src="/logo.png" alt="APTRADES" className="brand-logo" />
+            <span>
+              <p className="brand-kicker">Breeze only</p>
+              <h1>APTRADES</h1>
+              <p className="brand-caption">Track | Trade | Triumph</p>
+            </span>
+          </NavLink>
         </div>
+
         <nav className="nav-list" aria-label="Primary">
-          {navigation.map((item) => (
+          {primaryNavigation.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === "/"}
+              end
               className={({ isActive }) => (isActive ? "nav-item nav-item-active" : "nav-item")}
             >
+              <span className="nav-icon" aria-hidden="true">
+                {item.short}
+              </span>
               {item.label}
             </NavLink>
           ))}
         </nav>
+
+        <div className="nav-divider" />
+
+        <div className="nav-section">
+          <p className="nav-section-label">Utilities</p>
+          <nav className="nav-list" aria-label="Utilities">
+            {utilityNavigation.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) => (isActive ? "nav-item nav-item-active" : "nav-item")}
+              >
+                <span className="nav-icon" aria-hidden="true">
+                  {item.short}
+                </span>
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+
+        <div className="sidebar-footer">
+          <div className={`live-pill live-pill-${connectionState}`}>
+            <span className={`status-dot status-dot-${connectionState}`} />
+            {liveStatusLabel(connectionState)}
+          </div>
+        </div>
       </aside>
       <div className="content-shell">
         <header className="topbar">
@@ -108,23 +153,28 @@ export function AppShell({ children }: PropsWithChildren) {
               )}
             </div>
           ) : (
-            <div>
+            <div className="topbar-page">
               <p className="topbar-label">Current page</p>
               <h2>{currentPage}</h2>
             </div>
           )}
-          <div className={`topbar-status topbar-status-${connectionState}`} title={liveStatusLabel(connectionState)}>
-            <span className={`status-dot status-dot-${connectionState}`} />
-            {liveStatusLabel(connectionState)}
+          <div className="topbar-actions">
+            <div className={`topbar-status topbar-status-${connectionState}`} title={liveStatusLabel(connectionState)}>
+              <span className={`status-dot status-dot-${connectionState}`} />
+              {liveStatusLabel(connectionState)}
+            </div>
+            <div className="user-avatar" aria-label="User profile">
+              A
+            </div>
           </div>
         </header>
         <main className="main-content">{children}</main>
         <nav className="mobile-nav" aria-label="Mobile">
-          {navigation.map((item) => (
+          {mobileNavigation.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === "/"}
+              end
               className={({ isActive }) => (isActive ? "mobile-item mobile-item-active" : "mobile-item")}
             >
               {item.label}
