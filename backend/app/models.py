@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -143,3 +143,26 @@ class AppEventLog(Base):
     message: Mapped[str] = mapped_column(String(256))
     context_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, index=True)
+
+
+class MarketCandle(Base):
+    """Phase 19: 1-minute OHLC+volume+OI aggregate of streamed ticks. Doubles as
+    proof of stream gaps (missing minutes) and as live tick history."""
+
+    __tablename__ = "market_candles"
+    __table_args__ = (UniqueConstraint("symbol", "minute_start", name="uq_market_candles_symbol_minute"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(64), index=True)
+    exchange_code: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    minute_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    open: Mapped[float | None] = mapped_column(Float, nullable=True)
+    high: Mapped[float | None] = mapped_column(Float, nullable=True)
+    low: Mapped[float | None] = mapped_column(Float, nullable=True)
+    close: Mapped[float | None] = mapped_column(Float, nullable=True)
+    volume: Mapped[float | None] = mapped_column(Float, nullable=True)
+    oi: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tick_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

@@ -24,6 +24,8 @@ class AppConfig:
     )
     security_master_connect_timeout: int = int(os.getenv("SECURITY_MASTER_CONNECT_TIMEOUT", "20"))
     security_master_read_timeout: int = int(os.getenv("SECURITY_MASTER_READ_TIMEOUT", "30"))
+    socketio_ping_interval: int = int(os.getenv("SOCKETIO_PING_INTERVAL", "25"))
+    socketio_ping_timeout: int = int(os.getenv("SOCKETIO_PING_TIMEOUT", "60"))
     frontend_origin: str | None = os.getenv("FRONTEND_ORIGIN")
     vercel_preview_origin: str | None = os.getenv("VERCEL_PREVIEW_ORIGIN")
 
@@ -64,6 +66,8 @@ class AppConfig:
             "SECURITY_MASTER_URL": self.security_master_url,
             "SECURITY_MASTER_CONNECT_TIMEOUT": self.security_master_connect_timeout,
             "SECURITY_MASTER_READ_TIMEOUT": self.security_master_read_timeout,
+            "SOCKETIO_PING_INTERVAL": self.socketio_ping_interval,
+            "SOCKETIO_PING_TIMEOUT": self.socketio_ping_timeout,
             "FRONTEND_ORIGIN": self.frontend_origin,
             "VERCEL_PREVIEW_ORIGIN": self.vercel_preview_origin,
             "CORS_ORIGINS": self.cors_origins,

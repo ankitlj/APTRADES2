@@ -34,14 +34,27 @@ def init_realtime(app: Flask) -> MarketDataWorker:
     global _worker
 
     origins = app.config.get("CORS_ORIGINS") or "*"
-    socketio.init_app(app, cors_allowed_origins=origins, async_mode="threading")
+    redis_url = app.config.get("REDIS_URL")
+    # Phase 19: a Redis message queue makes emits from the breeze-connect thread
+    # reliable (no cross-thread buffering); the tuned ping timeout rides out
+    # brief stalls instead of dropping the socket.
+    init_kwargs: dict[str, Any] = {
+        "cors_allowed_origins": origins,
+        "async_mode": "threading",
+        "ping_interval": app.config.get("SOCKETIO_PING_INTERVAL", 25),
+        "ping_timeout": app.config.get("SOCKETIO_PING_TIMEOUT", 60),
+    }
+    if redis_url:
+        init_kwargs["message_queue"] = redis_url
+    socketio.init_app(app, **init_kwargs)
 
     worker = MarketDataWorker(
         app_key=app.config.get("BREEZE_API_KEY"),
         secret_key=app.config.get("BREEZE_SECRET_KEY"),
         session_token=app.config.get("BREEZE_SESSION_TOKEN"),
-        redis_url=app.config.get("REDIS_URL"),
+        redis_url=redis_url,
         publish=socketio.emit,
+        database_url=app.config.get("DATABASE_URL"),
     )
     _worker = worker
     app.extensions["market_data_worker"] = worker

@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 from ..cache import create_redis_client
+from .tick_recorder import TickRecorder
+
+logger = logging.getLogger(__name__)
 
 # Breeze stock-token format is "X.Y!token".
 #   X = exchange code: 1 = BSE, 2 = BFO OHLC, 4 = NSE / NFO, 8 = BFO live data
@@ -78,6 +83,9 @@ class MarketDataWorker:
         tick_ttl_seconds: int = 60,
         reconnect_backoff_seconds: float = 5.0,
         max_backoff_seconds: float = 60.0,
+        database_url: str | None = None,
+        gap_log_seconds: float = 5.0,
+        flush_seconds: float = 15.0,
     ):
         self._app_key = app_key
         self._secret_key = secret_key
@@ -88,12 +96,17 @@ class MarketDataWorker:
         self._tick_ttl_seconds = tick_ttl_seconds
         self._reconnect_backoff_seconds = reconnect_backoff_seconds
         self._max_backoff_seconds = max_backoff_seconds
+        self._gap_log_seconds = gap_log_seconds
+        self._flush_seconds = flush_seconds
 
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._recorder_thread: Optional[threading.Thread] = None
         self._breeze: Any | None = None
         self._redis: Any | None = None
+        self._recorder = TickRecorder(database_url)
+        self._last_tick_monotonic: float | None = None
 
         self._state = STATE_OFFLINE
         self._error: str | None = None
@@ -131,6 +144,22 @@ class MarketDataWorker:
                 daemon=True,
             )
             self._thread.start()
+            if self._recorder.enabled and (self._recorder_thread is None or not self._recorder_thread.is_alive()):
+                self._recorder_thread = threading.Thread(
+                    target=self._run_recorder,
+                    name="market-data-recorder",
+                    daemon=True,
+                )
+                self._recorder_thread.start()
+
+    def _run_recorder(self) -> None:
+        """Flush aggregated candles to the DB on a fixed cadence, off the tick
+        hot path. Survives DB hiccups (flush swallows errors)."""
+        while not self._stop.is_set():
+            self._stop.wait(self._flush_seconds)
+            self._recorder.flush()
+        # Final flush so the last partial minute is not lost on shutdown.
+        self._recorder.flush()
 
     def stop(self) -> None:
         self._stop.set()
@@ -302,11 +331,24 @@ class MarketDataWorker:
         normalized = self._normalize_tick(tick)
         if normalized is None:
             return
+        self._log_gap()
         self._last_tick_at = normalized["ts"]
         with self._lock:
             self._last_ticks[normalized["symbol"]] = normalized
         self._write_redis(normalized)
+        self._recorder.record(normalized)
         self._emit(normalized)
+
+    def _log_gap(self) -> None:
+        """Warn when the stream stalled longer than the configured threshold, so
+        Railway logs show exactly when and for how long ticks stopped arriving."""
+        now = time.monotonic()
+        previous = self._last_tick_monotonic
+        self._last_tick_monotonic = now
+        if previous is not None:
+            gap = now - previous
+            if gap >= self._gap_log_seconds:
+                logger.warning("market-data stream gap of %.1fs", gap)
 
     def _normalize_tick(self, tick: dict[str, Any]) -> dict[str, Any] | None:
         stock_token = str(tick.get("symbol") or "").strip()
