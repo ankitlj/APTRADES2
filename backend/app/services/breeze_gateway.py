@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -12,6 +13,31 @@ import requests
 
 class BreezeGatewayError(Exception):
     pass
+
+
+# Phase 18 Tier 1: one process-wide gateway reused across requests so the
+# customerdetails token exchange happens once, not on every quote. Keyed by the
+# credential tuple so a daily session-token refresh (redeploy) rebuilds it.
+_gateway_lock = threading.Lock()
+
+
+def get_gateway(
+    extensions: dict[str, Any],
+    app_key: str | None,
+    secret_key: str | None,
+    session_token: str | None,
+) -> "BreezeGateway":
+    key = (app_key, secret_key, session_token)
+    cached = extensions.get("breeze_gateway")
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    with _gateway_lock:
+        cached = extensions.get("breeze_gateway")
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        gateway = BreezeGateway(app_key, secret_key, session_token)
+        extensions["breeze_gateway"] = (key, gateway)
+        return gateway
 
 
 @dataclass(frozen=True)
@@ -34,6 +60,9 @@ class BreezeGateway:
         self.session_token = session_token
         self._customer_details_cache: dict[str, Any] | None = None
         self._customer_session_token_cache: str | None = None
+        # The gateway is shared across gthread workers; guard the lazy token
+        # fields. RLock because _customer_session_token nests get_customer_details.
+        self._token_lock = threading.RLock()
 
     def is_configured(self) -> bool:
         return all([self.app_key, self.secret_key, self.session_token])
@@ -95,13 +124,16 @@ class BreezeGateway:
         if self._customer_details_cache is not None:
             return self._customer_details_cache
 
-        payload = {
-            "SessionToken": self.session_token,
-            "AppKey": self.app_key,
-        }
-        response = self._request("GET", "/customerdetails", payload, requires_auth=False)
-        self._customer_details_cache = response
-        return response
+        with self._token_lock:
+            if self._customer_details_cache is not None:
+                return self._customer_details_cache
+            payload = {
+                "SessionToken": self.session_token,
+                "AppKey": self.app_key,
+            }
+            response = self._request("GET", "/customerdetails", payload, requires_auth=False)
+            self._customer_details_cache = response
+            return response
 
     def get_quote(self, instrument: BreezeInstrument) -> Any:
         payload = {
@@ -216,6 +248,17 @@ class BreezeGateway:
         if requires_auth and not self.is_configured():
             raise BreezeGatewayError(f"Missing Breeze configuration: {', '.join(self._missing_fields())}")
 
+        # Authenticated calls retry once on a session error: the cached customer
+        # session token may have expired mid-session, so drop it and re-exchange.
+        for auth_attempt in range(2):
+            response = self._send(method, path, payload, requires_auth=requires_auth)
+            if requires_auth and auth_attempt == 0 and self._is_session_error(response):
+                self._invalidate_session()
+                continue
+            return response
+        return response
+
+    def _send(self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool) -> dict[str, Any]:
         payload_json = json.dumps(payload, separators=(",", ":"))
         url = f"{self.base_url}{path}"
         headers = {"Content-Type": "application/json"}
@@ -236,6 +279,9 @@ class BreezeGateway:
         for attempt in range(3):
             try:
                 response = requests.request(method, url, headers=headers, data=payload_json, timeout=15)
+                if response.status_code in (401, 403):
+                    # Surface as a session error so _request can refresh and retry.
+                    return {"Success": None, "Status": response.status_code, "Error": "Breeze session expired or unauthorized."}
                 response.raise_for_status()
                 return response.json()
             except (requests.RequestException, ValueError) as error:
@@ -246,17 +292,36 @@ class BreezeGateway:
 
         raise BreezeGatewayError(f"Breeze request failed for {path}: {last_error}")
 
+    @staticmethod
+    def _is_session_error(response: Any) -> bool:
+        if not isinstance(response, dict):
+            return False
+        if response.get("Status") in (401, 403):
+            return True
+        error_text = str(response.get("Error") or "").lower()
+        if not error_text:
+            return False
+        return "session" in error_text and any(token in error_text for token in ("expire", "invalid", "not exist"))
+
+    def _invalidate_session(self) -> None:
+        with self._token_lock:
+            self._customer_details_cache = None
+            self._customer_session_token_cache = None
+
     def _customer_session_token(self) -> str:
         if self._customer_session_token_cache:
             return self._customer_session_token_cache
 
-        details = self.get_customer_details()
-        success = details.get("Success") or {}
-        token = success.get("session_token")
-        if not token:
-            raise BreezeGatewayError("CustomerDetails response did not include session_token")
-        self._customer_session_token_cache = token
-        return token
+        with self._token_lock:
+            if self._customer_session_token_cache:
+                return self._customer_session_token_cache
+            details = self.get_customer_details()
+            success = details.get("Success") or {}
+            token = success.get("session_token")
+            if not token:
+                raise BreezeGatewayError("CustomerDetails response did not include session_token")
+            self._customer_session_token_cache = token
+            return token
 
     def _missing_fields(self) -> list[str]:
         missing: list[str] = []

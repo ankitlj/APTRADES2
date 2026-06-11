@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify
 
-from ..services.breeze_gateway import BreezeGateway
+from ..services.breeze_gateway import get_gateway
 from ..services.positions_service import PositionsService, PositionsServiceError
 
 positions_bp = Blueprint("positions", __name__)
 
 
 def _positions_service() -> PositionsService:
-    gateway = BreezeGateway(
-        app_key=current_app.config.get("BREEZE_API_KEY"),
-        secret_key=current_app.config.get("BREEZE_SECRET_KEY"),
-        session_token=current_app.config.get("BREEZE_SESSION_TOKEN"),
+    gateway = get_gateway(
+        current_app.extensions,
+        current_app.config.get("BREEZE_API_KEY"),
+        current_app.config.get("BREEZE_SECRET_KEY"),
+        current_app.config.get("BREEZE_SESSION_TOKEN"),
     )
     return PositionsService(gateway, current_app.config.get("DATABASE_URL"))
 

@@ -3,15 +3,31 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import re
+import threading
+import time
 
 from sqlalchemy import Select, func, or_, select
 
-from ..db import create_session_factory, ensure_tables
+from ..db import create_session_factory
 from ..models import Instrument, InstrumentAlias
 
 
 class SymbolResolverError(Exception):
     pass
+
+
+# Phase 18 Tier 1: in-memory TTL cache so repeated resolutions (every quote, an
+# option chain resolving dozens of strikes) skip the DB round-trip. The master
+# contract changes at most daily, so a 1-hour TTL is safe; a fresh import clears
+# the cache explicitly via clear_resolution_cache().
+_RESOLUTION_TTL_SECONDS = 3600
+_resolution_lock = threading.Lock()
+_resolution_cache: dict[tuple, tuple[float, "ResolvedInstrument"]] = {}
+
+
+def clear_resolution_cache() -> None:
+    with _resolution_lock:
+        _resolution_cache.clear()
 
 
 @dataclass(frozen=True)
@@ -56,25 +72,45 @@ class SymbolResolver:
         resolved_product_type = (product_type or self._default_product_type(resolved_exchange)).strip().lower()
         normalized_alias = self._normalize_alias(cleaned_symbol)
 
-        ensure_tables(self.database_url)
+        cache_key = (
+            self.database_url,
+            cleaned_symbol,
+            resolved_exchange,
+            resolved_product_type,
+            expiry_date.isoformat() if expiry_date else None,
+            (right or "").strip().lower() or None,
+            strike_price or None,
+        )
+        now = time.monotonic()
+        with _resolution_lock:
+            entry = _resolution_cache.get(cache_key)
+            if entry is not None and (now - entry[0]) < _RESOLUTION_TTL_SECONDS:
+                return entry[1]
+
+        # Tables are created at app startup / master-contract import, so the
+        # resolve() hot path no longer pays a schema round-trip.
         session_factory = create_session_factory(self.database_url)
         with session_factory() as session:
             if resolved_exchange in {"NSE", "BSE"}:
                 instrument = self._resolve_cash_instrument(session, cleaned_symbol, normalized_alias, resolved_exchange)
-                return self._to_resolved_instrument(instrument, resolution_source="alias")
+                resolved = self._to_resolved_instrument(instrument, resolution_source="alias")
+            else:
+                base_symbol = self._resolve_base_broker_symbol(session, cleaned_symbol, normalized_alias)
+                instrument = self._resolve_derivative_instrument(
+                    session,
+                    base_symbol,
+                    resolved_exchange,
+                    resolved_product_type,
+                    expiry_date=expiry_date,
+                    right=right,
+                    strike_price=strike_price,
+                )
+                resolution_source = "alias" if base_symbol != cleaned_symbol else "broker_symbol"
+                resolved = self._to_resolved_instrument(instrument, resolution_source=resolution_source)
 
-            base_symbol = self._resolve_base_broker_symbol(session, cleaned_symbol, normalized_alias)
-            instrument = self._resolve_derivative_instrument(
-                session,
-                base_symbol,
-                resolved_exchange,
-                resolved_product_type,
-                expiry_date=expiry_date,
-                right=right,
-                strike_price=strike_price,
-            )
-            resolution_source = "alias" if base_symbol != cleaned_symbol else "broker_symbol"
-            return self._to_resolved_instrument(instrument, resolution_source=resolution_source)
+        with _resolution_lock:
+            _resolution_cache[cache_key] = (now, resolved)
+        return resolved
 
     @staticmethod
     def _default_product_type(exchange_code: str) -> str:

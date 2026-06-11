@@ -5,17 +5,18 @@ from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 
-from ..services.breeze_gateway import BreezeGateway
+from ..services.breeze_gateway import BreezeGateway, get_gateway
 from ..services.quote_service import QuoteRequest, QuoteService, QuoteServiceError
 
 quotes_bp = Blueprint("quotes", __name__)
 
 
 def _gateway() -> BreezeGateway:
-    return BreezeGateway(
-        app_key=current_app.config.get("BREEZE_API_KEY"),
-        secret_key=current_app.config.get("BREEZE_SECRET_KEY"),
-        session_token=current_app.config.get("BREEZE_SESSION_TOKEN"),
+    return get_gateway(
+        current_app.extensions,
+        current_app.config.get("BREEZE_API_KEY"),
+        current_app.config.get("BREEZE_SECRET_KEY"),
+        current_app.config.get("BREEZE_SESSION_TOKEN"),
     )
 
 

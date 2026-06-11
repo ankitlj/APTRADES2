@@ -21,6 +21,7 @@ from .api.positions import positions_bp
 from .api.quotes import quotes_bp
 from .api.strategy import strategy_bp
 from .config import load_config
+from .db import ensure_tables
 from .errors import register_error_handlers
 from .rate_limit import init_rate_limiting
 from .realtime import init_realtime
@@ -99,4 +100,15 @@ def create_app() -> Flask:
     init_rate_limiting(app)
     _register_cli(app)
     init_realtime(app)
+
+    # Phase 18 Tier 1: create tables once at startup so the resolve() hot path no
+    # longer pays a schema round-trip. Degraded-safe: if the DB is unreachable at
+    # boot, services re-run ensure_tables (idempotent) when it returns.
+    database_url = app.config.get("DATABASE_URL")
+    if database_url:
+        try:
+            ensure_tables(database_url)
+        except Exception:  # noqa: BLE001 — never block boot on the database
+            pass
+
     return app

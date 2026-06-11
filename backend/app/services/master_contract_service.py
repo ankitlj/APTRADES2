@@ -15,6 +15,7 @@ from sqlalchemy import delete, func, select
 
 from ..db import create_session_factory, ensure_tables
 from ..models import Instrument, InstrumentAlias, MasterContractRun
+from .symbol_resolver import clear_resolution_cache
 
 
 class MasterContractImportError(Exception):
@@ -146,6 +147,10 @@ class MasterContractService:
             )
             session.add(run)
             session.commit()
+
+        # Phase 18 Tier 1: instruments/aliases just changed, so drop the cached
+        # symbol resolutions and serve the freshly imported tokens immediately.
+        clear_resolution_cache()
 
         return {
             "status": "ok",

@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify
 
-from ..services.breeze_gateway import BreezeGateway, BreezeGatewayError
+from ..services.breeze_gateway import BreezeGateway, BreezeGatewayError, get_gateway
 from ..services.quote_service import QuoteRequest, QuoteService, QuoteServiceError
 
 debug_bp = Blueprint("debug", __name__)
 
 
 def _gateway() -> BreezeGateway:
-    return BreezeGateway(
-        app_key=current_app.config.get("BREEZE_API_KEY"),
-        secret_key=current_app.config.get("BREEZE_SECRET_KEY"),
-        session_token=current_app.config.get("BREEZE_SESSION_TOKEN"),
+    return get_gateway(
+        current_app.extensions,
+        current_app.config.get("BREEZE_API_KEY"),
+        current_app.config.get("BREEZE_SECRET_KEY"),
+        current_app.config.get("BREEZE_SESSION_TOKEN"),
     )
 
 
