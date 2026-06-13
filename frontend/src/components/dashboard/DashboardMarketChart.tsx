@@ -156,8 +156,8 @@ export function DashboardMarketChart() {
         >
           <defs>
             <linearGradient id="dashboard-chart-area" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+              <stop offset="0%" stopColor="#00f2ff" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#00f2ff" stopOpacity="0" />
             </linearGradient>
           </defs>
           <path
@@ -170,15 +170,16 @@ export function DashboardMarketChart() {
             <path
               d={line}
               fill="none"
-              stroke="#6366f1"
+              stroke="#00f2ff"
               strokeWidth="3"
               vectorEffect="non-scaling-stroke"
+              className="glow-line"
             />
           )}
         </svg>
 
         {latestValue !== null && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-indigo-500 px-2 py-1 text-[11px] font-semibold text-white tabular-nums">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-[#00f2ff] px-2 py-1 text-[11px] font-semibold text-slate-900 tabular-nums">
             {latestValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
           </span>
         )}

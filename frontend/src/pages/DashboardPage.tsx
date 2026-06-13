@@ -1,4 +1,14 @@
-import { AlertTriangle, Bell, CircleAlert } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  Bell,
+  CircleAlert,
+  Layers,
+  type LucideIcon,
+  Percent,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
@@ -66,6 +76,26 @@ function toneColor(tone: string | undefined) {
   if (tone === "positive") return "text-green-600 dark:text-green-400";
   if (tone === "negative") return "text-red-500";
   return "text-foreground";
+}
+
+function metricIcon(key: string | undefined): LucideIcon {
+  switch (key) {
+    case "total_pnl":
+    case "day_pnl":
+      return TrendingUp;
+    case "open_positions":
+      return Layers;
+    case "margin":
+    case "margin_used":
+    case "utilised_margin":
+      return Wallet;
+    case "monthly_roi":
+    case "annual_roi":
+    case "roi":
+      return Percent;
+    default:
+      return Activity;
+  }
 }
 
 function pnlColor(value: number | null | undefined) {
@@ -242,26 +272,36 @@ export function DashboardPage() {
         {(metrics.length
           ? metrics
           : (Array.from({ length: 4 }, () => undefined) as (DashboardMetric | undefined)[])
-        ).map((metric, index) => (
-          <Card key={metric?.key ?? `loading-${index}`}>
-            <CardContent className="p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                {metric?.label ?? "Loading"}
-              </p>
-              <p
-                className={cn(
-                  "mt-2 text-2xl font-bold tabular-nums",
-                  toneColor(metric?.tone)
-                )}
-              >
-                {metric ? metricValue(metric) : "..."}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {metric ? metricChangeText(metric) : "Syncing dashboard summary..."}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+        ).map((metric, index) => {
+          const Icon = metricIcon(metric?.key);
+          return (
+            <Card
+              key={metric?.key ?? `loading-${index}`}
+              className="glow-card overflow-hidden dark:bg-white/[0.04] dark:backdrop-blur-md"
+            >
+              <CardContent className="relative p-5">
+                <Icon className="engraved-icon h-28 w-28" aria-hidden="true" />
+                <div className="relative flex items-center gap-2">
+                  <Icon className="glow-icon h-4 w-4 shrink-0" aria-hidden="true" />
+                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                    {metric?.label ?? "Loading"}
+                  </p>
+                </div>
+                <p
+                  className={cn(
+                    "relative mt-2 text-2xl font-bold tabular-nums",
+                    toneColor(metric?.tone)
+                  )}
+                >
+                  {metric ? metricValue(metric) : "..."}
+                </p>
+                <p className="relative mt-1 text-xs text-muted-foreground">
+                  {metric ? metricChangeText(metric) : "Syncing dashboard summary..."}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {summaryState.error && (
