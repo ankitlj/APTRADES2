@@ -1,5 +1,4 @@
 import {
-  Activity,
   AlertTriangle,
   Bell,
   CircleAlert,
@@ -78,7 +77,11 @@ function toneColor(tone: string | undefined) {
   return "text-foreground";
 }
 
-function metricIcon(key: string | undefined): LucideIcon {
+// Distinct topic icons per box position, used when a metric is still loading or
+// its key is unmapped, so the four boxes never share the same icon.
+const FALLBACK_METRIC_ICONS: LucideIcon[] = [TrendingUp, Layers, Percent, Wallet];
+
+function metricIcon(key: string | undefined, index: number): LucideIcon {
   switch (key) {
     case "total_pnl":
     case "day_pnl":
@@ -94,7 +97,7 @@ function metricIcon(key: string | undefined): LucideIcon {
     case "roi":
       return Percent;
     default:
-      return Activity;
+      return FALLBACK_METRIC_ICONS[index % FALLBACK_METRIC_ICONS.length];
   }
 }
 
@@ -273,7 +276,7 @@ export function DashboardPage() {
           ? metrics
           : (Array.from({ length: 4 }, () => undefined) as (DashboardMetric | undefined)[])
         ).map((metric, index) => {
-          const Icon = metricIcon(metric?.key);
+          const Icon = metricIcon(metric?.key, index);
           return (
             <Card
               key={metric?.key ?? `loading-${index}`}
