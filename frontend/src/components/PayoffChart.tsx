@@ -47,7 +47,7 @@ export function PayoffChart({ payoff, uid }: { payoff: PayoffResponse; uid: stri
         <polygon points={areaPoints} fill="rgba(21,128,61,0.14)" clipPath={`url(#${aboveId})`} />
         <polygon points={areaPoints} fill="rgba(220,38,38,0.12)" clipPath={`url(#${belowId})`} />
 
-        <polyline points={pts} fill="none" stroke="#1d4ed8" strokeWidth="1.8" strokeLinejoin="round" />
+        <polyline points={pts} fill="none" stroke="#1d4ed8" strokeWidth="1.8" strokeLinejoin="round" className="glow-line" />
 
         {payoff.breakevens.map((be) => (
           <g key={be}>

@@ -13,7 +13,7 @@ export function Navbar() {
     cn(
       "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
       active
-        ? "bg-primary text-primary-foreground"
+        ? "bg-primary text-primary-foreground dark:shadow-[0_0_16px_-3px_rgba(0,242,255,0.55)]"
         : "text-muted-foreground hover:bg-muted hover:text-foreground"
     );
 

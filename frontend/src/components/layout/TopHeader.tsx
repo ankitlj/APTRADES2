@@ -68,7 +68,7 @@ export function TopHeader() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full bg-primary text-primary-foreground"
+                className="h-8 w-8 rounded-full bg-primary text-primary-foreground dark:shadow-[0_0_12px_-2px_rgba(0,242,255,0.5)]"
                 aria-label="Open menu"
               >
                 <span className="text-sm font-medium">A</span>
