@@ -1,17 +1,27 @@
+import { Activity, BarChart3, Briefcase, Code2, Layers, type LucideIcon, Sigma } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/page";
-import { cn } from "@/lib/utils";
 
-const tools = [
+interface Tool {
+  title: string;
+  subtitle: string;
+  description: string;
+  status: "next" | "deferred";
+  href: string | null;
+  icon: LucideIcon;
+}
+
+const tools: Tool[] = [
   {
     title: "Strategy Builder",
     subtitle: "Phase 14 live",
     description: "Build multi-leg option structures, preview payoff diagrams, and save to your portfolio.",
     status: "next",
     href: "/strategy-builder",
+    icon: Code2,
   },
   {
     title: "Strategy Portfolio",
@@ -19,6 +29,7 @@ const tools = [
     description: "View saved strategies with on-demand payoff calculation, metrics, and delete controls.",
     status: "next",
     href: "/strategy-portfolio",
+    icon: Briefcase,
   },
   {
     title: "Option Chain",
@@ -26,6 +37,7 @@ const tools = [
     description: "Open the first live option-chain tool with expiry control, ATM context, and normalized CE/PE rows.",
     status: "next",
     href: "/optionchain",
+    icon: Layers,
   },
   {
     title: "Option Greeks",
@@ -33,6 +45,7 @@ const tools = [
     description: "Reserved in the MVP grid, but real Greeks logic stays deferred until an explicit calculation phase.",
     status: "deferred",
     href: null,
+    icon: Sigma,
   },
   {
     title: "OI Tracker",
@@ -40,6 +53,7 @@ const tools = [
     description: "Strikes ranked by total OI. Spot resistance at max CE OI strike, support at max PE OI strike.",
     status: "next",
     href: "/oi-tracker",
+    icon: Activity,
   },
   {
     title: "OI Profile",
@@ -47,16 +61,9 @@ const tools = [
     description: "Full OI distribution across all strikes sorted by price with proportional CE/PE bars.",
     status: "next",
     href: "/oi-profile",
+    icon: BarChart3,
   },
 ];
-
-function initials(title: string) {
-  return title
-    .split(" ")
-    .map((word) => word[0])
-    .join("")
-    .slice(0, 2);
-}
 
 export function ToolsPage() {
   return (
@@ -70,23 +77,20 @@ export function ToolsPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {tools.map((tool) => {
+          const Icon = tool.icon;
           const content = (
-            <Card
-              className={cn(
-                "h-full transition-colors",
-                tool.href && "hover:border-primary/50 hover:bg-muted/30"
-              )}
-            >
-              <CardContent className="flex flex-col gap-3 p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-                    {initials(tool.title)}
+            <Card className="glow-card h-full overflow-hidden dark:bg-white/[0.04] dark:backdrop-blur-md">
+              <CardContent className="relative flex flex-col gap-3 p-5">
+                <Icon className="engraved-icon h-24 w-24" aria-hidden="true" />
+                <div className="relative flex items-center justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 dark:shadow-[0_0_14px_-3px_rgba(0,242,255,0.6)]">
+                    <Icon className="glow-icon h-5 w-5" aria-hidden="true" />
                   </div>
                   <Badge variant={tool.status === "next" ? "default" : "secondary"}>
                     {tool.subtitle}
                   </Badge>
                 </div>
-                <div>
+                <div className="relative">
                   <p className="font-semibold">{tool.title}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{tool.description}</p>
                 </div>
