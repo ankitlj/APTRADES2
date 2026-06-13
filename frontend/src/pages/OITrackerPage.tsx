@@ -1,4 +1,4 @@
-import { BarChart3 } from "lucide-react";
+import { ArrowDown, ArrowUp, BarChart3, Scale, Target } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getOptionExpiries, getOITracker, type OITrackerResponse, type OIRow } from "@/lib/api";
@@ -170,13 +170,14 @@ export function OITrackerPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatCard label="ATM Strike" value={formatNumber(state.data?.atm_strike, 0)} />
+        <StatCard label="ATM Strike" value={formatNumber(state.data?.atm_strike, 0)} icon={Target} />
         <StatCard
           label="PCR"
           value={state.data?.pcr === null || state.data?.pcr === undefined ? "n/a" : state.data.pcr.toFixed(4)}
+          icon={Scale}
         />
-        <StatCard label="Resistance (Max CE OI)" value={formatNumber(state.data?.max_ce_oi_strike, 0)} tone="positive" />
-        <StatCard label="Support (Max PE OI)" value={formatNumber(state.data?.max_pe_oi_strike, 0)} tone="negative" />
+        <StatCard label="Resistance (Max CE OI)" value={formatNumber(state.data?.max_ce_oi_strike, 0)} tone="positive" icon={ArrowUp} />
+        <StatCard label="Support (Max PE OI)" value={formatNumber(state.data?.max_pe_oi_strike, 0)} tone="negative" icon={ArrowDown} />
       </div>
 
       {state.error ? (

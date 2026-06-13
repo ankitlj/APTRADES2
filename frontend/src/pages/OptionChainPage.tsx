@@ -1,4 +1,4 @@
-import { TrendingUp } from "lucide-react";
+import { Layers, Scale, Target, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -202,13 +202,15 @@ export function OptionChainPage() {
           label="Spot"
           value={formatNumber(state.data?.underlying_ltp)}
           tone={tone(previousCloseDelta)}
+          icon={TrendingUp}
         />
-        <StatCard label="ATM strike" value={formatNumber(state.data?.atm_strike, 0)} />
+        <StatCard label="ATM strike" value={formatNumber(state.data?.atm_strike, 0)} icon={Target} />
         <StatCard
           label="PCR"
           value={state.data?.pcr === null || state.data?.pcr === undefined ? "n/a" : state.data.pcr.toFixed(4)}
+          icon={Scale}
         />
-        <StatCard label="Total OI" value={formatNumber(state.data?.total_oi, 0)} />
+        <StatCard label="Total OI" value={formatNumber(state.data?.total_oi, 0)} icon={Layers} />
       </div>
 
       {state.error ? (

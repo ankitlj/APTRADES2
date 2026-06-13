@@ -1,3 +1,4 @@
+import { Layers, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { getPositions, type PositionRecord, type PositionsResponse } from "@/lib/api";
@@ -134,10 +135,10 @@ export function PositionsPage() {
     const shortPositions = positions.filter((position) => position.quantity < 0).length;
     const totalPnl = positions.reduce((sum, position) => sum + (position.pnl ?? 0), 0);
     return [
-      { label: "Open positions", value: openPositions, tone: tone(undefined) },
-      { label: "Long", value: longPositions, tone: tone(undefined) },
-      { label: "Short", value: shortPositions, tone: tone(undefined) },
-      { label: "Total P&L", value: formatNumber(totalPnl), tone: tone(totalPnl) },
+      { label: "Open positions", value: openPositions, tone: tone(undefined), icon: Layers },
+      { label: "Long", value: longPositions, tone: tone(undefined), icon: TrendingUp },
+      { label: "Short", value: shortPositions, tone: tone(undefined), icon: TrendingDown },
+      { label: "Total P&L", value: formatNumber(totalPnl), tone: tone(totalPnl), icon: Wallet },
     ];
   }, [positions]);
 
@@ -245,7 +246,7 @@ export function PositionsPage() {
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {stats.map((item) => (
-          <StatCard key={item.label} label={item.label} value={item.value} tone={item.tone} />
+          <StatCard key={item.label} label={item.label} value={item.value} tone={item.tone} icon={item.icon} />
         ))}
       </div>
 

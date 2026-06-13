@@ -1,3 +1,4 @@
+import { AppWindow, List, Server } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { getLiveLogs, getLogs, type LiveLogsResponse, type LogRow, type LogsResponse } from "@/lib/api";
@@ -108,9 +109,9 @@ export function LogsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="API rows" value={state.logs?.summary.api_count ?? 0} />
-        <StatCard label="App rows" value={state.logs?.summary.app_count ?? 0} />
-        <StatCard label="Visible rows" value={state.logs?.summary.total_count ?? 0} />
+        <StatCard label="API rows" value={state.logs?.summary.api_count ?? 0} icon={Server} />
+        <StatCard label="App rows" value={state.logs?.summary.app_count ?? 0} icon={AppWindow} />
+        <StatCard label="Visible rows" value={state.logs?.summary.total_count ?? 0} icon={List} />
       </div>
 
       {state.error ? <ErrorState title="Logs unavailable" message={state.error} onRetry={() => void load()} /> : null}

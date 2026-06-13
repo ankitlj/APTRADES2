@@ -1,3 +1,4 @@
+import { Ban, CheckCircle2, ClipboardList, Clock, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -112,11 +113,11 @@ export function OrderbookPage() {
   };
 
   const stats = [
-    { label: "Total", value: state.data?.stats.total ?? 0 },
-    { label: "Completed", value: state.data?.stats.completed ?? 0 },
-    { label: "Open", value: state.data?.stats.open ?? 0 },
-    { label: "Rejected", value: state.data?.stats.rejected ?? 0 },
-    { label: "Cancelled", value: state.data?.stats.cancelled ?? 0 },
+    { label: "Total", value: state.data?.stats.total ?? 0, icon: ClipboardList },
+    { label: "Completed", value: state.data?.stats.completed ?? 0, icon: CheckCircle2 },
+    { label: "Open", value: state.data?.stats.open ?? 0, icon: Clock },
+    { label: "Rejected", value: state.data?.stats.rejected ?? 0, icon: XCircle },
+    { label: "Cancelled", value: state.data?.stats.cancelled ?? 0, icon: Ban },
   ];
 
   return (
@@ -162,7 +163,7 @@ export function OrderbookPage() {
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
         {stats.map((item) => (
-          <StatCard key={item.label} label={item.label} value={item.value} />
+          <StatCard key={item.label} label={item.label} value={item.value} icon={item.icon} />
         ))}
       </div>
 

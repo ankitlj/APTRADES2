@@ -1,4 +1,4 @@
-import { Layers } from "lucide-react";
+import { Layers, Scale, Target, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getOptionExpiries, getOIProfile, type OIProfileResponse, type OIRow } from "@/lib/api";
@@ -174,15 +174,17 @@ export function OIProfilePage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatCard label="Spot" value={formatNumber(state.data?.underlying_ltp)} />
-        <StatCard label="ATM Strike" value={formatNumber(state.data?.atm_strike, 0)} />
+        <StatCard label="Spot" value={formatNumber(state.data?.underlying_ltp)} icon={TrendingUp} />
+        <StatCard label="ATM Strike" value={formatNumber(state.data?.atm_strike, 0)} icon={Target} />
         <StatCard
           label="PCR"
           value={state.data?.pcr === null || state.data?.pcr === undefined ? "n/a" : state.data.pcr.toFixed(4)}
+          icon={Scale}
         />
         <StatCard
           label="Total OI"
           value={formatNumber((state.data?.total_call_oi ?? 0) + (state.data?.total_put_oi ?? 0), 0)}
+          icon={Layers}
         />
       </div>
 

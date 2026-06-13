@@ -1,3 +1,4 @@
+import { ArrowDownRight, ArrowUpRight, ListChecks } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getTrades, type TradeRecord, type TradesResponse } from "@/lib/api";
@@ -106,9 +107,9 @@ export function TradebookPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Total trades" value={state.data?.stats.total ?? 0} />
-        <StatCard label="Buy trades" value={state.data?.stats.buy ?? 0} />
-        <StatCard label="Sell trades" value={state.data?.stats.sell ?? 0} />
+        <StatCard label="Total trades" value={state.data?.stats.total ?? 0} icon={ListChecks} />
+        <StatCard label="Buy trades" value={state.data?.stats.buy ?? 0} icon={ArrowUpRight} />
+        <StatCard label="Sell trades" value={state.data?.stats.sell ?? 0} icon={ArrowDownRight} />
       </div>
 
       {state.error ? <ErrorState title="Trades unavailable" message={state.error} onRetry={() => void load()} /> : null}

@@ -1,3 +1,4 @@
+import { CheckCircle2, Clock, Filter, Inbox, XCircle } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import {
@@ -118,11 +119,11 @@ export function ActionCentrePage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Pending" value={stats.pending} />
-        <StatCard label="Approved" value={stats.approved} />
-        <StatCard label="Rejected" value={stats.rejected} />
-        <StatCard label="All" value={stats.all} />
-        <StatCard label="Current tab" value={<span className="capitalize">{statusFilter}</span>} />
+        <StatCard label="Pending" value={stats.pending} icon={Clock} />
+        <StatCard label="Approved" value={stats.approved} icon={CheckCircle2} />
+        <StatCard label="Rejected" value={stats.rejected} icon={XCircle} />
+        <StatCard label="All" value={stats.all} icon={Inbox} />
+        <StatCard label="Current tab" value={<span className="capitalize">{statusFilter}</span>} icon={Filter} />
       </div>
 
       {state.message ? (

@@ -1,3 +1,4 @@
+import { Target, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { PayoffChart } from "@/components/PayoffChart";
@@ -192,12 +193,14 @@ export function StrategyPortfolioPage() {
                       label="Net Premium"
                       value={fmt(entry.data.net_premium)}
                       tone={entry.data.net_premium >= 0 ? "positive" : "negative"}
+                      icon={Wallet}
                     />
-                    <StatCard label="Max Profit" value={fmt(entry.data.max_profit)} tone="positive" />
-                    <StatCard label="Max Loss" value={fmt(entry.data.max_loss)} tone="negative" />
+                    <StatCard label="Max Profit" value={fmt(entry.data.max_profit)} tone="positive" icon={TrendingUp} />
+                    <StatCard label="Max Loss" value={fmt(entry.data.max_loss)} tone="negative" icon={TrendingDown} />
                     <StatCard
                       label="Breakeven(s)"
                       value={entry.data.breakevens.length ? entry.data.breakevens.map((b) => fmt(b, 0)).join(", ") : "n/a"}
+                      icon={Target}
                     />
                   </div>
                   <div className="mt-4">
