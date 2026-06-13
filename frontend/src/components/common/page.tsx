@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,20 +37,26 @@ export function StatCard({
   label,
   value,
   tone = "neutral",
+  icon: Icon,
 }: {
   label: string;
   value: ReactNode;
   tone?: StatTone;
+  icon?: LucideIcon;
 }) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
-          {label}
-        </p>
+    <Card className="glow-card overflow-hidden dark:bg-white/[0.04] dark:backdrop-blur-md">
+      <CardContent className="relative p-4">
+        {Icon ? <Icon className="engraved-icon h-24 w-24" aria-hidden="true" /> : null}
+        <div className="relative flex items-center gap-2">
+          {Icon ? <Icon className="glow-icon h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+          <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">
+            {label}
+          </p>
+        </div>
         <p
           className={cn(
-            "mt-1.5 text-xl font-bold tabular-nums",
+            "relative mt-1.5 text-xl font-bold tabular-nums",
             tone === "positive" && "text-green-600 dark:text-green-400",
             tone === "negative" && "text-red-500"
           )}
