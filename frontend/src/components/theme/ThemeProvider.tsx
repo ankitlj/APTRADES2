@@ -27,7 +27,7 @@ function readStored(): { mode: ThemeMode; color: ThemeColor } {
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<{ mode: ThemeMode; color: ThemeColor }>;
         return {
-          mode: parsed.mode === "dark" ? "dark" : "light",
+          mode: parsed.mode === "light" ? "light" : "dark",
           color: (parsed.color as ThemeColor) ?? "zinc",
         };
       }
@@ -35,7 +35,8 @@ function readStored(): { mode: ThemeMode; color: ThemeColor } {
       /* ignore corrupt storage */
     }
   }
-  return { mode: "light", color: "zinc" };
+  // Futuristic theme defaults to dark mode.
+  return { mode: "dark", color: "zinc" };
 }
 
 function applyTheme(mode: ThemeMode, color: ThemeColor) {

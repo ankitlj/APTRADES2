@@ -237,3 +237,73 @@
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.4);
 }
+
+/* =============================================================================
+   FUTURISTIC / NEON GLOW SYSTEM (inspired by Crypto-Trading-Dashboard-3D)
+   ============================================================================= */
+:root {
+  --neon-primary: #00f2ff;   /* cyan */
+  --neon-secondary: #bc13fe; /* purple */
+  --neon-success: #00ff88;   /* green */
+  --neon-danger: #ff0055;    /* red */
+}
+
+/* Radial neon ambience on the dark page background */
+.dark body {
+  background-image:
+    radial-gradient(circle at 8% 12%, rgba(0, 242, 255, 0.08) 0%, transparent 24%),
+    radial-gradient(circle at 92% 88%, rgba(188, 19, 254, 0.08) 0%, transparent 24%);
+  background-attachment: fixed;
+}
+
+/* Glow card: subtle lift + neon edge glow on hover. Works on any bordered card. */
+.glow-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
+}
+.glow-card:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--neon-primary) 35%, transparent);
+  box-shadow: 0 14px 34px rgba(0, 242, 255, 0.12);
+}
+.dark .glow-card:hover {
+  border-color: color-mix(in srgb, var(--neon-primary) 45%, transparent);
+  box-shadow: 0 0 0 1px rgba(0, 242, 255, 0.2), 0 18px 42px rgba(0, 242, 255, 0.16);
+}
+@media (prefers-reduced-motion: reduce) {
+  .glow-card {
+    transition: none;
+  }
+  .glow-card:hover {
+    transform: none;
+  }
+}
+
+/* Neon glowing accent icon (top-left of a card) */
+.glow-icon {
+  color: var(--neon-primary);
+  filter: drop-shadow(0 0 6px var(--neon-primary));
+}
+
+/* Deeply engraved oversized faint icon (bottom-right of a card) */
+.engraved-icon {
+  position: absolute;
+  right: -14px;
+  bottom: -14px;
+  opacity: 0.06;
+  transform: rotate(-15deg);
+  pointer-events: none;
+  color: currentColor;
+}
+.dark .engraved-icon {
+  opacity: 0.08;
+}
+
+/* Glowing chart line (apply to an SVG <path>/<polyline>) */
+.glow-line {
+  filter: drop-shadow(0 0 3px rgba(0, 242, 255, 0.7));
+}
+.dark .glow-line {
+  filter: drop-shadow(0 0 4px rgba(0, 242, 255, 0.85));
+}
