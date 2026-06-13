@@ -1,18 +1,20 @@
+import { AlertTriangle, Bell, CircleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   getDashboardAlerts,
-  getDashboardChart,
   getDashboardSummary,
   type DashboardAlertsResponse,
-  type DashboardChartPoint,
-  type DashboardChartResponse,
+  type DashboardMetric,
   type DashboardPosition,
   type DashboardSummaryResponse,
-} from "../lib/api";
-import { useLiveMarketData, useLiveSubscribe } from "../hooks/useLiveMarketData";
-import type { LiveTick, SubscriptionRequest } from "../lib/realtime";
-import { ErrorState } from "../components/ErrorState";
+} from "@/lib/api";
+import { useLiveMarketData, useLiveSubscribe } from "@/hooks/useLiveMarketData";
+import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
+import { DashboardMarketChart } from "@/components/dashboard/DashboardMarketChart";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type AsyncState<T> = {
   data: T | null;
@@ -51,10 +53,7 @@ function metricValue(metric: DashboardSummaryResponse["metrics"][number]) {
 }
 
 function metricChangeText(metric: DashboardSummaryResponse["metrics"][number]) {
-  if (metric.key === "open_positions") {
-    return metric.meta;
-  }
-  if (metric.key === "total_pnl") {
+  if (metric.key === "open_positions" || metric.key === "total_pnl") {
     return metric.meta;
   }
   if (metric.change === null || metric.change === undefined) {
@@ -63,89 +62,23 @@ function metricChangeText(metric: DashboardSummaryResponse["metrics"][number]) {
   return `${formatSignedNumber(metric.change)} vs prev close`;
 }
 
-function toneClassName(tone: string) {
-  if (tone === "positive") {
-    return "tone-positive";
-  }
-  if (tone === "negative") {
-    return "tone-negative";
-  }
-  return "tone-neutral";
+function toneColor(tone: string | undefined) {
+  if (tone === "positive") return "text-green-600 dark:text-green-400";
+  if (tone === "negative") return "text-red-500";
+  return "text-foreground";
 }
 
-function alertClassName(level: string) {
-  if (level === "success") {
-    return "alert-card alert-success";
-  }
-  if (level === "warning") {
-    return "alert-card alert-warning";
-  }
-  if (level === "error") {
-    return "alert-card alert-error";
-  }
-  return "alert-card alert-info";
+function pnlColor(value: number | null | undefined) {
+  if ((value ?? 0) > 0) return "text-green-600 dark:text-green-400";
+  if ((value ?? 0) < 0) return "text-red-500";
+  return "text-foreground";
 }
 
-function chartPath(points: DashboardChartPoint[]) {
-  const closes = points.map((point) => point.close ?? 0);
-  const min = Math.min(...closes);
-  const max = Math.max(...closes);
-  const width = 720;
-  const height = 280;
-  return points
-    .map((point, index) => {
-      const x = points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
-      const close = point.close ?? min;
-      const y = max === min ? height / 2 : height - ((close - min) / (max - min)) * height;
-      return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
-}
-
-function ChartPanel({ state, onRetry }: { state: AsyncState<DashboardChartResponse>; onRetry: () => void }) {
-  if (state.error) {
-    return <ErrorState title="Chart unavailable" message={state.error} onRetry={onRetry} />;
-  }
-  if (state.loading) {
-    return <p className="panel-message">Loading chart data...</p>;
-  }
-  const points = state.data?.points ?? [];
-  if (!points.length) {
-    return <p className="panel-message">No chart candles returned for this symbol yet.</p>;
-  }
-
-  const latest = points[points.length - 1];
-  const earliest = points[0];
-  return (
-    <div className="chart-panel">
-      <div className="chart-meta">
-        <div>
-          <p className="section-kicker">{state.data?.resolved.display_symbol}</p>
-          <strong>{formatNumber(latest.close)}</strong>
-        </div>
-        <div>
-          <p className="section-kicker">Range</p>
-          <strong>
-            {earliest.time?.slice(0, 10)} to {latest.time?.slice(0, 10)}
-          </strong>
-        </div>
-      </div>
-      <svg className="chart-svg" viewBox="0 0 720 280" role="img" aria-label="Historical price chart">
-        <defs>
-          <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgba(14, 116, 144, 0.28)" />
-            <stop offset="100%" stopColor="rgba(14, 116, 144, 0)" />
-          </linearGradient>
-        </defs>
-        <path d={`${chartPath(points)} L 720 280 L 0 280 Z`} fill="url(#chartFill)" />
-        <path d={chartPath(points)} fill="none" stroke="#0f172a" strokeWidth="3" strokeLinecap="round" />
-      </svg>
-      <div className="chart-axis">
-        <span>{earliest.time?.slice(0, 10)}</span>
-        <span>{latest.time?.slice(0, 10)}</span>
-      </div>
-    </div>
-  );
+function alertDotColor(level: string) {
+  if (level === "error") return "bg-red-500";
+  if (level === "warning") return "bg-amber-500";
+  if (level === "success") return "bg-green-500";
+  return "bg-blue-500";
 }
 
 function applyLiveTick(position: DashboardPosition, tick: LiveTick | undefined): DashboardPosition {
@@ -163,66 +96,82 @@ function applyLiveTick(position: DashboardPosition, tick: LiveTick | undefined):
 function PositionsTable({
   positions,
   status,
-  error,
-  onRetry,
 }: {
   positions: DashboardPosition[];
   status: string | undefined;
-  error: string | null | undefined;
-  onRetry: () => void;
 }) {
   const { ticks } = useLiveMarketData();
 
-  if (error) {
-    return <ErrorState title="Positions unavailable" message={error} onRetry={onRetry} />;
-  }
-  if (!positions.length) {
-    return (
-      <p className="panel-message">
-        {status === "not_configured"
-          ? "Breeze positions are not configured yet."
-          : "No active positions returned by Breeze right now."}
-      </p>
-    );
-  }
-
   return (
-    <div className="table-wrap">
-      <table className="positions-table">
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[900px] text-sm">
         <thead>
-          <tr>
-            <th>Symbol</th>
-            <th>Exchange</th>
-            <th>Product</th>
-            <th className="numeric">Qty</th>
-            <th className="numeric">Avg</th>
-            <th className="numeric">LTP</th>
-            <th className="numeric">P&amp;L</th>
+          <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+            <th className="px-4 py-3 font-medium">Symbol</th>
+            <th className="px-4 py-3 font-medium">Exchange</th>
+            <th className="px-4 py-3 font-medium">Product</th>
+            <th className="px-4 py-3 text-right font-medium">Qty</th>
+            <th className="px-4 py-3 text-right font-medium">Avg</th>
+            <th className="px-4 py-3 text-right font-medium">LTP</th>
+            <th className="px-4 py-3 text-right font-medium">P&amp;L</th>
           </tr>
         </thead>
-        <tbody>
-          {positions.map((rawPosition) => {
-            const position = applyLiveTick(rawPosition, ticks[rawPosition.symbol.toUpperCase()]);
-            const isLive = Boolean(ticks[rawPosition.symbol.toUpperCase()]);
-            return (
-              <tr key={`${position.symbol}-${position.exchange_code}-${position.product_type}`}>
-                <td>
-                  <div className="table-symbol">
-                    <strong>{position.symbol}</strong>
-                    <span>{position.broker_symbol}</span>
-                  </div>
-                </td>
-                <td>{position.exchange_code}</td>
-                <td>{position.product_type}</td>
-                <td className="numeric">{formatNumber(position.quantity, 0)}</td>
-                <td className="numeric">{formatNumber(position.average_price)}</td>
-                <td className={`numeric ${isLive ? "cell-live" : ""}`}>{formatNumber(position.ltp)}</td>
-                <td className={`numeric ${toneClassName((position.pnl ?? 0) > 0 ? "positive" : (position.pnl ?? 0) < 0 ? "negative" : "neutral")}`}>
-                  {formatNumber(position.pnl)}
-                </td>
-              </tr>
-            );
-          })}
+        <tbody className="divide-y">
+          {positions.length === 0 ? (
+            <tr>
+              <td
+                colSpan={7}
+                className="h-[206px] px-4 text-center text-sm text-muted-foreground"
+              >
+                {status === "not_configured"
+                  ? "Breeze positions are not configured yet."
+                  : "No active positions"}
+              </td>
+            </tr>
+          ) : (
+            positions.map((rawPosition) => {
+              const position = applyLiveTick(
+                rawPosition,
+                ticks[rawPosition.symbol.toUpperCase()]
+              );
+              const isLive = Boolean(ticks[rawPosition.symbol.toUpperCase()]);
+              return (
+                <tr
+                  key={`${position.symbol}-${position.exchange_code}-${position.product_type}`}
+                  className="hover:bg-muted/20"
+                >
+                  <td className="px-4 py-3">
+                    <div className="font-semibold">{position.symbol}</div>
+                    <div className="text-xs text-muted-foreground">{position.broker_symbol}</div>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{position.exchange_code}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{position.product_type}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {formatNumber(position.quantity, 0)}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {formatNumber(position.average_price)}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-4 py-3 text-right tabular-nums",
+                      isLive && "text-foreground font-medium"
+                    )}
+                  >
+                    {formatNumber(position.ltp)}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-4 py-3 text-right font-medium tabular-nums",
+                      pnlColor(position.pnl)
+                    )}
+                  >
+                    {formatNumber(position.pnl)}
+                  </td>
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
     </div>
@@ -230,9 +179,10 @@ function PositionsTable({
 }
 
 export function DashboardPage() {
-  const [summaryState, setSummaryState] = useState<AsyncState<DashboardSummaryResponse>>(createInitialState);
-  const [alertsState, setAlertsState] = useState<AsyncState<DashboardAlertsResponse>>(createInitialState);
-  const [chartState, setChartState] = useState<AsyncState<DashboardChartResponse>>(createInitialState);
+  const [summaryState, setSummaryState] =
+    useState<AsyncState<DashboardSummaryResponse>>(createInitialState);
+  const [alertsState, setAlertsState] =
+    useState<AsyncState<DashboardAlertsResponse>>(createInitialState);
 
   const positionSubscriptions = useMemo<SubscriptionRequest[]>(
     () =>
@@ -243,19 +193,17 @@ export function DashboardPage() {
           exchange: position.exchange_code,
           product_type: position.product_type,
         })),
-    [summaryState.data],
+    [summaryState.data]
   );
   useLiveSubscribe(positionSubscriptions);
 
   const loadDashboard = useCallback(async () => {
     setSummaryState((current) => ({ ...current, loading: true, error: null }));
     setAlertsState((current) => ({ ...current, loading: true, error: null }));
-    setChartState((current) => ({ ...current, loading: true, error: null }));
 
-    const [summaryResult, alertsResult, chartResult] = await Promise.allSettled([
+    const [summaryResult, alertsResult] = await Promise.allSettled([
       getDashboardSummary(),
       getDashboardAlerts(),
-      getDashboardChart("NIFTY"),
     ]);
 
     setSummaryState(
@@ -264,8 +212,9 @@ export function DashboardPage() {
         : {
             data: null,
             loading: false,
-            error: summaryResult.reason instanceof Error ? summaryResult.reason.message : "Unknown error",
-          },
+            error:
+              summaryResult.reason instanceof Error ? summaryResult.reason.message : "Unknown error",
+          }
     );
     setAlertsState(
       alertsResult.status === "fulfilled"
@@ -273,17 +222,9 @@ export function DashboardPage() {
         : {
             data: null,
             loading: false,
-            error: alertsResult.reason instanceof Error ? alertsResult.reason.message : "Unknown error",
-          },
-    );
-    setChartState(
-      chartResult.status === "fulfilled"
-        ? { data: chartResult.value, loading: false, error: null }
-        : {
-            data: null,
-            loading: false,
-            error: chartResult.reason instanceof Error ? chartResult.reason.message : "Unknown error",
-          },
+            error:
+              alertsResult.reason instanceof Error ? alertsResult.reason.message : "Unknown error",
+          }
     );
   }, []);
 
@@ -291,72 +232,94 @@ export function DashboardPage() {
     void loadDashboard();
   }, [loadDashboard]);
 
+  const metrics = summaryState.data?.metrics ?? [];
+  const alerts = alertsState.data?.alerts ?? [];
+  const positions = summaryState.data?.positions ?? [];
+
   return (
-    <section className="dashboard-page">
-      <div className="metrics-grid">
-        {(summaryState.data?.metrics ?? Array.from({ length: 4 })).map((metric, index) => (
-          <article key={metric?.key ?? `loading-${index}`} className="metric-card">
-            <p className="metric-label">{metric?.label ?? "Loading metric"}</p>
-            <strong className={`metric-value ${toneClassName(metric?.tone ?? "neutral")}`}>{metric ? metricValue(metric) : "..."}</strong>
-            <p className="metric-meta">{metric ? metricChangeText(metric) : "Syncing dashboard summary..."}</p>
-            {metric?.expiry_date ? <span className="metric-footnote">Expiry {metric.expiry_date}</span> : null}
-          </article>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {(metrics.length
+          ? metrics
+          : (Array.from({ length: 4 }, () => undefined) as (DashboardMetric | undefined)[])
+        ).map((metric, index) => (
+          <Card key={metric?.key ?? `loading-${index}`}>
+            <CardContent className="p-5">
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {metric?.label ?? "Loading"}
+              </p>
+              <p
+                className={cn(
+                  "mt-2 text-2xl font-bold tabular-nums",
+                  toneColor(metric?.tone)
+                )}
+              >
+                {metric ? metricValue(metric) : "..."}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {metric ? metricChangeText(metric) : "Syncing dashboard summary..."}
+              </p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      <div className="dashboard-split">
-        <article className="panel chart-card">
-          <div className="section-header">
-            <div>
-              <p className="section-kicker">Chart panel</p>
-              <h3>NIFTY market structure</h3>
-            </div>
-            <span className="section-pill">{chartState.loading ? "Loading" : chartState.data?.interval ?? "1day"}</span>
-          </div>
-          <ChartPanel state={chartState} onRetry={() => void loadDashboard()} />
-        </article>
+      {summaryState.error && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {summaryState.error}
+        </div>
+      )}
 
-        <article className="panel alerts-card">
-          <div className="section-header">
-            <div>
-              <p className="section-kicker">Alerts</p>
-              <h3>Operational watchlist</h3>
-            </div>
-            <span className="section-pill">{alertsState.loading ? "Syncing" : `${alertsState.data?.alerts.length ?? 0} items`}</span>
-          </div>
-          {alertsState.error ? (
-            <ErrorState title="Alerts unavailable" message={alertsState.error} onRetry={() => void loadDashboard()} />
-          ) : (
-            <div className="alerts-stack">
-              {(alertsState.data?.alerts ?? []).map((alert) => (
-                <article key={`${alert.level}-${alert.title}`} className={alertClassName(alert.level)}>
-                  <p>{alert.level}</p>
-                  <strong>{alert.title}</strong>
-                  <span>{alert.message}</span>
-                </article>
-              ))}
-            </div>
-          )}
-        </article>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2.2fr)_minmax(280px,0.8fr)]">
+        <DashboardMarketChart />
+
+        <Card>
+          <CardHeader className="flex-row items-center justify-between border-b px-4 py-3">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Bell className="h-4 w-4" />
+              Alerts
+            </CardTitle>
+            <Badge variant="secondary">{alerts.length} Active</Badge>
+          </CardHeader>
+          <CardContent className="p-0">
+            {alerts.length === 0 ? (
+              <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center">
+                <CircleAlert className="h-8 w-8 text-muted-foreground/50" />
+                <p className="mt-3 text-sm font-medium">No active trade alerts</p>
+                <p className="mt-1 max-w-56 text-xs text-muted-foreground">
+                  Stop-loss, target, and rejected-order alerts will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {alerts.map((alert) => (
+                  <div key={`${alert.level}-${alert.title}`} className="flex gap-3 p-4">
+                    <span
+                      className={cn(
+                        "mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                        alertDotColor(alert.level)
+                      )}
+                    />
+                    <div>
+                      <p className="text-sm font-medium">{alert.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{alert.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      <article className="panel positions-card">
-        <div className="section-header">
-          <div>
-            <p className="section-kicker">Active positions</p>
-            <h3>Live Breeze positions snapshot</h3>
-          </div>
-          <span className="section-pill">
-            {summaryState.loading ? "Loading" : `${summaryState.data?.positions.length ?? 0} rows`}
-          </span>
-        </div>
-        <PositionsTable
-          positions={summaryState.data?.positions ?? []}
-          status={summaryState.data?.positions_status}
-          error={summaryState.error ?? summaryState.data?.positions_error}
-          onRetry={() => void loadDashboard()}
-        />
-      </article>
-    </section>
+      <Card className="min-h-[306px] overflow-hidden">
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+          <CardTitle className="text-sm">Active Positions</CardTitle>
+          <Badge variant="secondary">{positions.length}</Badge>
+        </CardHeader>
+        <PositionsTable positions={positions} status={summaryState.data?.positions_status} />
+      </Card>
+    </div>
   );
 }
