@@ -3,6 +3,42 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
+## 2026-06-13 - Full Visual Port: APTRADES2 frontend matches APTRADES 100%
+
+- Goal: make every APTRADES2 page look identical to the old `ankitlj/APTRADES.git`
+  frontend (fonts, colors, tables, boxes, layouts, chart lines, dark/light mode,
+  top-right "A" menu, dashboard ticker) without touching backend or any
+  frontend->backend data wiring.
+- Approach: 5 gated steps, each built and pushed, with user approval between steps:
+  1. Audit & map (commit `7cb6d2e`) - see `UI_OVERHAUL_PLAN.md`
+  2. Foundation + layout shell (commit `c21b216`)
+  3. Dashboard (commit `b5feb5b`)
+  4. Pages batch 1 - Positions, Orderbook, Tradebook, Option Chain, OI Tracker,
+     OI Profile (commit `95b0945`)
+  5. Pages batch 2 + polish - Action Centre, Logs, Tools, Strategy Builder,
+     Strategy Portfolio, Placeholder, shared states (commit `3b3d206`)
+- Foundation added: Tailwind v4 (`@tailwindcss/vite`) + shadcn/ui primitives
+  (Button, Card, Badge, Table, Input, DropdownMenu) + lucide-react +
+  class-variance-authority/clsx/tailwind-merge. Ported the old APTRADES oklch
+  theme tokens (light/dark + accent themes via `data-theme`) into `index.css`.
+  Custom `ThemeProvider` persists mode + accent to localStorage.
+- Shell rebuilt: sidebar `Navbar` (logo, TRACK|TRADE|TRIUMPH, lucide nav, ICICI
+  Direct status), sticky `TopHeader` (dashboard market ticker scrolling
+  right->left, live/offline dot, Sun/Moon dark-light toggle, "A" tools/accent
+  menu), `Footer`, mobile bottom nav.
+- Pages (all 13) restyled with shared helpers in `components/common/page.tsx`
+  (PageHeader, StatCard, Field, selectClass). Dashboard uses an SVG market chart
+  (indigo `#6366f1` line + gradient + grid + symbol search). Option chain keeps a
+  colored Calls/Strike/Puts two-tier header + ATM highlight; OI Tracker/Profile
+  use Tailwind CE/PE OI bars. `PayoffChart` reused unchanged (inline SVG colors).
+- FROZEN (never edited, per user): `frontend/src/lib/api.ts`,
+  `frontend/src/lib/realtime.ts`, `frontend/src/hooks/useLiveMarketData.tsx`,
+  `frontend/src/hooks/useQuotes.ts`, all of `backend/`. Every live websocket feed,
+  filter, mutation, and CSV export is unchanged.
+- Verification: `npm run build` passes on every step (1853 modules, ~47KB CSS).
+- Remaining: a live-market visual click-through with a fresh Breeze session token
+  is recommended (pure UI change, data wiring is identical to before).
+
 ## 2026-06-11 - Old APTRADES UI Alignment Pass 1
 
 - User clarified that APTRADES2 should use the older `ankitlj/APTRADES.git` frontend/UI directly as the visual source, not a new redesign.

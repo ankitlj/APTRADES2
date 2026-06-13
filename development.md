@@ -1,7 +1,7 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current UI track: APTRADES shell alignment pass 1 completed - APTRADES2 now uses the old APTRADES brand/logo treatment, denser left navigation, utility section, live-status footer, and old-style top header chrome instead of the interim rebuild shell.
+- Current UI track: FULL VISUAL PORT COMPLETE (2026-06-13) - all 13 APTRADES2 pages now match the old APTRADES frontend 100% (Tailwind v4 + shadcn/ui + ported oklch theme tokens, dark/light + accent themes, sidebar/topbar shell with dark-light toggle and "A" tools/accent menu, dashboard market ticker + SVG chart). Built on shared helpers in `frontend/src/components/common/page.tsx`. Data layer (api.ts/realtime.ts/hooks) and all backend FROZEN/untouched. 5 commits 7cb6d2e..3b3d206. See the 2026-06-13 entry in REBUILD.md.
 - Current phase: Phase 18 - Performance and Caching (Tier 1 implemented; Tiers 2-3 still planned)
 - Last completed phase: Phase 18 Tier 1 - backend caching (engine/sessionmaker singletons, idempotent ensure_tables, in-memory symbol-resolution TTL cache, shared process-wide BreezeGateway). Motivated by the live-stream live<->offline flicker: per-request engine rebuilds + per-request Breeze token exchange blocked the single gthread worker and starved the Socket.IO heartbeat.
 - Planned next: Phase 18 Tier 2 (Redis-first quote reads, option-chain strike streaming, parallel batch) and Tier 3 (frontend stale-while-revalidate / live-first render); then Phase 19 - Live-stream stability (Redis message_queue + background-task emit + ping tuning + frontend grace period + tick/gap recorder)
@@ -20,6 +20,20 @@
 - Deployment: Railway + Vercel live
 
 ## Phase Log
+
+### 2026-06-13 - UI Alignment Pass 2: Full Visual Port (all pages)
+- Goal: complete the page-by-page 1:1 legacy visual port flagged as a follow-up in Pass 1 - make every APTRADES2 page look identical to the old `ankitlj/APTRADES.git` frontend (fonts, colors, tables, boxes, layouts, chart lines, dark/light mode, "A" menu, dashboard ticker) with backend and all frontend->backend data wiring frozen.
+- Delivered in 5 user-gated steps, each built and pushed:
+  - Step 1 audit & map (commit `7cb6d2e`, `UI_OVERHAUL_PLAN.md`)
+  - Step 2 foundation + shell (commit `c21b216`)
+  - Step 3 Dashboard (commit `b5feb5b`)
+  - Step 4 Positions/Orderbook/Tradebook/OptionChain/OITracker/OIProfile (commit `95b0945`)
+  - Step 5 ActionCentre/Logs/Tools/StrategyBuilder/StrategyPortfolio/Placeholder + shared states (commit `3b3d206`)
+- Foundation: Tailwind v4 (`@tailwindcss/vite`) + shadcn/ui primitives (Button, Card, Badge, Table, Input, DropdownMenu) + lucide-react + cva/clsx/tailwind-merge. Ported old APTRADES oklch theme tokens (light/dark + accent via `data-theme`) into `index.css`. New `ThemeProvider` persists mode + accent to localStorage.
+- Shell: sidebar `Navbar`, sticky `TopHeader` (market ticker, live/offline dot, Sun/Moon toggle, "A" tools/accent menu), `Footer`, mobile bottom nav. Dashboard SVG chart uses indigo `#6366f1`.
+- Shared page helpers added in `frontend/src/components/common/page.tsx` (PageHeader, StatCard, Field, selectClass).
+- FROZEN/untouched per user: `frontend/src/lib/api.ts`, `frontend/src/lib/realtime.ts`, `frontend/src/hooks/useLiveMarketData.tsx`, `frontend/src/hooks/useQuotes.ts`, all of `backend/`.
+- Verification: `npm run build` passes on every step (1853 modules, ~47KB CSS). Live-market visual click-through with a fresh Breeze session token still recommended.
 
 ### 2026-06-11 - UI Alignment Pass 1: Old APTRADES Shell Port
 - Goal: Replace the temporary APTRADES2 app chrome with the older APTRADES shell vocabulary without disturbing the Phase 1-18 backend/data contracts.
