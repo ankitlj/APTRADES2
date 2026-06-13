@@ -34,6 +34,10 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
     metrics were loading or unmapped; `metricIcon(key, index)` now falls back per
     box position (TrendingUp / Layers / Percent / Wallet) so each box (and its
     engraved sticker) is always distinct and topic-appropriate.
+  - Fix (commit `671b3b5`): the 6 Tools cards used the base Card without
+    `.glow-card`, so they did not glow on hover; they now use glow-card + dark
+    glass, a per-tool neon glow-icon (Code2/Briefcase/Layers/Sigma/Activity/
+    BarChart3), and an engraved icon bottom-right.
 - FROZEN/untouched: `frontend/src/lib/api.ts`, `frontend/src/lib/realtime.ts`,
   `frontend/src/hooks/*`, all of `backend/`.
 - Verification: `npm run build` passes on every step.

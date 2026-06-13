@@ -31,6 +31,7 @@
   - Step 4 (commit `7642647`): base `Card` -> dark glass surface (all panels glassy); neon topic icons on stat boxes across every page.
   - Step 5 (commit `183a208`): neon glow on active sidebar item, PayoffChart line, "A" avatar.
   - Fix (commit `9bfa57e`): per-position fallback icons so the 4 dashboard boxes are distinct even while loading/unmapped (`metricIcon(key, index)`).
+  - Fix (commit `671b3b5`): the 6 Tools cards now use glow-card + dark glass + per-tool neon/engraved icons (they previously used the base Card and did not glow on hover).
 - FROZEN/untouched: `frontend/src/lib/api.ts`, `frontend/src/lib/realtime.ts`, `frontend/src/hooks/*`, all of `backend/`. `npm run build` passes on every step.
 
 ### 2026-06-13 - UI Alignment Pass 2: Full Visual Port (all pages)
