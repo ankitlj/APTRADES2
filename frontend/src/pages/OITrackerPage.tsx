@@ -1,11 +1,13 @@
+import { BarChart3 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import {
-  getOptionExpiries,
-  getOITracker,
-  type OITrackerResponse,
-  type OIRow,
-} from "../lib/api";
+import { getOptionExpiries, getOITracker, type OITrackerResponse, type OIRow } from "@/lib/api";
+import { ErrorState } from "@/components/ErrorState";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
+import { cn } from "@/lib/utils";
 
 type OITrackerState = {
   expiries: string[];
@@ -17,21 +19,6 @@ type OITrackerState = {
 
 const underlyingOptions = ["NIFTY", "BANKNIFTY"];
 
-function BarChartIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-      <path
-        d="M4 20V10M8 20V4M12 20V14M16 20V8M20 20V12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function formatNumber(value: number | null | undefined, maximumFractionDigits = 2) {
   if (value === null || value === undefined) {
     return "n/a";
@@ -39,15 +26,15 @@ function formatNumber(value: number | null | undefined, maximumFractionDigits = 
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(value);
 }
 
-function OIBar({ ceOi, peOi }: { ceOi: number; peOi: number }) {
+function OISplitBar({ ceOi, peOi }: { ceOi: number; peOi: number }) {
   const total = ceOi + peOi;
   if (total === 0) {
-    return null;
+    return <div className="h-2 w-full rounded-full bg-muted" />;
   }
   const cePercent = (ceOi / total) * 100;
   return (
-    <div className="oi-bar-wrap">
-      <div className="oi-bar-ce" style={{ width: `${cePercent.toFixed(1)}%` }} />
+    <div className="flex h-2 w-full overflow-hidden rounded-full bg-red-500/70">
+      <div className="h-full bg-green-500/80" style={{ width: `${cePercent.toFixed(1)}%` }} />
     </div>
   );
 }
@@ -55,16 +42,20 @@ function OIBar({ ceOi, peOi }: { ceOi: number; peOi: number }) {
 function OITrackerRow({ row, atmStrike }: { row: OIRow; atmStrike: number }) {
   const isAtm = row.strike_price === atmStrike;
   return (
-    <tr className={isAtm ? "oi-row-atm" : undefined}>
-      <td className="numeric">{formatNumber(row.strike_price, 0)}</td>
-      <td className="numeric tone-positive">{formatNumber(row.ce_oi, 0)}</td>
-      <td className="numeric tone-negative">{formatNumber(row.pe_oi, 0)}</td>
-      <td className="numeric">{formatNumber(row.total_oi, 0)}</td>
-      <td>
-        <OIBar ceOi={row.ce_oi} peOi={row.pe_oi} />
+    <tr className={cn("hover:bg-muted/20", isAtm && "bg-primary/5")}>
+      <td className={cn("px-4 py-3 text-right tabular-nums", isAtm && "font-semibold text-primary")}>
+        {formatNumber(row.strike_price, 0)}
       </td>
-      <td className="numeric">{formatNumber(row.ce_ltp)}</td>
-      <td className="numeric">{formatNumber(row.pe_ltp)}</td>
+      <td className="px-4 py-3 text-right tabular-nums text-green-600 dark:text-green-400">
+        {formatNumber(row.ce_oi, 0)}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums text-red-500">{formatNumber(row.pe_oi, 0)}</td>
+      <td className="px-4 py-3 text-right tabular-nums">{formatNumber(row.total_oi, 0)}</td>
+      <td className="px-4 py-3">
+        <OISplitBar ceOi={row.ce_oi} peOi={row.pe_oi} />
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums">{formatNumber(row.ce_ltp)}</td>
+      <td className="px-4 py-3 text-right tabular-nums">{formatNumber(row.pe_ltp)}</td>
     </tr>
   );
 }
@@ -134,131 +125,99 @@ export function OITrackerPage() {
   }, [selectedExpiry]);
 
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Open interest</p>
-          <h3 className="route-title-with-icon">
-            <span className="icon-tile" aria-hidden="true">
-              <BarChartIcon />
-            </span>
-            OI Tracker
-          </h3>
-          <p className="panel-message">
-            Strikes ranked by total OI. Highest CE OI = resistance. Highest PE OI = support.
-          </p>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Open interest"
+        title="OI Tracker"
+        description="Strikes ranked by total OI. Highest CE OI = resistance. Highest PE OI = support."
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Field label="Exchange">
+            <select value={exchangeCode} onChange={(e) => setExchangeCode(e.target.value)} className={selectClass}>
+              <option value="NFO">NFO</option>
+              <option value="BFO">BFO</option>
+            </select>
+          </Field>
+          <Field label="Underlying">
+            <select value={underlying} onChange={(e) => setUnderlying(e.target.value)} className={selectClass}>
+              {underlyingOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Expiry">
+            <select
+              value={selectedExpiry}
+              onChange={(e) => setSelectedExpiry(e.target.value)}
+              disabled={state.loadingExpiries || !state.expiries.length}
+              className={selectClass}
+            >
+              {state.expiries.map((expiry) => (
+                <option key={expiry} value={expiry}>
+                  {expiry}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
+        <Button variant="outline" size="sm" onClick={() => void loadData()} disabled={!selectedExpiry || state.loadingData}>
+          {state.loadingData ? "Refreshing..." : "Refresh"}
+        </Button>
       </div>
 
-      <article className="panel route-panel">
-        <div className="route-toolbar">
-          <div className="toolbar-group">
-            <label className="toolbar-field">
-              <span>Exchange</span>
-              <select value={exchangeCode} onChange={(e) => setExchangeCode(e.target.value)}>
-                <option value="NFO">NFO</option>
-                <option value="BFO">BFO</option>
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Underlying</span>
-              <select value={underlying} onChange={(e) => setUnderlying(e.target.value)}>
-                {underlyingOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Expiry</span>
-              <select
-                value={selectedExpiry}
-                onChange={(e) => setSelectedExpiry(e.target.value)}
-                disabled={state.loadingExpiries || !state.expiries.length}
-              >
-                {state.expiries.map((expiry) => (
-                  <option key={expiry} value={expiry}>
-                    {expiry}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="toolbar-actions">
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={() => void loadData()}
-              disabled={!selectedExpiry || state.loadingData}
-            >
-              {state.loadingData ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="ATM Strike" value={formatNumber(state.data?.atm_strike, 0)} />
+        <StatCard
+          label="PCR"
+          value={state.data?.pcr === null || state.data?.pcr === undefined ? "n/a" : state.data.pcr.toFixed(4)}
+        />
+        <StatCard label="Resistance (Max CE OI)" value={formatNumber(state.data?.max_ce_oi_strike, 0)} tone="positive" />
+        <StatCard label="Support (Max PE OI)" value={formatNumber(state.data?.max_pe_oi_strike, 0)} tone="negative" />
+      </div>
 
-        <div className="stats-grid option-chain-summary-grid">
-          <article className="stat-card">
-            <p className="metric-label">ATM Strike</p>
-            <strong className="metric-value tone-neutral">{formatNumber(state.data?.atm_strike, 0)}</strong>
-            <p className="metric-meta">{selectedExpiry || "Select expiry"}</p>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">PCR</p>
-            <strong className="metric-value tone-neutral">
-              {state.data?.pcr === null || state.data?.pcr === undefined ? "n/a" : state.data.pcr.toFixed(4)}
-            </strong>
-            <p className="metric-meta">Put OI / Call OI</p>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Resistance (Max CE OI)</p>
-            <strong className="metric-value tone-positive">
-              {formatNumber(state.data?.max_ce_oi_strike, 0)}
-            </strong>
-            <p className="metric-meta">Highest call OI strike</p>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Support (Max PE OI)</p>
-            <strong className="metric-value tone-negative">
-              {formatNumber(state.data?.max_pe_oi_strike, 0)}
-            </strong>
-            <p className="metric-meta">Highest put OI strike</p>
-          </article>
-        </div>
+      {state.error ? (
+        <ErrorState title="OI Tracker unavailable" message={state.error} onRetry={() => void loadData()} />
+      ) : null}
 
-        {state.error ? (
-          <div className="option-chain-error-card">
-            <p className="metric-label">Data unavailable</p>
-            <strong>OI Tracker unavailable</strong>
-            <p className="panel-message">{state.error}</p>
-          </div>
-        ) : null}
-
-        {state.loadingData && !state.data ? <p className="panel-message">Loading OI data...</p> : null}
-
-        {state.data ? (
-          <div className="table-wrap">
-            <table className="data-table oi-tracker-table">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <BarChart3 className="h-4 w-4" />
+            Open interest by strike
+          </CardTitle>
+          {selectedExpiry ? <Badge variant="secondary">{selectedExpiry}</Badge> : null}
+        </CardHeader>
+        {state.loadingData && !state.data ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading OI data...</p>
+        ) : state.data ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-sm">
               <thead>
-                <tr>
-                  <th>Strike</th>
-                  <th className="numeric tone-positive">CE OI</th>
-                  <th className="numeric tone-negative">PE OI</th>
-                  <th className="numeric">Total OI</th>
-                  <th>CE / PE split</th>
-                  <th className="numeric">CE LTP</th>
-                  <th className="numeric">PE LTP</th>
+                <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3 text-right font-medium">Strike</th>
+                  <th className="px-4 py-3 text-right font-medium">CE OI</th>
+                  <th className="px-4 py-3 text-right font-medium">PE OI</th>
+                  <th className="px-4 py-3 text-right font-medium">Total OI</th>
+                  <th className="px-4 py-3 font-medium">CE / PE split</th>
+                  <th className="px-4 py-3 text-right font-medium">CE LTP</th>
+                  <th className="px-4 py-3 text-right font-medium">PE LTP</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {state.data.rows.map((row) => (
                   <OITrackerRow key={row.strike_price} row={row} atmStrike={state.data!.atm_strike} />
                 ))}
               </tbody>
             </table>
           </div>
-        ) : null}
-      </article>
-    </section>
+        ) : (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Select an expiry to load OI data.</p>
+        )}
+      </Card>
+    </div>
   );
 }

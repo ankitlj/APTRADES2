@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 
-import { getTrades, type TradeRecord, type TradesResponse } from "../lib/api";
-import { ErrorState } from "../components/ErrorState";
-import { EmptyState } from "../components/EmptyState";
+import { getTrades, type TradeRecord, type TradesResponse } from "@/lib/api";
+import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/EmptyState";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 
 type TradebookState = {
   data: TradesResponse | null;
@@ -66,103 +70,96 @@ export function TradebookPage() {
   const trades = state.data?.trades ?? [];
 
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Broker trades</p>
-          <h3>Compact tradebook</h3>
-          <p className="panel-message">Track normalized Breeze trades, apply quick filters, and export the visible book.</p>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Broker trades"
+        title="Tradebook"
+        description="Track normalized Breeze trades, apply quick filters, and export the visible book."
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Field label="Exchange">
+            <select value={exchange} onChange={(event) => setExchange(event.target.value)} className={selectClass}>
+              <option value="NFO">NFO</option>
+              <option value="NSE">NSE</option>
+              <option value="BFO">BFO</option>
+              <option value="BSE">BSE</option>
+            </select>
+          </Field>
+          <Field label="Action">
+            <select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)} className={selectClass}>
+              <option value="">All</option>
+              <option value="BUY">Buy</option>
+              <option value="SELL">Sell</option>
+            </select>
+          </Field>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => void load()}>
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportCsv(trades)} disabled={!trades.length}>
+            Export CSV
+          </Button>
         </div>
       </div>
 
-      <article className="panel route-panel">
-        <div className="route-toolbar">
-          <div className="toolbar-group">
-            <label className="toolbar-field">
-              <span>Exchange</span>
-              <select value={exchange} onChange={(event) => setExchange(event.target.value)}>
-                <option value="NFO">NFO</option>
-                <option value="NSE">NSE</option>
-                <option value="BFO">BFO</option>
-                <option value="BSE">BSE</option>
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Action</span>
-              <select value={actionFilter} onChange={(event) => setActionFilter(event.target.value)}>
-                <option value="">All</option>
-                <option value="BUY">Buy</option>
-                <option value="SELL">Sell</option>
-              </select>
-            </label>
-          </div>
-          <div className="toolbar-actions">
-            <button type="button" className="toolbar-button" onClick={() => void load()}>
-              Refresh
-            </button>
-            <button type="button" className="toolbar-button" onClick={() => exportCsv(trades)} disabled={!trades.length}>
-              Export CSV
-            </button>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard label="Total trades" value={state.data?.stats.total ?? 0} />
+        <StatCard label="Buy trades" value={state.data?.stats.buy ?? 0} />
+        <StatCard label="Sell trades" value={state.data?.stats.sell ?? 0} />
+      </div>
 
-        <div className="stats-grid stats-grid-trades">
-          <article className="stat-card">
-            <p className="metric-label">Total trades</p>
-            <strong className="metric-value">{state.data?.stats.total ?? 0}</strong>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Buy trades</p>
-            <strong className="metric-value">{state.data?.stats.buy ?? 0}</strong>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Sell trades</p>
-            <strong className="metric-value">{state.data?.stats.sell ?? 0}</strong>
-          </article>
-        </div>
+      {state.error ? <ErrorState title="Trades unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
-        {state.error ? <ErrorState title="Trades unavailable" message={state.error} onRetry={() => void load()} /> : null}
-        {state.loading ? <p className="panel-message">Loading tradebook...</p> : null}
-        {!state.loading && !state.error && !trades.length ? (
+      <Card className="overflow-hidden">
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+          <CardTitle className="text-sm">Trades</CardTitle>
+          <Badge variant="secondary">{trades.length}</Badge>
+        </CardHeader>
+        {state.loading ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading tradebook...</p>
+        ) : !trades.length && !state.error ? (
           <EmptyState title="No trades" message="No trades returned for this filter window." />
-        ) : null}
-
-        {!state.loading && !state.error && trades.length ? (
-          <div className="table-wrap">
-            <table className="data-table data-table-trades">
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] text-sm">
               <thead>
-                <tr>
-                  <th>Symbol</th>
-                  <th>Trade ID</th>
-                  <th>Order ID</th>
-                  <th>Action</th>
-                  <th className="numeric">Qty</th>
-                  <th className="numeric">Price</th>
-                  <th>Time</th>
+                <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">Symbol</th>
+                  <th className="px-4 py-3 font-medium">Trade ID</th>
+                  <th className="px-4 py-3 font-medium">Order ID</th>
+                  <th className="px-4 py-3 font-medium">Action</th>
+                  <th className="px-4 py-3 text-right font-medium">Qty</th>
+                  <th className="px-4 py-3 text-right font-medium">Price</th>
+                  <th className="px-4 py-3 font-medium">Time</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {trades.map((trade) => (
-                  <tr key={`${trade.trade_id}-${trade.order_id}`}>
-                    <td>
-                      <div className="table-symbol">
-                        <strong>{trade.symbol}</strong>
-                        <span>{trade.exchange_code} · {trade.product_type}</span>
+                  <tr key={`${trade.trade_id}-${trade.order_id}`} className="hover:bg-muted/20">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold">{trade.symbol}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {trade.exchange_code} · {trade.product_type}
                       </div>
                     </td>
-                    <td>{trade.trade_id || "n/a"}</td>
-                    <td>{trade.order_id || "n/a"}</td>
-                    <td>{trade.action}</td>
-                    <td className="numeric">{formatNumber(trade.quantity, 0)}</td>
-                    <td className="numeric">{formatNumber(trade.price)}</td>
-                    <td>{trade.trade_time || "n/a"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{trade.trade_id || "n/a"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{trade.order_id || "n/a"}</td>
+                    <td className="px-4 py-3">
+                      <span className={trade.action === "BUY" ? "badge-buy" : "badge-sell"}>{trade.action}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(trade.quantity, 0)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(trade.price)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{trade.trade_time || "n/a"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : null}
-      </article>
-    </section>
+        )}
+      </Card>
+    </div>
   );
 }

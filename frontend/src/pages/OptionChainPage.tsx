@@ -1,3 +1,4 @@
+import { TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -5,19 +6,14 @@ import {
   getOptionExpiries,
   type OptionChainResponse,
   type OptionChainRow,
-} from "../lib/api";
-import { useLiveMarketData } from "../hooks/useLiveMarketData";
-import { ErrorState } from "../components/ErrorState";
-
-function liveBadgeLabel(state: string): string {
-  if (state === "live") {
-    return "Live feed";
-  }
-  if (state === "connecting") {
-    return "Connecting";
-  }
-  return "REST only";
-}
+} from "@/lib/api";
+import { useLiveMarketData } from "@/hooks/useLiveMarketData";
+import { ErrorState } from "@/components/ErrorState";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, PageHeader, StatCard, selectClass, tone } from "@/components/common/page";
+import { cn } from "@/lib/utils";
 
 type OptionChainState = {
   expiries: string[];
@@ -30,19 +26,10 @@ type OptionChainState = {
 const underlyingOptions = ["NIFTY", "BANKNIFTY"];
 const strikeWindowOptions = [8, 12, 16, 20];
 
-function TrendingUpIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-      <path
-        d="M4 16L10 10L14 14L20 8M14 8H20V14"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+function liveBadgeLabel(state: string): string {
+  if (state === "live") return "Live feed";
+  if (state === "connecting") return "Connecting";
+  return "REST only";
 }
 
 function formatNumber(value: number | null | undefined, maximumFractionDigits = 2) {
@@ -52,25 +39,15 @@ function formatNumber(value: number | null | undefined, maximumFractionDigits = 
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(value);
 }
 
-function toneClass(value: number | null | undefined) {
-  if ((value ?? 0) > 0) {
-    return "tone-positive";
-  }
-  if ((value ?? 0) < 0) {
-    return "tone-negative";
-  }
-  return "tone-neutral";
-}
-
-function OptionChainLegCell({ row, side }: { row: OptionChainRow; side: "ce" | "pe" }) {
+function LegCells({ row, side }: { row: OptionChainRow; side: "ce" | "pe" }) {
   const leg = row[side];
   return (
     <>
-      <td className="numeric option-chain-cell">{formatNumber(leg?.oi, 0)}</td>
-      <td className="numeric option-chain-cell">{formatNumber(leg?.volume, 0)}</td>
-      <td className="numeric option-chain-cell">{formatNumber(leg?.bid)}</td>
-      <td className="numeric option-chain-cell">{formatNumber(leg?.ask)}</td>
-      <td className="numeric option-chain-cell">{formatNumber(leg?.ltp)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(leg?.oi, 0)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(leg?.volume, 0)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(leg?.bid)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(leg?.ask)}</td>
+      <td className="px-3 py-2 text-right font-medium tabular-nums">{formatNumber(leg?.ltp)}</td>
     </>
   );
 }
@@ -101,9 +78,7 @@ export function OptionChainPage() {
 
     getOptionExpiries({ underlying, exchange: exchangeCode })
       .then((payload) => {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         const nextExpiry = payload.expiries[0] ?? "";
         setSelectedExpiry(nextExpiry);
         setState((current) => ({
@@ -114,9 +89,7 @@ export function OptionChainPage() {
         }));
       })
       .catch((error) => {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setSelectedExpiry("");
         setState((current) => ({
           ...current,
@@ -131,9 +104,7 @@ export function OptionChainPage() {
   }, [exchangeCode, underlying]);
 
   const loadChain = async () => {
-    if (!selectedExpiry) {
-      return;
-    }
+    if (!selectedExpiry) return;
 
     setState((current) => ({ ...current, loadingChain: true, error: null }));
     try {
@@ -143,12 +114,7 @@ export function OptionChainPage() {
         exchange: exchangeCode,
         strike_count: strikeCount,
       });
-      setState((current) => ({
-        ...current,
-        data: payload,
-        loadingChain: false,
-        error: null,
-      }));
+      setState((current) => ({ ...current, data: payload, loadingChain: false, error: null }));
     } catch (error) {
       setState((current) => ({
         ...current,
@@ -173,147 +139,148 @@ export function OptionChainPage() {
   }, [state.data]);
 
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Options data</p>
-          <h3 className="route-title-with-icon">
-            <span className="icon-tile" aria-hidden="true">
-              <TrendingUpIcon />
-            </span>
-            Option chain
-          </h3>
-          <p className="panel-message">Live Breeze chain normalized into a strike grid with expiry control, ATM context, and real broker errors.</p>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Options data"
+        title="Option Chain"
+        description="Live Breeze chain normalized into a strike grid with expiry control, ATM context, and real broker errors."
+        actions={
+          <Badge variant={connectionState === "live" ? "default" : "secondary"}>
+            {liveBadgeLabel(connectionState)}
+          </Badge>
+        }
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Field label="Exchange">
+            <select value={exchangeCode} onChange={(event) => setExchangeCode(event.target.value)} className={selectClass}>
+              <option value="NFO">NFO</option>
+              <option value="BFO">BFO</option>
+            </select>
+          </Field>
+          <Field label="Underlying">
+            <select value={underlying} onChange={(event) => setUnderlying(event.target.value)} className={selectClass}>
+              {underlyingOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Expiry">
+            <select
+              value={selectedExpiry}
+              onChange={(event) => setSelectedExpiry(event.target.value)}
+              disabled={state.loadingExpiries || !state.expiries.length}
+              className={selectClass}
+            >
+              {state.expiries.map((expiry) => (
+                <option key={expiry} value={expiry}>
+                  {expiry}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Strikes">
+            <select value={strikeCount} onChange={(event) => setStrikeCount(Number(event.target.value))} className={selectClass}>
+              {strikeWindowOptions.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </Field>
         </div>
-        <span className={`section-pill live-pill live-pill-${connectionState}`} title={`Market data: ${connectionState}`}>
-          <span className={`status-dot status-dot-${connectionState}`} />
-          {liveBadgeLabel(connectionState)}
-        </span>
+        <Button variant="outline" size="sm" onClick={() => void loadChain()} disabled={!selectedExpiry || state.loadingChain}>
+          {state.loadingChain ? "Refreshing..." : "Refresh"}
+        </Button>
       </div>
 
-      <article className="panel route-panel">
-        <div className="route-toolbar">
-          <div className="toolbar-group">
-            <label className="toolbar-field">
-              <span>Exchange</span>
-              <select value={exchangeCode} onChange={(event) => setExchangeCode(event.target.value)}>
-                <option value="NFO">NFO</option>
-                <option value="BFO">BFO</option>
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Underlying</span>
-              <select value={underlying} onChange={(event) => setUnderlying(event.target.value)}>
-                {underlyingOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Expiry</span>
-              <select value={selectedExpiry} onChange={(event) => setSelectedExpiry(event.target.value)} disabled={state.loadingExpiries || !state.expiries.length}>
-                {state.expiries.map((expiry) => (
-                  <option key={expiry} value={expiry}>
-                    {expiry}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Strike count</span>
-              <select value={strikeCount} onChange={(event) => setStrikeCount(Number(event.target.value))}>
-                {strikeWindowOptions.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="toolbar-actions">
-            <button type="button" className="toolbar-button" onClick={() => void loadChain()} disabled={!selectedExpiry || state.loadingChain}>
-              {state.loadingChain ? "Refreshing..." : "Refresh"}
-            </button>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard
+          label="Spot"
+          value={formatNumber(state.data?.underlying_ltp)}
+          tone={tone(previousCloseDelta)}
+        />
+        <StatCard label="ATM strike" value={formatNumber(state.data?.atm_strike, 0)} />
+        <StatCard
+          label="PCR"
+          value={state.data?.pcr === null || state.data?.pcr === undefined ? "n/a" : state.data.pcr.toFixed(4)}
+        />
+        <StatCard label="Total OI" value={formatNumber(state.data?.total_oi, 0)} />
+      </div>
 
-        <div className="stats-grid option-chain-summary-grid">
-          <article className="stat-card">
-            <p className="metric-label">Spot</p>
-            <strong className={`metric-value ${toneClass(previousCloseDelta)}`}>{formatNumber(state.data?.underlying_ltp)}</strong>
-            <p className="metric-meta">{previousCloseDelta === null ? "Awaiting Breeze response" : `${formatNumber(previousCloseDelta)} vs prev close`}</p>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">ATM strike</p>
-            <strong className="metric-value tone-neutral">{formatNumber(state.data?.atm_strike, 0)}</strong>
-            <p className="metric-meta">{selectedExpiry || "Select expiry"}</p>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">PCR</p>
-            <strong className="metric-value tone-neutral">{state.data?.pcr === null || state.data?.pcr === undefined ? "n/a" : state.data.pcr.toFixed(4)}</strong>
-            <p className="metric-meta">Put OI / Call OI</p>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Total OI</p>
-            <strong className="metric-value tone-neutral">{formatNumber(state.data?.total_oi, 0)}</strong>
-            <p className="metric-meta">Calls + puts</p>
-          </article>
-        </div>
+      {state.error ? (
+        <ErrorState title="Option chain unavailable" message={state.error} onRetry={() => void loadChain()} />
+      ) : null}
 
-        {state.error ? (
-          <ErrorState title="Option chain unavailable" message={state.error} onRetry={() => void loadChain()} />
-        ) : null}
-
-        {state.loadingChain && !state.data ? <p className="panel-message">Loading option chain...</p> : null}
-
-        {state.data ? (
-          <div className="table-wrap">
-            <table className="data-table option-chain-table">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <TrendingUp className="h-4 w-4" />
+            Strike grid
+          </CardTitle>
+          {selectedExpiry ? <Badge variant="secondary">{selectedExpiry}</Badge> : null}
+        </CardHeader>
+        {state.loadingChain && !state.data ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading option chain...</p>
+        ) : state.data ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] text-sm">
               <thead>
-                <tr>
-                  <th colSpan={5} className="option-chain-head option-chain-head-calls">
+                <tr className="border-b text-[11px] uppercase tracking-wider">
+                  <th colSpan={5} className="bg-green-500/10 px-3 py-2 text-center font-semibold text-green-700 dark:text-green-400">
                     Calls
                   </th>
-                  <th className="option-chain-head option-chain-head-strike">Strike</th>
-                  <th colSpan={5} className="option-chain-head option-chain-head-puts">
+                  <th className="bg-muted px-3 py-2 text-center font-semibold text-muted-foreground">Strike</th>
+                  <th colSpan={5} className="bg-red-500/10 px-3 py-2 text-center font-semibold text-red-600 dark:text-red-400">
                     Puts
                   </th>
                 </tr>
-                <tr>
-                  <th>OI</th>
-                  <th>Vol</th>
-                  <th>Bid</th>
-                  <th>Ask</th>
-                  <th>LTP</th>
-                  <th>Strike</th>
-                  <th>LTP</th>
-                  <th>Bid</th>
-                  <th>Ask</th>
-                  <th>Vol</th>
-                  <th>OI</th>
+                <tr className="border-b bg-muted/30 text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-2 text-right font-medium">OI</th>
+                  <th className="px-3 py-2 text-right font-medium">Vol</th>
+                  <th className="px-3 py-2 text-right font-medium">Bid</th>
+                  <th className="px-3 py-2 text-right font-medium">Ask</th>
+                  <th className="px-3 py-2 text-right font-medium">LTP</th>
+                  <th className="px-3 py-2 text-center font-medium">Strike</th>
+                  <th className="px-3 py-2 text-right font-medium">LTP</th>
+                  <th className="px-3 py-2 text-right font-medium">Bid</th>
+                  <th className="px-3 py-2 text-right font-medium">Ask</th>
+                  <th className="px-3 py-2 text-right font-medium">Vol</th>
+                  <th className="px-3 py-2 text-right font-medium">OI</th>
                 </tr>
               </thead>
-              <tbody>
-                {state.data.rows.map((row) => (
-                  <tr key={row.strike_price}>
-                    <OptionChainLegCell row={row} side="ce" />
-                    <td className={`numeric option-chain-strike-cell ${row.strike_price === state.data?.atm_strike ? "option-chain-strike-atm" : ""}`}>
-                      {formatNumber(row.strike_price, 0)}
-                    </td>
-                    <td className="numeric option-chain-cell">{formatNumber(row.pe?.ltp)}</td>
-                    <td className="numeric option-chain-cell">{formatNumber(row.pe?.bid)}</td>
-                    <td className="numeric option-chain-cell">{formatNumber(row.pe?.ask)}</td>
-                    <td className="numeric option-chain-cell">{formatNumber(row.pe?.volume, 0)}</td>
-                    <td className="numeric option-chain-cell">{formatNumber(row.pe?.oi, 0)}</td>
-                  </tr>
-                ))}
+              <tbody className="divide-y">
+                {state.data.rows.map((row) => {
+                  const isAtm = row.strike_price === state.data?.atm_strike;
+                  return (
+                    <tr key={row.strike_price} className={cn("hover:bg-muted/20", isAtm && "bg-primary/5")}>
+                      <LegCells row={row} side="ce" />
+                      <td
+                        className={cn(
+                          "px-3 py-2 text-center font-semibold tabular-nums",
+                          isAtm ? "bg-primary/10 text-primary" : "bg-muted/40"
+                        )}
+                      >
+                        {formatNumber(row.strike_price, 0)}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium tabular-nums">{formatNumber(row.pe?.ltp)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.pe?.bid)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.pe?.ask)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.pe?.volume, 0)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.pe?.oi, 0)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        ) : null}
-      </article>
-    </section>
+        ) : (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Select an expiry to load the chain.</p>
+        )}
+      </Card>
+    </div>
   );
 }

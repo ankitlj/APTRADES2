@@ -6,9 +6,13 @@ import {
   getOrders,
   type OrderRecord,
   type OrdersResponse,
-} from "../lib/api";
-import { ErrorState } from "../components/ErrorState";
-import { EmptyState } from "../components/EmptyState";
+} from "@/lib/api";
+import { ErrorState } from "@/components/ErrorState";
+import { EmptyState } from "@/components/EmptyState";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 
 type OrderbookState = {
   data: OrdersResponse | null;
@@ -50,16 +54,6 @@ function formatNumber(value: number | null | undefined, maximumFractionDigits = 
     return "n/a";
   }
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(value);
-}
-
-function statItems(data: OrdersResponse | null) {
-  return [
-    { label: "Total", value: data?.stats.total ?? 0 },
-    { label: "Completed", value: data?.stats.completed ?? 0 },
-    { label: "Open", value: data?.stats.open ?? 0 },
-    { label: "Rejected", value: data?.stats.rejected ?? 0 },
-    { label: "Cancelled", value: data?.stats.cancelled ?? 0 },
-  ];
 }
 
 export function OrderbookPage() {
@@ -117,126 +111,132 @@ export function OrderbookPage() {
     }
   };
 
+  const stats = [
+    { label: "Total", value: state.data?.stats.total ?? 0 },
+    { label: "Completed", value: state.data?.stats.completed ?? 0 },
+    { label: "Open", value: state.data?.stats.open ?? 0 },
+    { label: "Rejected", value: state.data?.stats.rejected ?? 0 },
+    { label: "Cancelled", value: state.data?.stats.cancelled ?? 0 },
+  ];
+
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Broker orders</p>
-          <h3>Compact orderbook</h3>
-          <p className="panel-message">Review live Breeze orders, filter by state, and export the current book.</p>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Broker orders"
+        title="Orderbook"
+        description="Review live Breeze orders, filter by state, and export the current book."
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Field label="Exchange">
+            <select value={exchange} onChange={(event) => setExchange(event.target.value)} className={selectClass}>
+              <option value="NFO">NFO</option>
+              <option value="NSE">NSE</option>
+              <option value="BFO">BFO</option>
+              <option value="BSE">BSE</option>
+            </select>
+          </Field>
+          <Field label="Status">
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={selectClass}>
+              <option value="">All</option>
+              <option value="open">Open</option>
+              <option value="completed">Completed</option>
+              <option value="rejected">Rejected</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </Field>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => void load()}>
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportCsv(orders)} disabled={!orders.length}>
+            Export
+          </Button>
+          <Button variant="destructive" size="sm" onClick={() => void handleCancelAll()}>
+            Cancel All
+          </Button>
         </div>
       </div>
 
-      <article className="panel route-panel">
-        <div className="route-toolbar">
-          <div className="toolbar-group">
-            <label className="toolbar-field">
-              <span>Exchange</span>
-              <select value={exchange} onChange={(event) => setExchange(event.target.value)}>
-                <option value="NFO">NFO</option>
-                <option value="NSE">NSE</option>
-                <option value="BFO">BFO</option>
-                <option value="BSE">BSE</option>
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Status</span>
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="">All</option>
-                <option value="open">Open</option>
-                <option value="completed">Completed</option>
-                <option value="rejected">Rejected</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </label>
-          </div>
-          <div className="toolbar-actions">
-            <button type="button" className="toolbar-button" onClick={() => void load()}>
-              Refresh
-            </button>
-            <button type="button" className="toolbar-button" onClick={() => exportCsv(orders)} disabled={!orders.length}>
-              Export
-            </button>
-            <button type="button" className="toolbar-button toolbar-button-danger" onClick={() => void handleCancelAll()}>
-              Cancel All
-            </button>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        {stats.map((item) => (
+          <StatCard key={item.label} label={item.label} value={item.value} />
+        ))}
+      </div>
 
-        <div className="tab-strip">
-          <span className="tab-chip tab-chip-active">Orders</span>
-          <span className="tab-chip">GTT unavailable</span>
+      {state.actionMessage ? (
+        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          {state.actionMessage}
         </div>
+      ) : null}
+      {state.error ? <ErrorState title="Orders unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
-        <div className="stats-grid stats-grid-orders">
-          {statItems(state.data).map((item) => (
-            <article key={item.label} className="stat-card">
-              <p className="metric-label">{item.label}</p>
-              <strong className="metric-value">{item.value}</strong>
-            </article>
-          ))}
-        </div>
-
-        {state.actionMessage ? <p className="panel-message">{state.actionMessage}</p> : null}
-        {state.error ? <ErrorState title="Orders unavailable" message={state.error} onRetry={() => void load()} /> : null}
-        {state.loading ? <p className="panel-message">Loading orderbook...</p> : null}
-        {!state.loading && !state.error && !orders.length ? (
+      <Card className="overflow-hidden">
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+          <CardTitle className="text-sm">Orders</CardTitle>
+          <Badge variant="secondary">{orders.length}</Badge>
+        </CardHeader>
+        {state.loading ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading orderbook...</p>
+        ) : !orders.length && !state.error ? (
           <EmptyState title="No orders" message="No orders returned for this filter window." />
-        ) : null}
-
-        {!state.loading && !state.error && orders.length ? (
-          <div className="table-wrap">
-            <table className="data-table data-table-orders">
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1000px] text-sm">
               <thead>
-                <tr>
-                  <th>Symbol</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                  <th className="numeric">Qty</th>
-                  <th className="numeric">Pending</th>
-                  <th className="numeric">Filled</th>
-                  <th className="numeric">Limit</th>
-                  <th className="numeric">Avg</th>
-                  <th>Type</th>
-                  <th>Created</th>
-                  <th>Control</th>
+                <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">Symbol</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Action</th>
+                  <th className="px-4 py-3 text-right font-medium">Qty</th>
+                  <th className="px-4 py-3 text-right font-medium">Pending</th>
+                  <th className="px-4 py-3 text-right font-medium">Filled</th>
+                  <th className="px-4 py-3 text-right font-medium">Limit</th>
+                  <th className="px-4 py-3 text-right font-medium">Avg</th>
+                  <th className="px-4 py-3 font-medium">Type</th>
+                  <th className="px-4 py-3 font-medium">Created</th>
+                  <th className="px-4 py-3 font-medium">Control</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {orders.map((order) => (
-                  <tr key={`${order.order_id}-${order.symbol}`}>
-                    <td>
-                      <div className="table-symbol">
-                        <strong>{order.symbol}</strong>
-                        <span>{order.exchange_code} · {order.product_type}</span>
+                  <tr key={`${order.order_id}-${order.symbol}`} className="hover:bg-muted/20">
+                    <td className="px-4 py-3">
+                      <div className="font-semibold">{order.symbol}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {order.exchange_code} · {order.product_type}
                       </div>
                     </td>
-                    <td>{order.status}</td>
-                    <td>{order.action}</td>
-                    <td className="numeric">{formatNumber(order.quantity, 0)}</td>
-                    <td className="numeric">{formatNumber(order.pending_quantity, 0)}</td>
-                    <td className="numeric">{formatNumber(order.filled_quantity, 0)}</td>
-                    <td className="numeric">{formatNumber(order.limit_price)}</td>
-                    <td className="numeric">{formatNumber(order.average_price)}</td>
-                    <td>{order.order_type || order.validity || "n/a"}</td>
-                    <td>{order.created_at || "n/a"}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="row-action"
+                    <td className="px-4 py-3 text-muted-foreground">{order.status}</td>
+                    <td className="px-4 py-3">
+                      <span className={order.action === "BUY" ? "badge-buy" : "badge-sell"}>{order.action}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.quantity, 0)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.pending_quantity, 0)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.filled_quantity, 0)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.limit_price)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.average_price)}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{order.order_type || order.validity || "n/a"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{order.created_at || "n/a"}</td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => void handleCancel(order)}
                         disabled={!(order.status_normalized === "open" || order.status_normalized === "pending" || order.status_normalized === "ordered")}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : null}
-      </article>
-    </section>
+        )}
+      </Card>
+    </div>
   );
 }
