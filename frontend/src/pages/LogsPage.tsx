@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { getLiveLogs, getLogs, type LiveLogsResponse, type LogRow, type LogsResponse } from "../lib/api";
+import { getLiveLogs, getLogs, type LiveLogsResponse, type LogRow, type LogsResponse } from "@/lib/api";
+import { ErrorState } from "@/components/ErrorState";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 
 type LogsState = {
   logs: LogsResponse | null;
@@ -13,10 +18,16 @@ function formatDateTime(value: string | null) {
   if (!value) {
     return "n/a";
   }
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(
+    new Date(value)
+  );
+}
+
+function formatPathEvent(row: LogRow) {
+  if (row.kind === "api") {
+    return [row.method, row.path, row.status_code].filter(Boolean).join(" · ");
+  }
+  return row.event_type;
 }
 
 export function LogsPage() {
@@ -55,125 +66,113 @@ export function LogsPage() {
   }, [rows]);
 
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Operational logs</p>
-          <h3>Logs</h3>
-          <p className="panel-message">Inspect API traffic, app events, and a live monospace tail without leaving the dashboard shell.</p>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Operational logs"
+        title="Logs"
+        description="Inspect API traffic, app events, and a live monospace tail without leaving the dashboard shell."
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Field label="Level">
+            <select value={level} onChange={(event) => setLevel(event.target.value)} className={selectClass}>
+              <option value="all">All</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+            </select>
+          </Field>
+          <Field label="Source">
+            <select value={source} onChange={(event) => setSource(event.target.value)} className={selectClass}>
+              {availableSources.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Time">
+            <select value={timeWindow} onChange={(event) => setTimeWindow(event.target.value)} className={selectClass}>
+              <option value="15m">15m</option>
+              <option value="1h">1h</option>
+              <option value="24h">24h</option>
+              <option value="7d">7d</option>
+              <option value="all">All</option>
+            </select>
+          </Field>
         </div>
+        <Button variant="outline" size="sm" onClick={() => void load()}>
+          Refresh
+        </Button>
       </div>
 
-      <article className="panel route-panel">
-        <div className="route-toolbar">
-          <div className="toolbar-group">
-            <label className="toolbar-field">
-              <span>Level</span>
-              <select value={level} onChange={(event) => setLevel(event.target.value)}>
-                <option value="all">All</option>
-                <option value="info">Info</option>
-                <option value="warning">Warning</option>
-                <option value="error">Error</option>
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Source</span>
-              <select value={source} onChange={(event) => setSource(event.target.value)}>
-                {availableSources.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Time</span>
-              <select value={timeWindow} onChange={(event) => setTimeWindow(event.target.value)}>
-                <option value="15m">15m</option>
-                <option value="1h">1h</option>
-                <option value="24h">24h</option>
-                <option value="7d">7d</option>
-                <option value="all">All</option>
-              </select>
-            </label>
-          </div>
-          <div className="toolbar-actions">
-            <button type="button" className="toolbar-button" onClick={() => void load()}>
-              Refresh
-            </button>
-          </div>
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard label="API rows" value={state.logs?.summary.api_count ?? 0} />
+        <StatCard label="App rows" value={state.logs?.summary.app_count ?? 0} />
+        <StatCard label="Visible rows" value={state.logs?.summary.total_count ?? 0} />
+      </div>
 
-        <div className="stats-grid stats-grid-trades">
-          <article className="stat-card">
-            <p className="metric-label">API rows</p>
-            <strong className="metric-value">{state.logs?.summary.api_count ?? 0}</strong>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">App rows</p>
-            <strong className="metric-value">{state.logs?.summary.app_count ?? 0}</strong>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Visible rows</p>
-            <strong className="metric-value">{state.logs?.summary.total_count ?? 0}</strong>
-          </article>
-        </div>
+      {state.error ? <ErrorState title="Logs unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
-        {state.error ? <p className="panel-message panel-error">Logs unavailable: {state.error}</p> : null}
-        {state.loading ? <p className="panel-message">Loading logs...</p> : null}
-
-        <div className="logs-layout">
-          <div className="table-wrap">
-            <table className="data-table data-table-orders">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Level</th>
-                  <th>Kind</th>
-                  <th>Source</th>
-                  <th>Message</th>
-                  <th>Path/Event</th>
-                </tr>
-              </thead>
-              <tbody>
-                {!state.loading && !rows.length ? (
-                  <tr>
-                    <td colSpan={6}>No logs returned for this filter.</td>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+        <Card className="overflow-hidden">
+          <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+            <CardTitle className="text-sm">Log rows</CardTitle>
+            <Badge variant="secondary">{rows.length}</Badge>
+          </CardHeader>
+          {state.loading && !rows.length ? (
+            <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading logs...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-3 font-medium">Time</th>
+                    <th className="px-4 py-3 font-medium">Level</th>
+                    <th className="px-4 py-3 font-medium">Kind</th>
+                    <th className="px-4 py-3 font-medium">Source</th>
+                    <th className="px-4 py-3 font-medium">Message</th>
+                    <th className="px-4 py-3 font-medium">Path/Event</th>
                   </tr>
-                ) : null}
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{formatDateTime(row.created_at)}</td>
-                    <td>{row.level}</td>
-                    <td>{row.kind}</td>
-                    <td>{row.source}</td>
-                    <td>{row.message}</td>
-                    <td>{formatPathEvent(row)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="logs-live-panel">
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Live logs</p>
-                <h3>Monospace tail</h3>
-              </div>
-              <span className="section-pill">{state.live?.lines.length ?? 0} lines</span>
+                </thead>
+                <tbody className="divide-y">
+                  {!rows.length ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                        No logs returned for this filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((row) => (
+                      <tr key={row.id} className="hover:bg-muted/20">
+                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{formatDateTime(row.created_at)}</td>
+                        <td className="px-4 py-3">{row.level}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.kind}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{row.source}</td>
+                        <td className="px-4 py-3">{row.message}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{formatPathEvent(row)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-            <pre className="monospace-viewer">{(state.live?.lines ?? ["Awaiting log rows..."]).join("\n")}</pre>
-          </div>
-        </div>
-      </article>
-    </section>
-  );
-}
+          )}
+        </Card>
 
-function formatPathEvent(row: LogRow) {
-  if (row.kind === "api") {
-    return [row.method, row.path, row.status_code].filter(Boolean).join(" · ");
-  }
-  return row.event_type;
+        <Card className="overflow-hidden">
+          <CardHeader className="flex-row items-center justify-between gap-2 border-b px-4 py-3">
+            <CardTitle className="text-sm">Live logs</CardTitle>
+            <Badge variant="secondary">{state.live?.lines.length ?? 0} lines</Badge>
+          </CardHeader>
+          <div className="p-3">
+            <pre className="max-h-[420px] overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
+              {(state.live?.lines ?? ["Awaiting log rows..."]).join("\n")}
+            </pre>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
 }

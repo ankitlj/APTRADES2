@@ -6,7 +6,13 @@ import {
   rejectAction,
   type ActionCentreRecord,
   type ActionCentreResponse,
-} from "../lib/api";
+} from "@/lib/api";
+import { ErrorState } from "@/components/ErrorState";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader, StatCard } from "@/components/common/page";
+import { cn } from "@/lib/utils";
 
 type ActionCentreState = {
   data: ActionCentreResponse | null;
@@ -21,10 +27,9 @@ function formatDateTime(value: string | null) {
   if (!value) {
     return "n/a";
   }
-  return new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(
+    new Date(value)
+  );
 }
 
 export function ActionCentrePage() {
@@ -72,153 +77,150 @@ export function ActionCentrePage() {
   const stats = state.data?.stats ?? { pending: 0, approved: 0, rejected: 0, all: 0 };
 
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Broker actions</p>
-          <h3>Action Centre</h3>
-          <p className="panel-message">Review queued broker actions, approve live requests, or reject them with full audit rows.</p>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Broker actions"
+        title="Action Centre"
+        description="Review queued broker actions, approve live requests, or reject them with full audit rows."
+      />
+
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-sm font-semibold">Semi-auto workflow</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pending rows are sourced from live broker orders. Approve sends the linked Breeze action.
+            Reject keeps the audit trail without touching the broker.
+          </p>
+        </CardContent>
+      </Card>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setStatusFilter(tab)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors",
+                tab === statusFilter
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
+        <Button variant="outline" size="sm" onClick={() => void load()}>
+          Refresh
+        </Button>
       </div>
 
-      <article className="panel route-panel">
-        <div className="info-banner">
-          <strong>Semi-auto workflow</strong>
-          <span>Pending rows are sourced from live broker orders. Approve sends the linked Breeze action. Reject keeps the audit trail without touching the broker.</span>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Pending" value={stats.pending} />
+        <StatCard label="Approved" value={stats.approved} />
+        <StatCard label="Rejected" value={stats.rejected} />
+        <StatCard label="All" value={stats.all} />
+        <StatCard label="Current tab" value={<span className="capitalize">{statusFilter}</span>} />
+      </div>
+
+      {state.message ? (
+        <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          {state.message}
         </div>
+      ) : null}
+      {state.error ? <ErrorState title="Action Centre unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
-        <div className="route-toolbar">
-          <div className="tab-strip">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                className={tab === statusFilter ? "tab-chip tab-chip-active" : "tab-chip"}
-                onClick={() => setStatusFilter(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-          <div className="toolbar-actions">
-            <button type="button" className="toolbar-button" onClick={() => void load()}>
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        <div className="stats-grid stats-grid-orders">
-          <article className="stat-card">
-            <p className="metric-label">Pending</p>
-            <strong className="metric-value">{stats.pending}</strong>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Approved</p>
-            <strong className="metric-value">{stats.approved}</strong>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Rejected</p>
-            <strong className="metric-value">{stats.rejected}</strong>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">All</p>
-            <strong className="metric-value">{stats.all}</strong>
-          </article>
-          <article className="stat-card">
-            <p className="metric-label">Current tab</p>
-            <strong className="metric-value">{statusFilter}</strong>
-          </article>
-        </div>
-
-        {state.message ? <p className="panel-message">{state.message}</p> : null}
-        {state.error ? <p className="panel-message panel-error">Action Centre unavailable: {state.error}</p> : null}
-        {state.loading ? <p className="panel-message">Loading action queue...</p> : null}
-        {!state.loading && !state.error && !actions.length ? <p className="panel-message">No rows returned for this status.</p> : null}
-
-        {!state.loading && !state.error && actions.length ? (
-          <div className="table-wrap">
-            <table className="data-table data-table-orders">
+      <Card className="overflow-hidden">
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+          <CardTitle className="text-sm">Action queue</CardTitle>
+          <Badge variant="secondary">{actions.length}</Badge>
+        </CardHeader>
+        {state.loading ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading action queue...</p>
+        ) : !actions.length && !state.error ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">No rows returned for this status.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1000px] text-sm">
               <thead>
-                <tr>
-                  <th>Symbol</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                  <th>Order ID</th>
-                  <th className="numeric">Qty</th>
-                  <th>Requested</th>
-                  <th>Reviewed</th>
-                  <th>Controls</th>
+                <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-3 font-medium">Symbol</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Action</th>
+                  <th className="px-4 py-3 font-medium">Order ID</th>
+                  <th className="px-4 py-3 text-right font-medium">Qty</th>
+                  <th className="px-4 py-3 font-medium">Requested</th>
+                  <th className="px-4 py-3 font-medium">Reviewed</th>
+                  <th className="px-4 py-3 font-medium">Controls</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {actions.map((row) => (
                   <Fragment key={row.id}>
-                    <tr key={row.id}>
-                      <td>
-                        <div className="table-symbol">
-                          <strong>{row.symbol}</strong>
-                          <span>{row.exchange_code} · {row.product_type ?? "n/a"}</span>
+                    <tr className="hover:bg-muted/20">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold">{row.symbol}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.exchange_code} · {row.product_type ?? "n/a"}
                         </div>
                       </td>
-                      <td>{row.status}</td>
-                      <td>{row.action_type}</td>
-                      <td>{row.order_id}</td>
-                      <td className="numeric">{row.quantity ?? "n/a"}</td>
-                      <td>{formatDateTime(row.requested_at)}</td>
-                      <td>{formatDateTime(row.reviewed_at)}</td>
-                      <td>
-                        <div className="row-actions-inline">
-                          <button
-                            type="button"
-                            className="row-action"
-                            onClick={() => void mutate(row, "approve")}
-                            disabled={!row.can_approve}
-                          >
+                      <td className="px-4 py-3 text-muted-foreground">{row.status}</td>
+                      <td className="px-4 py-3">
+                        <span className={row.action_type === "BUY" ? "badge-buy" : "badge-sell"}>{row.action_type}</span>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{row.order_id}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{row.quantity ?? "n/a"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatDateTime(row.requested_at)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{formatDateTime(row.reviewed_at)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => void mutate(row, "approve")} disabled={!row.can_approve}>
                             Approve
-                          </button>
-                          <button
-                            type="button"
-                            className="row-action"
-                            onClick={() => void mutate(row, "reject")}
-                            disabled={!row.can_reject}
-                          >
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => void mutate(row, "reject")} disabled={!row.can_reject}>
                             Reject
-                          </button>
-                          <button
-                            type="button"
-                            className="row-action"
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setExpandedId((current) => (current === row.id ? null : row.id))}
                           >
                             {expandedId === row.id ? "Hide" : "Details"}
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
                     {expandedId === row.id ? (
-                      <tr className="expanded-row">
-                        <td colSpan={8}>
-                          <div className="expanded-panel">
-                            <div className="expanded-meta-grid">
-                              <div>
-                                <p className="metric-label">Requested by</p>
-                                <strong>{row.requested_by}</strong>
-                              </div>
-                              <div>
-                                <p className="metric-label">Created from</p>
-                                <strong>{row.created_from}</strong>
-                              </div>
-                              <div>
-                                <p className="metric-label">Note</p>
-                                <strong>{row.resolution_note ?? "Awaiting review"}</strong>
-                              </div>
+                      <tr className="bg-muted/20">
+                        <td colSpan={8} className="px-4 py-4">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div>
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Requested by</p>
+                              <p className="mt-0.5 text-sm font-medium">{row.requested_by}</p>
                             </div>
-                            <div className="logs-live-panel">
-                              <p className="metric-label">Request payload</p>
-                              <pre className="monospace-viewer">{JSON.stringify(row.request_payload ?? {}, null, 2)}</pre>
+                            <div>
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Created from</p>
+                              <p className="mt-0.5 text-sm font-medium">{row.created_from}</p>
                             </div>
-                            <div className="logs-live-panel">
-                              <p className="metric-label">Broker result</p>
-                              <pre className="monospace-viewer">{JSON.stringify(row.broker_result ?? {}, null, 2)}</pre>
+                            <div>
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Note</p>
+                              <p className="mt-0.5 text-sm font-medium">{row.resolution_note ?? "Awaiting review"}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                            <div>
+                              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Request payload</p>
+                              <pre className="overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
+                                {JSON.stringify(row.request_payload ?? {}, null, 2)}
+                              </pre>
+                            </div>
+                            <div>
+                              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Broker result</p>
+                              <pre className="overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
+                                {JSON.stringify(row.broker_result ?? {}, null, 2)}
+                              </pre>
                             </div>
                           </div>
                         </td>
@@ -229,8 +231,8 @@ export function ActionCentrePage() {
               </tbody>
             </table>
           </div>
-        ) : null}
-      </article>
-    </section>
+        )}
+      </Card>
+    </div>
   );
 }

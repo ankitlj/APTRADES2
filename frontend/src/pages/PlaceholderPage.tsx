@@ -1,3 +1,6 @@
+import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/common/page";
+
 interface PlaceholderPageProps {
   title: string;
   description: string;
@@ -5,10 +8,13 @@ interface PlaceholderPageProps {
 
 export function PlaceholderPage({ title, description }: PlaceholderPageProps) {
   return (
-    <section className="placeholder-panel">
-      <p className="placeholder-kicker">Planned route</p>
-      <h3>{title}</h3>
-      <p className="panel-message">{description}</p>
-    </section>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader kicker="Planned route" title={title} />
+      <Card>
+        <CardContent className="p-6">
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

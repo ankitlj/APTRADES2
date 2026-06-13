@@ -1,5 +1,10 @@
 import { Link } from "react-router-dom";
 
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/common/page";
+import { cn } from "@/lib/utils";
+
 const tools = [
   {
     title: "Strategy Builder",
@@ -45,71 +50,64 @@ const tools = [
   },
 ];
 
-function toneClassName(status: string) {
-  if (status === "next") {
-    return "tone-positive";
-  }
-  if (status === "deferred") {
-    return "tone-warning";
-  }
-  return "tone-neutral";
+function initials(title: string) {
+  return title
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2);
 }
 
 export function ToolsPage() {
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Reduced tools scope</p>
-          <h3>MVP tools only</h3>
-          <p className="panel-message">Only the six approved APTRADES v2 tools remain visible in the MVP flow.</p>
-        </div>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Reduced tools scope"
+        title="Tools"
+        description="Only the six approved APTRADES v2 tools remain visible in the MVP flow."
+        actions={<Badge variant="secondary">6 visible</Badge>}
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {tools.map((tool) => {
+          const content = (
+            <Card
+              className={cn(
+                "h-full transition-colors",
+                tool.href && "hover:border-primary/50 hover:bg-muted/30"
+              )}
+            >
+              <CardContent className="flex flex-col gap-3 p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
+                    {initials(tool.title)}
+                  </div>
+                  <Badge variant={tool.status === "next" ? "default" : "secondary"}>
+                    {tool.subtitle}
+                  </Badge>
+                </div>
+                <div>
+                  <p className="font-semibold">{tool.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{tool.description}</p>
+                </div>
+              </CardContent>
+            </Card>
+          );
+
+          return tool.href ? (
+            <Link key={tool.title} to={tool.href} className="block">
+              {content}
+            </Link>
+          ) : (
+            <div key={tool.title}>{content}</div>
+          );
+        })}
       </div>
 
-      <article className="panel route-panel">
-        <div className="section-header">
-          <div>
-            <p className="section-kicker">Tools grid</p>
-            <h3>Selected toolset</h3>
-          </div>
-          <span className="section-pill">6 visible</span>
-        </div>
-
-        <div className="tools-grid">
-          {tools.map((tool) => {
-            const card = (
-              <article key={tool.title} className={`tool-card ${tool.href ? "tool-card-link" : ""}`}>
-                <div className="tool-card-top">
-                  <div className="tool-icon-tile" aria-hidden="true">
-                    {tool.title
-                      .split(" ")
-                      .map((word) => word[0])
-                      .join("")
-                      .slice(0, 2)}
-                  </div>
-                  <span className={`tool-status ${toneClassName(tool.status)}`}>{tool.subtitle}</span>
-                </div>
-                <div className="tool-card-body">
-                  <strong>{tool.title}</strong>
-                  <p className="panel-message">{tool.description}</p>
-                </div>
-              </article>
-            );
-
-            return tool.href ? (
-              <Link key={tool.title} to={tool.href}>
-                {card}
-              </Link>
-            ) : (
-              card
-            );
-          })}
-        </div>
-
-        <p className="panel-message">
-          Removed from the visible MVP tools flow: Max Pain, Straddle Chart, Straddle P&amp;L, Vol Surface, GEX, and IV Smile.
-        </p>
-      </article>
-    </section>
+      <p className="text-xs text-muted-foreground">
+        Removed from the visible MVP tools flow: Max Pain, Straddle Chart, Straddle P&amp;L, Vol
+        Surface, GEX, and IV Smile.
+      </p>
+    </div>
   );
 }

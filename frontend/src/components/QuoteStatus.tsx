@@ -1,15 +1,23 @@
+import { cn } from "@/lib/utils";
+
 type QuoteStatusProps = {
   status: string;
 };
 
 export function QuoteStatus({ status }: QuoteStatusProps) {
   const normalized = status.toLowerCase();
-  const className =
-    normalized === "ok"
-      ? "status-value status-online"
-      : normalized === "error"
-        ? "status-value status-offline"
-        : "status-value status-unknown";
-
-  return <strong className={className}>{normalized}</strong>;
+  return (
+    <strong
+      className={cn(
+        "font-semibold",
+        normalized === "ok"
+          ? "text-green-600 dark:text-green-400"
+          : normalized === "error"
+            ? "text-red-500"
+            : "text-muted-foreground"
+      )}
+    >
+      {normalized}
+    </strong>
+  );
 }

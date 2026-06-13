@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 
-import { PayoffChart } from "../components/PayoffChart";
+import { PayoffChart } from "@/components/PayoffChart";
 import {
   createStrategy,
   getOptionExpiries,
   getStrategyPayoff,
   type PayoffResponse,
   type StrategyLeg,
-} from "../lib/api";
+} from "@/lib/api";
+import { ErrorState } from "@/components/ErrorState";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 
 type LegDraft = {
   action: string;
@@ -166,264 +172,188 @@ export function StrategyBuilderPage() {
     }
   }
 
-  const payoffUid = state.payoff
-    ? `builder-${state.legs.map((l) => l.strike).join("-")}`
-    : "builder";
+  const payoffUid = state.payoff ? `builder-${state.legs.map((l) => l.strike).join("-")}` : "builder";
 
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Strategy tools</p>
-          <h3>Strategy Builder</h3>
-          <p className="panel-message">
-            Compose multi-leg option structures, preview the payoff diagram, and save to your portfolio.
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Strategy tools"
+        title="Strategy Builder"
+        description="Compose multi-leg option structures, preview the payoff diagram, and save to your portfolio."
+      />
 
-      <article className="panel route-panel">
-        <div className="section-header">
-          <div>
-            <p className="section-kicker">Step 1</p>
-            <h3>Strategy details</h3>
-          </div>
-        </div>
+      <Card>
+        <CardHeader className="border-b px-4 py-3">
+          <CardTitle className="text-sm">Step 1 · Strategy details</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end gap-4 pt-4">
+          <Field label="Exchange">
+            <select
+              value={state.exchangeCode}
+              onChange={(e) => setState((s) => ({ ...s, exchangeCode: e.target.value }))}
+              className={selectClass}
+            >
+              <option value="NFO">NFO</option>
+              <option value="BFO">BFO</option>
+            </select>
+          </Field>
+          <Field label="Underlying">
+            <select
+              value={state.underlying}
+              onChange={(e) => setState((s) => ({ ...s, underlying: e.target.value }))}
+              className={selectClass}
+            >
+              {UNDERLYINGS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Expiry">
+            <select
+              value={state.expiry}
+              onChange={(e) => setState((s) => ({ ...s, expiry: e.target.value }))}
+              disabled={state.loadingExpiries || !state.expiries.length}
+              className={selectClass}
+            >
+              {state.expiries.map((ex) => (
+                <option key={ex} value={ex}>
+                  {ex}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <span className="font-medium">Strategy name</span>
+            <Input
+              type="text"
+              placeholder="e.g. Bear Call Spread"
+              value={state.name}
+              onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
+              maxLength={128}
+              className="h-9 w-56"
+            />
+          </label>
+        </CardContent>
+      </Card>
 
-        <div className="route-toolbar">
-          <div className="toolbar-group">
-            <label className="toolbar-field">
-              <span>Exchange</span>
-              <select
-                value={state.exchangeCode}
-                onChange={(e) => setState((s) => ({ ...s, exchangeCode: e.target.value }))}
-              >
-                <option value="NFO">NFO</option>
-                <option value="BFO">BFO</option>
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Underlying</span>
-              <select
-                value={state.underlying}
-                onChange={(e) => setState((s) => ({ ...s, underlying: e.target.value }))}
-              >
-                {UNDERLYINGS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Expiry</span>
-              <select
-                value={state.expiry}
-                onChange={(e) => setState((s) => ({ ...s, expiry: e.target.value }))}
-                disabled={state.loadingExpiries || !state.expiries.length}
-              >
-                {state.expiries.map((ex) => (
-                  <option key={ex} value={ex}>
-                    {ex}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="toolbar-field strategy-name-field">
-              <span>Strategy name</span>
-              <input
-                type="text"
-                placeholder="e.g. Bear Call Spread"
-                value={state.name}
-                onChange={(e) => setState((s) => ({ ...s, name: e.target.value }))}
-                maxLength={128}
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="section-header" style={{ marginTop: "24px" }}>
-          <div>
-            <p className="section-kicker">Step 2</p>
-            <h3>Add legs</h3>
-          </div>
-          <span className="section-pill">{state.legs.length} / 8</span>
-        </div>
-
-        <div className="route-toolbar">
-          <div className="toolbar-group">
-            <label className="toolbar-field">
-              <span>Action</span>
-              <select value={draft.action} onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value }))}>
+      <Card>
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+          <CardTitle className="text-sm">Step 2 · Add legs</CardTitle>
+          <Badge variant="secondary">{state.legs.length} / 8</Badge>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="Action">
+              <select value={draft.action} onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value }))} className={selectClass}>
                 <option value="sell">Sell</option>
                 <option value="buy">Buy</option>
               </select>
-            </label>
-            <label className="toolbar-field">
-              <span>Right</span>
-              <select value={draft.right} onChange={(e) => setDraft((d) => ({ ...d, right: e.target.value }))}>
+            </Field>
+            <Field label="Right">
+              <select value={draft.right} onChange={(e) => setDraft((d) => ({ ...d, right: e.target.value }))} className={selectClass}>
                 <option value="call">Call</option>
                 <option value="put">Put</option>
               </select>
+            </Field>
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              <span className="font-medium">Strike</span>
+              <Input type="number" placeholder="23300" value={draft.strike} onChange={(e) => setDraft((d) => ({ ...d, strike: e.target.value }))} min="0" step="50" className="h-9 w-28" />
             </label>
-            <label className="toolbar-field">
-              <span>Strike</span>
-              <input
-                type="number"
-                placeholder="23300"
-                value={draft.strike}
-                onChange={(e) => setDraft((d) => ({ ...d, strike: e.target.value }))}
-                min="0"
-                step="50"
-              />
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              <span className="font-medium">Qty</span>
+              <Input type="number" placeholder="1" value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} min="1" step="1" className="h-9 w-24" />
             </label>
-            <label className="toolbar-field">
-              <span>Qty</span>
-              <input
-                type="number"
-                placeholder="1"
-                value={draft.quantity}
-                onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))}
-                min="1"
-                step="1"
-              />
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              <span className="font-medium">Premium</span>
+              <Input type="number" placeholder="100" value={draft.premium} onChange={(e) => setDraft((d) => ({ ...d, premium: e.target.value }))} min="0" step="0.05" className="h-9 w-28" />
             </label>
-            <label className="toolbar-field">
-              <span>Premium</span>
-              <input
-                type="number"
-                placeholder="100"
-                value={draft.premium}
-                onChange={(e) => setDraft((d) => ({ ...d, premium: e.target.value }))}
-                min="0"
-                step="0.05"
-              />
-            </label>
-          </div>
-          <div className="toolbar-actions">
-            <button type="button" className="toolbar-button" onClick={addLeg} disabled={state.legs.length >= 8}>
+            <Button variant="outline" size="sm" onClick={addLeg} disabled={state.legs.length >= 8}>
               Add Leg
-            </button>
+            </Button>
           </div>
-        </div>
 
-        {state.legs.length > 0 && (
-          <div className="table-wrap" style={{ marginTop: "12px" }}>
-            <table className="data-table strategy-leg-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Action</th>
-                  <th>Right</th>
-                  <th className="numeric">Strike</th>
-                  <th className="numeric">Qty</th>
-                  <th className="numeric">Premium</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {state.legs.map((leg, i) => (
-                  <tr key={i}>
-                    <td>{i + 1}</td>
-                    <td>
-                      <span className={`leg-action-badge ${leg.action === "buy" ? "leg-buy" : "leg-sell"}`}>
-                        {leg.action.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className={leg.right === "call" ? "tone-positive" : "tone-negative"}>
-                      {leg.right.toUpperCase()}
-                    </td>
-                    <td className="numeric">{fmt(leg.strike, 0)}</td>
-                    <td className="numeric">{leg.quantity}</td>
-                    <td className="numeric">{fmt(leg.premium)}</td>
-                    <td>
-                      <button type="button" className="leg-remove-btn" onClick={() => removeLeg(i)}>
-                        Remove
-                      </button>
-                    </td>
+          {state.legs.length > 0 && (
+            <div className="mt-4 overflow-x-auto rounded-md border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-2.5 font-medium">#</th>
+                    <th className="px-4 py-2.5 font-medium">Action</th>
+                    <th className="px-4 py-2.5 font-medium">Right</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Strike</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Qty</th>
+                    <th className="px-4 py-2.5 text-right font-medium">Premium</th>
+                    <th className="px-4 py-2.5" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {state.error && (
-          <div className="option-chain-error-card" style={{ marginTop: "12px" }}>
-            <p className="metric-label">Error</p>
-            <p className="panel-message">{state.error}</p>
-          </div>
-        )}
-
-        {state.saveMessage && (
-          <p className="panel-message" style={{ marginTop: "12px", color: "var(--positive)" }}>
-            {state.saveMessage}
-          </p>
-        )}
-
-        <div className="strategy-action-row">
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => void previewPayoff()}
-            disabled={!state.legs.length || state.computingPayoff}
-          >
-            {state.computingPayoff ? "Computing..." : "Preview Payoff"}
-          </button>
-          <button
-            type="button"
-            className="toolbar-button toolbar-button-primary"
-            onClick={() => void saveStrategy()}
-            disabled={!state.legs.length || state.saving}
-          >
-            {state.saving ? "Saving..." : "Save Strategy"}
-          </button>
-        </div>
-
-        {state.payoff && (
-          <div style={{ marginTop: "24px" }}>
-            <div className="section-header">
-              <div>
-                <p className="section-kicker">Step 3</p>
-                <h3>Payoff preview</h3>
-              </div>
+                </thead>
+                <tbody className="divide-y">
+                  {state.legs.map((leg, i) => (
+                    <tr key={i} className="hover:bg-muted/20">
+                      <td className="px-4 py-2.5 text-muted-foreground">{i + 1}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={leg.action === "buy" ? "badge-buy" : "badge-sell"}>{leg.action.toUpperCase()}</span>
+                      </td>
+                      <td className={leg.right === "call" ? "px-4 py-2.5 text-green-600 dark:text-green-400" : "px-4 py-2.5 text-red-500"}>
+                        {leg.right.toUpperCase()}
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{fmt(leg.strike, 0)}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{leg.quantity}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{fmt(leg.premium)}</td>
+                      <td className="px-4 py-2.5">
+                        <Button variant="ghost" size="sm" onClick={() => removeLeg(i)}>
+                          Remove
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          )}
 
-            <div className="stats-grid option-chain-summary-grid" style={{ marginBottom: "16px" }}>
-              <article className="stat-card">
-                <p className="metric-label">Net Premium</p>
-                <strong
-                  className={`metric-value ${state.payoff.net_premium >= 0 ? "tone-positive" : "tone-negative"}`}
-                >
-                  {fmt(state.payoff.net_premium)}
-                </strong>
-                <p className="metric-meta">{state.payoff.net_premium >= 0 ? "Credit received" : "Debit paid"}</p>
-              </article>
-              <article className="stat-card">
-                <p className="metric-label">Max Profit</p>
-                <strong className="metric-value tone-positive">{fmt(state.payoff.max_profit)}</strong>
-                <p className="metric-meta">per lot</p>
-              </article>
-              <article className="stat-card">
-                <p className="metric-label">Max Loss</p>
-                <strong className="metric-value tone-negative">{fmt(state.payoff.max_loss)}</strong>
-                <p className="metric-meta">per lot</p>
-              </article>
-              <article className="stat-card">
-                <p className="metric-label">Breakeven(s)</p>
-                <strong className="metric-value tone-neutral">
-                  {state.payoff.breakevens.length
-                    ? state.payoff.breakevens.map((b) => fmt(b, 0)).join(", ")
-                    : "n/a"}
-                </strong>
-                <p className="metric-meta">spot price</p>
-              </article>
-            </div>
+          {state.error && <ErrorState title="Builder error" message={state.error} />}
+          {state.saveMessage && (
+            <p className="mt-3 text-sm font-medium text-green-600 dark:text-green-400">{state.saveMessage}</p>
+          )}
 
-            <PayoffChart payoff={state.payoff} uid={payoffUid} />
+          <div className="mt-4 flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => void previewPayoff()} disabled={!state.legs.length || state.computingPayoff}>
+              {state.computingPayoff ? "Computing..." : "Preview Payoff"}
+            </Button>
+            <Button size="sm" onClick={() => void saveStrategy()} disabled={!state.legs.length || state.saving}>
+              {state.saving ? "Saving..." : "Save Strategy"}
+            </Button>
           </div>
-        )}
-      </article>
-    </section>
+        </CardContent>
+      </Card>
+
+      {state.payoff && (
+        <Card>
+          <CardHeader className="border-b px-4 py-3">
+            <CardTitle className="text-sm">Step 3 · Payoff preview</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <StatCard
+                label="Net Premium"
+                value={fmt(state.payoff.net_premium)}
+                tone={state.payoff.net_premium >= 0 ? "positive" : "negative"}
+              />
+              <StatCard label="Max Profit" value={fmt(state.payoff.max_profit)} tone="positive" />
+              <StatCard label="Max Loss" value={fmt(state.payoff.max_loss)} tone="negative" />
+              <StatCard
+                label="Breakeven(s)"
+                value={state.payoff.breakevens.length ? state.payoff.breakevens.map((b) => fmt(b, 0)).join(", ") : "n/a"}
+              />
+            </div>
+            <div className="mt-4">
+              <PayoffChart payoff={state.payoff} uid={payoffUid} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

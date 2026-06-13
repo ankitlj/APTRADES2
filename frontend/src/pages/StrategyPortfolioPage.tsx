@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { PayoffChart } from "../components/PayoffChart";
+import { PayoffChart } from "@/components/PayoffChart";
 import {
   deleteStrategy,
   getStrategies,
@@ -8,7 +8,12 @@ import {
   type PayoffResponse,
   type StrategyLeg,
   type StrategyRecord,
-} from "../lib/api";
+} from "@/lib/api";
+import { ErrorState } from "@/components/ErrorState";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader, StatCard } from "@/components/common/page";
+import { cn } from "@/lib/utils";
 
 type PortfolioState = {
   strategies: StrategyRecord[];
@@ -28,21 +33,22 @@ function fmt(v: number | null, dec = 2): string {
 }
 
 function LegTag({ leg }: { leg: StrategyLeg }) {
-  const actionClass = leg.action === "buy" ? "leg-tag-buy" : "leg-tag-sell";
-  const rightClass = leg.right === "call" ? "leg-tag-call" : "leg-tag-put";
   return (
-    <span className={`strategy-leg-tag ${actionClass} ${rightClass}`}>
+    <span
+      className={cn(
+        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium",
+        leg.action === "buy"
+          ? "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400"
+          : "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+      )}
+    >
       {leg.action.toUpperCase()} {leg.quantity}x {fmt(leg.strike, 0)} {leg.right.toUpperCase()} @{leg.premium}
     </span>
   );
 }
 
 export function StrategyPortfolioPage() {
-  const [state, setState] = useState<PortfolioState>({
-    strategies: [],
-    loading: true,
-    error: null,
-  });
+  const [state, setState] = useState<PortfolioState>({ strategies: [], loading: true, error: null });
   const [payoffs, setPayoffs] = useState<Record<number, PayoffEntry>>({});
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
 
@@ -112,139 +118,97 @@ export function StrategyPortfolioPage() {
   }
 
   return (
-    <section className="route-page">
-      <div className="route-header">
-        <div>
-          <p className="section-kicker">Strategy tools</p>
-          <h3>Strategy Portfolio</h3>
-          <p className="panel-message">
-            Saved option strategies. View on-demand payoff diagrams or delete positions.
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+      <PageHeader
+        kicker="Strategy tools"
+        title="Strategy Portfolio"
+        description="Saved option strategies. View on-demand payoff diagrams or delete positions."
+        actions={
+          <Button variant="outline" size="sm" onClick={loadStrategies} disabled={state.loading}>
+            {state.loading ? "Loading..." : "Refresh"}
+          </Button>
+        }
+      />
 
-      <article className="panel route-panel">
-        <div className="section-header">
-          <div>
-            <p className="section-kicker">Saved strategies</p>
-            <h3>Portfolio</h3>
-          </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <span className="section-pill">{state.strategies.length}</span>
-            <button
-              type="button"
-              className="toolbar-button"
-              onClick={loadStrategies}
-              disabled={state.loading}
-            >
-              {state.loading ? "Loading..." : "Refresh"}
-            </button>
-          </div>
-        </div>
+      {state.error && <ErrorState title="Portfolio unavailable" message={state.error} onRetry={loadStrategies} />}
 
-        {state.error && (
-          <div className="option-chain-error-card">
-            <p className="metric-label">Error</p>
-            <p className="panel-message">{state.error}</p>
-          </div>
-        )}
-
-        {!state.loading && state.strategies.length === 0 && !state.error && (
-          <p className="panel-message">
+      {!state.loading && state.strategies.length === 0 && !state.error && (
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
             No strategies saved yet. Use the Strategy Builder to create one.
-          </p>
-        )}
+          </CardContent>
+        </Card>
+      )}
 
-        {state.strategies.map((strategy) => {
-          const entry = payoffs[strategy.id];
-          const payoffUid = `portfolio-${strategy.id}`;
-          return (
-            <article key={strategy.id} className="strategy-portfolio-card">
-              <div className="strategy-card-header">
-                <div className="strategy-card-info">
-                  <strong className="strategy-card-name">{strategy.name}</strong>
-                  <span className="strategy-card-meta">
-                    {strategy.underlying} &middot; {strategy.exchange_code} &middot; {strategy.expiry}
-                  </span>
+      {state.strategies.map((strategy) => {
+        const entry = payoffs[strategy.id];
+        const payoffUid = `portfolio-${strategy.id}`;
+        return (
+          <Card key={strategy.id}>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{strategy.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {strategy.underlying} · {strategy.exchange_code} · {strategy.expiry}
+                  </p>
                 </div>
-                <div className="strategy-card-actions">
+                <div className="flex items-center gap-2">
                   <span
-                    className={`strategy-net-premium ${strategy.net_premium >= 0 ? "tone-positive" : "tone-negative"}`}
+                    className={cn(
+                      "text-sm font-semibold tabular-nums",
+                      strategy.net_premium >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500"
+                    )}
                   >
                     {strategy.net_premium >= 0 ? "CR" : "DR"} {fmt(Math.abs(strategy.net_premium))}
                   </span>
-                  <button
-                    type="button"
-                    className="toolbar-button"
-                    onClick={() => void handleTogglePayoff(strategy)}
-                    disabled={entry?.loading}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => void handleTogglePayoff(strategy)} disabled={entry?.loading}>
                     {entry?.loading ? "Loading..." : entry?.data ? "Hide Payoff" : "View Payoff"}
-                  </button>
-                  <button
-                    type="button"
-                    className="leg-remove-btn"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
                     onClick={() => void handleDelete(strategy.id)}
                     disabled={deletingIds.has(strategy.id)}
                   >
                     {deletingIds.has(strategy.id) ? "Deleting..." : "Delete"}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
-              <div className="strategy-legs-row">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {strategy.legs.map((leg, i) => (
                   <LegTag key={i} leg={leg} />
                 ))}
               </div>
 
-              {entry?.error && (
-                <p className="panel-message" style={{ color: "var(--negative)", marginTop: "8px" }}>
-                  {entry.error}
-                </p>
-              )}
+              {entry?.error && <p className="mt-3 text-sm text-red-500">{entry.error}</p>}
 
               {entry?.data && (
-                <div className="strategy-payoff-inline">
-                  <div className="stats-grid option-chain-summary-grid" style={{ marginBottom: "12px" }}>
-                    <article className="stat-card">
-                      <p className="metric-label">Net Premium</p>
-                      <strong
-                        className={`metric-value ${entry.data.net_premium >= 0 ? "tone-positive" : "tone-negative"}`}
-                      >
-                        {fmt(entry.data.net_premium)}
-                      </strong>
-                      <p className="metric-meta">
-                        {entry.data.net_premium >= 0 ? "Credit" : "Debit"}
-                      </p>
-                    </article>
-                    <article className="stat-card">
-                      <p className="metric-label">Max Profit</p>
-                      <strong className="metric-value tone-positive">{fmt(entry.data.max_profit)}</strong>
-                      <p className="metric-meta">per lot</p>
-                    </article>
-                    <article className="stat-card">
-                      <p className="metric-label">Max Loss</p>
-                      <strong className="metric-value tone-negative">{fmt(entry.data.max_loss)}</strong>
-                      <p className="metric-meta">per lot</p>
-                    </article>
-                    <article className="stat-card">
-                      <p className="metric-label">Breakeven(s)</p>
-                      <strong className="metric-value tone-neutral">
-                        {entry.data.breakevens.length
-                          ? entry.data.breakevens.map((b) => fmt(b, 0)).join(", ")
-                          : "n/a"}
-                      </strong>
-                      <p className="metric-meta">spot price</p>
-                    </article>
+                <div className="mt-4">
+                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+                    <StatCard
+                      label="Net Premium"
+                      value={fmt(entry.data.net_premium)}
+                      tone={entry.data.net_premium >= 0 ? "positive" : "negative"}
+                    />
+                    <StatCard label="Max Profit" value={fmt(entry.data.max_profit)} tone="positive" />
+                    <StatCard label="Max Loss" value={fmt(entry.data.max_loss)} tone="negative" />
+                    <StatCard
+                      label="Breakeven(s)"
+                      value={entry.data.breakevens.length ? entry.data.breakevens.map((b) => fmt(b, 0)).join(", ") : "n/a"}
+                    />
                   </div>
-                  <PayoffChart payoff={entry.data} uid={payoffUid} />
+                  <div className="mt-4">
+                    <PayoffChart payoff={entry.data} uid={payoffUid} />
+                  </div>
                 </div>
               )}
-            </article>
-          );
-        })}
-      </article>
-    </section>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
