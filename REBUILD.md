@@ -3,6 +3,44 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
+## 2026-06-14 - Futuristic Neon Glow Pass (Crypto-Trading-Dashboard-3D inspired)
+
+- Goal: layer a futuristic look on top of the APTRADES visual port, inspired by
+  `omkarghare8803/Crypto-Trading-Dashboard-3D`: dark mode by default, neon accent
+  glow, glassmorphism panels, hover lift+glow on stat boxes, a neon glowing icon
+  top-left of each box, a faint oversized "engraved" icon bottom-right, and a
+  glowing chart line. Data layer + backend still frozen.
+- Delivered in 5 steps + 1 fix, each built and pushed:
+  - Step 1 foundation (commit `e288994`): neon tokens (cyan `#00f2ff`, purple
+    `#bc13fe`, green `#00ff88`, red `#ff0055`), radial neon page-background
+    gradients in dark mode, reusable utility classes `.glow-card` (hover lift +
+    neon edge glow), `.glow-icon`, `.engraved-icon`, `.glow-line`, with a
+    `prefers-reduced-motion` guard, all in `index.css`. ThemeProvider now
+    defaults to dark mode.
+  - Step 2 (commit `39b7350`): shared `StatCard` (components/common/page.tsx)
+    gains glass background (white/4% + backdrop blur), hover glow, optional neon
+    glow-icon top-left, and faint engraved icon bottom-right.
+  - Step 3 (commit `6d46fbf`): dashboard 4 metric boxes get neon icons (mapped
+    per metric key) + engraved icons + hover glow; market chart line switches to
+    neon cyan with the `.glow-line` drop-shadow + cyan latest-value badge.
+  - Step 4 (commit `7642647`): base `Card` primitive gains a dark glass surface
+    (white/3.5% + blur + subtle border) so every panel/table is glassy; neon
+    topic icons added to the stat boxes on all pages (Positions, Orderbook,
+    Tradebook, Option Chain, OI Tracker, OI Profile, Logs, Action Centre,
+    Strategy Builder, Strategy Portfolio).
+  - Step 5 polish (commit `183a208`): neon glow on the active sidebar nav item,
+    the PayoffChart line, and the top-right "A" avatar button.
+  - Fix (commit `9bfa57e`): the four dashboard boxes shared one icon while
+    metrics were loading or unmapped; `metricIcon(key, index)` now falls back per
+    box position (TrendingUp / Layers / Percent / Wallet) so each box (and its
+    engraved sticker) is always distinct and topic-appropriate.
+- FROZEN/untouched: `frontend/src/lib/api.ts`, `frontend/src/lib/realtime.ts`,
+  `frontend/src/hooks/*`, all of `backend/`.
+- Verification: `npm run build` passes on every step.
+- Note: light mode still available via the Sun/Moon toggle (glow toned down in
+  light). The dashboard "Failed to fetch / Offline" seen during testing is the
+  Breeze data layer needing a fresh `BREEZE_SESSION_TOKEN` on Railway, not the UI.
+
 ## 2026-06-13 - Full Visual Port: APTRADES2 frontend matches APTRADES 100%
 
 - Goal: make every APTRADES2 page look identical to the old `ankitlj/APTRADES.git`

@@ -1,7 +1,8 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current UI track: FULL VISUAL PORT COMPLETE (2026-06-13) - all 13 APTRADES2 pages now match the old APTRADES frontend 100% (Tailwind v4 + shadcn/ui + ported oklch theme tokens, dark/light + accent themes, sidebar/topbar shell with dark-light toggle and "A" tools/accent menu, dashboard market ticker + SVG chart). Built on shared helpers in `frontend/src/components/common/page.tsx`. Data layer (api.ts/realtime.ts/hooks) and all backend FROZEN/untouched. 5 commits 7cb6d2e..3b3d206. See the 2026-06-13 entry in REBUILD.md.
+- Current UI track: FUTURISTIC NEON GLOW PASS COMPLETE (2026-06-14) - layered on top of the full visual port. Dark mode by default, neon tokens (cyan/purple/green/red), glassmorphism panels, hover lift+glow stat boxes, neon glow-icon top-left + engraved icon bottom-right per box, glowing neon chart line, sidebar/avatar/payoff glow. Reusable glow utilities in index.css; per-box topic icons across all pages with a per-position fallback. 6 commits e288994..9bfa57e. See the 2026-06-14 entry in REBUILD.md.
+- Prior UI track: FULL VISUAL PORT (2026-06-13) - all 13 APTRADES2 pages match the old APTRADES frontend (Tailwind v4 + shadcn/ui + ported oklch theme tokens, dark/light + accent themes, sidebar/topbar shell with dark-light toggle and "A" tools/accent menu, dashboard market ticker + SVG chart). Shared helpers in `frontend/src/components/common/page.tsx`. Data layer (api.ts/realtime.ts/hooks) and all backend FROZEN/untouched. 5 commits 7cb6d2e..3b3d206.
 - Current phase: Phase 18 - Performance and Caching (Tier 1 implemented; Tiers 2-3 still planned)
 - Last completed phase: Phase 18 Tier 1 - backend caching (engine/sessionmaker singletons, idempotent ensure_tables, in-memory symbol-resolution TTL cache, shared process-wide BreezeGateway). Motivated by the live-stream live<->offline flicker: per-request engine rebuilds + per-request Breeze token exchange blocked the single gthread worker and starved the Socket.IO heartbeat.
 - Planned next: Phase 18 Tier 2 (Redis-first quote reads, option-chain strike streaming, parallel batch) and Tier 3 (frontend stale-while-revalidate / live-first render); then Phase 19 - Live-stream stability (Redis message_queue + background-task emit + ping tuning + frontend grace period + tick/gap recorder)
@@ -20,6 +21,17 @@
 - Deployment: Railway + Vercel live
 
 ## Phase Log
+
+### 2026-06-14 - UI Pass 3: Futuristic Neon Glow (Crypto-Trading-Dashboard-3D inspired)
+- Goal: add a futuristic glow aesthetic on top of the visual port - dark by default, neon accents, glassmorphism, hover lift+glow boxes, neon icon top-left + engraved icon bottom-right per box, glowing chart line. Backend and frontend->backend data wiring frozen.
+- Delivered in 5 steps + 1 fix, each built and pushed:
+  - Step 1 foundation (commit `e288994`): neon tokens, radial neon dark-mode background, `.glow-card`/`.glow-icon`/`.engraved-icon`/`.glow-line` utilities + reduced-motion guard in `index.css`; ThemeProvider defaults to dark.
+  - Step 2 (commit `39b7350`): shared `StatCard` gets glass bg, hover glow, optional neon glow-icon + engraved icon.
+  - Step 3 (commit `6d46fbf`): dashboard 4 boxes neon/engraved icons + hover glow; chart line -> neon cyan `#00f2ff` with glow + cyan badge.
+  - Step 4 (commit `7642647`): base `Card` -> dark glass surface (all panels glassy); neon topic icons on stat boxes across every page.
+  - Step 5 (commit `183a208`): neon glow on active sidebar item, PayoffChart line, "A" avatar.
+  - Fix (commit `9bfa57e`): per-position fallback icons so the 4 dashboard boxes are distinct even while loading/unmapped (`metricIcon(key, index)`).
+- FROZEN/untouched: `frontend/src/lib/api.ts`, `frontend/src/lib/realtime.ts`, `frontend/src/hooks/*`, all of `backend/`. `npm run build` passes on every step.
 
 ### 2026-06-13 - UI Alignment Pass 2: Full Visual Port (all pages)
 - Goal: complete the page-by-page 1:1 legacy visual port flagged as a follow-up in Pass 1 - make every APTRADES2 page look identical to the old `ankitlj/APTRADES.git` frontend (fonts, colors, tables, boxes, layouts, chart lines, dark/light mode, "A" menu, dashboard ticker) with backend and all frontend->backend data wiring frozen.
