@@ -1,0 +1,94 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" fill="white"/>
+  <defs>
+    <linearGradient id="cubeTop" x1="250" y1="150" x2="770" y2="650" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00F4B8"/>
+      <stop offset="0.48" stop-color="#08B7D5"/>
+      <stop offset="1" stop-color="#1027A8"/>
+    </linearGradient>
+    <linearGradient id="cubeLeft" x1="250" y1="260" x2="560" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00D9C1"/>
+      <stop offset="1" stop-color="#1543C7"/>
+    </linearGradient>
+    <linearGradient id="cubeRight" x1="420" y1="220" x2="760" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE700"/>
+      <stop offset="0.42" stop-color="#FF361B"/>
+      <stop offset="1" stop-color="#18219E"/>
+    </linearGradient>
+    <filter id="logoShadow" x="160" y="85" width="720" height="650" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0E2299" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#logoShadow)">
+    <g transform="translate(512 405)">
+      <g transform="translate(-250 -125)">
+        <path d="M0 0L80 -45L160 0L80 45L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L80 45V135L0 90V0Z" fill="url(#cubeLeft)"/>
+        <path d="M160 0L80 45V135L160 90V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(-125 -195)">
+        <path d="M0 0L72 -40L144 0L72 40L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L72 40V120L0 80V0Z" fill="url(#cubeLeft)"/>
+        <path d="M144 0L72 40V120L144 80V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(5 -240)">
+        <path d="M0 0L78 -44L156 0L78 44L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L78 44V142L0 98V0Z" fill="url(#cubeLeft)"/>
+        <path d="M156 0L78 44V142L156 98V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(145 -195)">
+        <path d="M0 0L72 -40L144 0L72 40L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L72 40V120L0 80V0Z" fill="url(#cubeLeft)"/>
+        <path d="M144 0L72 40V120L144 80V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(250 -125)">
+        <path d="M0 0L80 -45L160 0L80 45L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L80 45V135L0 90V0Z" fill="url(#cubeLeft)"/>
+        <path d="M160 0L80 45V135L160 90V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(245 45)">
+        <path d="M0 0L76 -42L152 0L76 42L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L76 42V128L0 86V0Z" fill="url(#cubeLeft)"/>
+        <path d="M152 0L76 42V128L152 86V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(120 140)">
+        <path d="M0 0L78 -44L156 0L78 44L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L78 44V134L0 90V0Z" fill="url(#cubeLeft)"/>
+        <path d="M156 0L78 44V134L156 90V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(-65 190)">
+        <path d="M0 0L86 -48L172 0L86 48L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L86 48V144L0 96V0Z" fill="url(#cubeLeft)"/>
+        <path d="M172 0L86 48V144L172 96V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(-215 145)">
+        <path d="M0 0L74 -42L148 0L74 42L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L74 42V124L0 82V0Z" fill="url(#cubeLeft)"/>
+        <path d="M148 0L74 42V124L148 82V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(-305 35)">
+        <path d="M0 0L78 -44L156 0L78 44L0 0Z" fill="url(#cubeTop)"/>
+        <path d="M0 0L78 44V132L0 88V0Z" fill="url(#cubeLeft)"/>
+        <path d="M156 0L78 44V132L156 88V0Z" fill="url(#cubeRight)"/>
+      </g>
+      <g transform="translate(-140 8)">
+        <path d="M0 0L34 -20L68 0L34 20L0 0Z" fill="#BDFD1D"/>
+        <path d="M0 0L34 20V58L0 38V0Z" fill="#13B7D6"/>
+        <path d="M68 0L34 20V58L68 38V0Z" fill="#FF3020"/>
+      </g>
+      <g transform="translate(170 8)">
+        <path d="M0 0L34 -20L68 0L34 20L0 0Z" fill="#BDFD1D"/>
+        <path d="M0 0L34 20V58L0 38V0Z" fill="#13B7D6"/>
+        <path d="M68 0L34 20V58L68 38V0Z" fill="#FF3020"/>
+      </g>
+      <g transform="translate(-35 145)">
+        <path d="M0 0L34 -20L68 0L34 20L0 0Z" fill="#F9F21D"/>
+        <path d="M0 0L34 20V58L0 38V0Z" fill="#0EA6D0"/>
+        <path d="M68 0L34 20V58L68 38V0Z" fill="#FF3020"/>
+      </g>
+    </g>
+  </g>
+
+  <text x="512" y="885" text-anchor="middle" fill="#050505" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="150" font-weight="900" letter-spacing="8">ORIENS</text>
+</svg>

@@ -19,21 +19,13 @@ export function Navbar() {
 
   return (
     <aside className="hidden h-screen w-72 flex-shrink-0 flex-col border-r bg-background md:flex">
-      <div className="px-5 pb-5 pt-5">
-        <Link to="/dashboard" className="flex items-center gap-4 rounded-xl px-1 py-2">
+      <div className="px-5 pb-4 pt-5">
+        <Link to="/dashboard" className="block rounded-xl">
           <img
-            src="/oriens-mark.svg"
+            src="/oriens-logo.svg"
             alt="ORIENS"
-            className="h-14 w-14 shrink-0 object-contain transition-[filter] duration-300 dark:drop-shadow-[0_0_22px_rgba(74,214,228,0.45)]"
+            className="h-32 w-full rounded-lg bg-white object-contain p-1 transition-[filter] duration-300 dark:drop-shadow-[0_0_22px_rgba(74,214,228,0.45)]"
           />
-          <span className="min-w-0">
-            <span className="block font-serif text-[2rem] font-semibold leading-none tracking-[0.08em] text-[#0e5168] dark:text-[#a9ecf8]">
-              ORIENS
-            </span>
-            <span className="mt-2 block whitespace-nowrap text-[10px] font-semibold tracking-[0.14em] text-[#8b5f38] dark:text-muted-foreground">
-              TRACK | TRADE | TRIUMPH
-            </span>
-          </span>
         </Link>
       </div>
 
