@@ -18,22 +18,14 @@ export function Navbar() {
     );
 
   return (
-    <aside className="hidden md:flex flex-col w-56 border-r bg-background flex-shrink-0 h-screen sticky top-0 overflow-y-auto scrollbar-thin">
-      <div className="px-4 pt-5 pb-4">
-        <Link to="/dashboard" className="flex items-start gap-3">
+    <aside className="hidden md:flex flex-col w-70 min-w-[17.5rem] border-r bg-background flex-shrink-0 h-screen sticky top-0 overflow-y-auto scrollbar-thin">
+      <div className="px-4 pt-4 pb-4">
+        <Link to="/dashboard" className="block rounded-xl px-2 py-2">
           <img
-            src="/oriens-mark.svg"
+            src="/oriens-wordmark.svg"
             alt="ORIENS"
-            className="h-9 w-9 shrink-0 rounded-md object-contain transition-[filter,transform] duration-300 dark:drop-shadow-[0_0_18px_rgba(74,214,228,0.45)]"
+            className="h-20 w-full object-contain object-left transition-[filter] duration-300 dark:drop-shadow-[0_0_22px_rgba(74,214,228,0.35)]"
           />
-          <span className="min-w-0">
-            <span className="block font-serif text-[1.7rem] font-semibold leading-none tracking-[0.08em] text-[#0e5168] dark:text-[#a9ecf8]">
-              ORIENS
-            </span>
-            <span className="mt-1 block whitespace-nowrap text-[9px] font-semibold tracking-[0.13em] text-muted-foreground">
-              TRACK | TRADE | TRIUMPH
-            </span>
-          </span>
         </Link>
       </div>
 
