@@ -18,19 +18,19 @@ export function Navbar() {
     );
 
   return (
-    <aside className="hidden h-screen w-72 flex-shrink-0 flex-col border-r bg-background md:flex">
-      <div className="px-5 pb-5 pt-5">
-        <Link to="/dashboard" className="flex items-center gap-4 rounded-xl px-1 py-2">
+    <aside className="hidden h-screen w-60 flex-shrink-0 flex-col border-r bg-background md:flex">
+      <div className="px-4 pb-4 pt-4">
+        <Link to="/dashboard" className="flex items-center gap-3 rounded-xl px-1 py-1.5">
           <img
-            src="/oriens-ring-mark.svg"
+            src="/oriens-logo-mark.png"
             alt="ORIENS"
-            className="h-20 w-20 shrink-0 object-contain transition-[filter] duration-300 dark:drop-shadow-[0_0_24px_rgba(168,96,255,0.52)]"
+            className="h-14 w-14 shrink-0 object-contain transition-[filter] duration-300 dark:drop-shadow-[0_0_16px_rgba(168,96,255,0.46)]"
           />
           <span className="min-w-0">
-            <span className="block font-serif text-[2rem] font-semibold leading-none tracking-[0.08em] text-[#15163f] dark:text-[#d9d4ff]">
+            <span className="block font-serif text-2xl font-semibold leading-none tracking-[0.06em] text-[#15163f] dark:text-[#d9d4ff]">
               ORIENS
             </span>
-            <span className="mt-2 block whitespace-nowrap text-[10px] font-semibold tracking-[0.14em] text-[#6d5c92] dark:text-[#bda8ff]">
+            <span className="mt-1.5 block whitespace-nowrap text-[7.5px] font-semibold tracking-[0.08em] text-[#6d5c92] dark:text-[#bda8ff]">
               TRACK | TRADE | TRIUMPH
             </span>
           </span>
