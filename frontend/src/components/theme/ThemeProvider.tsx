@@ -18,7 +18,7 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
-const STORAGE_KEY = "aptrades-theme";
+const STORAGE_KEY = "oriens-theme";
 
 function readStored(): { mode: ThemeMode; color: ThemeColor } {
   if (typeof localStorage !== "undefined") {

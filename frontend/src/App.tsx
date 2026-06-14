@@ -16,7 +16,7 @@ import { TradebookPage } from "./pages/TradebookPage";
 import { ToolsPage } from "./pages/ToolsPage";
 
 const pages = [
-  { path: "/dashboard", title: "Dashboard", description: "The main APTRADES dashboard now runs through backend contracts." },
+  { path: "/dashboard", title: "Dashboard", description: "The main ORIENS dashboard now runs through backend contracts." },
   { path: "/optionchain", title: "Option Chain", description: "The core option chain grid now loads live Breeze-backed rows." },
   { path: "/positions", title: "Positions", description: "Live quote enrichment begins after QuoteService exists." },
   { path: "/strategy", title: "Strategy", description: "Strategy Builder and Strategy Portfolio stay under Tools in MVP." },

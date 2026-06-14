@@ -51,3 +51,5 @@ its existing data calls and socket subscriptions exactly as-is.
 
 Token discipline: reuse APTRADES's actual components/CSS verbatim where possible; work
 strictly page-by-page; never re-read frozen files after Step 1.
+
+From this point onward, the project is renamed ORIENS.

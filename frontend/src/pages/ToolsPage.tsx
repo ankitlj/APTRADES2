@@ -71,7 +71,7 @@ export function ToolsPage() {
       <PageHeader
         kicker="Reduced tools scope"
         title="Tools"
-        description="Only the six approved APTRADES v2 tools remain visible in the MVP flow."
+        description="Only the six approved ORIENS tools remain visible in the MVP flow."
         actions={<Badge variant="secondary">6 visible</Badge>}
       />
 

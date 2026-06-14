@@ -11,7 +11,7 @@ export function Footer({ className }: { className?: string }) {
           <span className="opacity-40">|</span>
           <span className="font-medium text-foreground">TRIUMPH</span>
           <span className="opacity-40 mx-1">-</span>
-          <span>APTRADES Trading Dashboard</span>
+          <span>ORIENS Trading Dashboard</span>
         </div>
       </div>
     </footer>

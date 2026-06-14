@@ -10,7 +10,7 @@ class AppConfig:
     host: str = os.getenv("FLASK_HOST", "127.0.0.1")
     port: int = int(os.getenv("FLASK_PORT", "5000"))
     debug: bool = os.getenv("FLASK_DEBUG", "0") == "1"
-    app_name: str = os.getenv("APP_NAME", "APTRADES v2")
+    app_name: str = os.getenv("APP_NAME", "ORIENS")
     api_prefix: str = "/api"
     database_url: str | None = os.getenv("DATABASE_URL")
     redis_url: str | None = os.getenv("REDIS_URL")

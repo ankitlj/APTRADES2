@@ -58,3 +58,5 @@ All error responses across `/api/*` use one structured shape:
 ```json
 { "status": "error", "error": { "code": 404, "message": "..." } }
 ```
+
+From this point onward, the project is renamed ORIENS.

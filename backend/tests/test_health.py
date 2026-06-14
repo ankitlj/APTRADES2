@@ -9,7 +9,7 @@ def test_health(client):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["status"] == "ok"
-    assert payload["service"] == "APTRADES v2"
+    assert payload["service"] == "ORIENS"
 
 
 def test_readiness(client):

@@ -37,3 +37,5 @@ cd frontend
 npm.cmd install
 npm.cmd run build
 ```
+
+From this point onward, the project is renamed ORIENS.

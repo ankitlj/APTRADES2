@@ -10,7 +10,7 @@ interface TickerQuote {
   changePercent: number | null;
 }
 
-// Mirrors the APTRADES dashboard ticker: index quotes scrolling right -> left,
+// Mirrors the ORIENS dashboard ticker: index quotes scrolling right -> left,
 // merging the REST snapshot with any live websocket ticks. Data layer unchanged.
 export function MarketTicker() {
   const [summary, setSummary] = useState<DashboardSummaryResponse | null>(null);

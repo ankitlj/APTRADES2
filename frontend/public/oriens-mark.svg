@@ -1,0 +1,34 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="glassA" x1="89" y1="95" x2="393" y2="405" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#44D6E4"/>
+      <stop offset="0.42" stop-color="#1A728E"/>
+      <stop offset="1" stop-color="#0C2D57"/>
+    </linearGradient>
+    <linearGradient id="glassB" x1="140" y1="120" x2="365" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B7F3FF" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#4CA5CC" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="87" y1="82" x2="415" y2="397" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B5F7FF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#08233B" stop-opacity="0.95"/>
+    </linearGradient>
+    <filter id="softShadow" x="52" y="66" width="408" height="380" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#0E315B" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <g filter="url(#softShadow)">
+    <path d="M256 92L347 145V251L256 304L165 251V145L256 92Z" fill="url(#glassA)" fill-opacity="0.9" stroke="url(#edge)" stroke-width="6"/>
+    <path d="M256 92L347 145L256 198L165 145L256 92Z" fill="url(#glassB)" fill-opacity="0.7"/>
+    <path d="M256 198V304" stroke="#B9F7FF" stroke-opacity="0.65" stroke-width="5"/>
+    <path d="M165 145V251L256 304" stroke="#C8FAFF" stroke-opacity="0.35" stroke-width="4"/>
+    <path d="M347 145V251L256 304" stroke="#092945" stroke-opacity="0.55" stroke-width="4"/>
+    <path d="M165 145L256 198V304L165 251V145Z" fill="url(#glassA)" fill-opacity="0.78" stroke="url(#edge)" stroke-width="6"/>
+    <path d="M198 198L289 251V357L198 304V198Z" fill="url(#glassA)" fill-opacity="0.78" stroke="url(#edge)" stroke-width="6"/>
+    <path d="M198 198L289 251L198 304L107 251L198 198Z" fill="url(#glassB)" fill-opacity="0.58"/>
+    <path d="M314 198L405 251V357L314 304V198Z" fill="url(#glassA)" fill-opacity="0.82" stroke="url(#edge)" stroke-width="6"/>
+    <path d="M314 198L405 251L314 304L223 251L314 198Z" fill="url(#glassB)" fill-opacity="0.55"/>
+    <path d="M256 198L314 231V297L256 330L198 297V231L256 198Z" fill="url(#glassA)" fill-opacity="0.92" stroke="url(#edge)" stroke-width="6"/>
+    <path d="M256 198L314 231L256 264L198 231L256 198Z" fill="url(#glassB)" fill-opacity="0.72"/>
+  </g>
+</svg>

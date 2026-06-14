@@ -735,3 +735,5 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - `python -m pytest` passed: `73 passed` (68 prior + 5 new hardening tests)
 - `npm.cmd run build` passed: `91 modules`
 - Live HTTP smoke test: enriched readiness/deployment fields present, structured 404 shape, `X-RateLimit-Limit: 600` on a limited route, `/api/health` exempt from the limit.
+
+From this point onward, the project is renamed ORIENS.

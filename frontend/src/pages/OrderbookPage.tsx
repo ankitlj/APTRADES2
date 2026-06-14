@@ -45,7 +45,7 @@ function exportCsv(rows: OrderRecord[]) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "aptrades-orderbook.csv";
+  anchor.download = "oriens-orderbook.csv";
   anchor.click();
   URL.revokeObjectURL(url);
 }

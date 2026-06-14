@@ -40,7 +40,7 @@ function exportCsv(rows: TradeRecord[]) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "aptrades-tradebook.csv";
+  anchor.download = "oriens-tradebook.csv";
   anchor.click();
   URL.revokeObjectURL(url);
 }
