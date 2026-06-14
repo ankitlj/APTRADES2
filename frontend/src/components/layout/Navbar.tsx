@@ -24,13 +24,13 @@ export function Navbar() {
           <img
             src="/oriens-ring-mark.svg"
             alt="ORIENS"
-            className="h-16 w-16 shrink-0 object-contain transition-[filter] duration-300 dark:drop-shadow-[0_0_22px_rgba(74,214,228,0.45)]"
+            className="h-20 w-20 shrink-0 object-contain transition-[filter] duration-300 dark:drop-shadow-[0_0_24px_rgba(168,96,255,0.52)]"
           />
           <span className="min-w-0">
-            <span className="block font-serif text-[2rem] font-semibold leading-none tracking-[0.08em] text-[#0e5168] dark:text-[#a9ecf8]">
+            <span className="block font-serif text-[2rem] font-semibold leading-none tracking-[0.08em] text-[#15163f] dark:text-[#d9d4ff]">
               ORIENS
             </span>
-            <span className="mt-2 block whitespace-nowrap text-[10px] font-semibold tracking-[0.14em] text-[#8b5f38] dark:text-muted-foreground">
+            <span className="mt-2 block whitespace-nowrap text-[10px] font-semibold tracking-[0.14em] text-[#6d5c92] dark:text-[#bda8ff]">
               TRACK | TRADE | TRIUMPH
             </span>
           </span>

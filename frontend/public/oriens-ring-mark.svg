@@ -1,91 +1,68 @@
-<svg width="512" height="512" viewBox="150 80 740 650" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="cubeTop" x1="250" y1="150" x2="770" y2="650" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#00F4B8"/>
-      <stop offset="0.48" stop-color="#08B7D5"/>
-      <stop offset="1" stop-color="#1027A8"/>
+    <radialGradient id="nodeLight" cx="35%" cy="28%" r="70%">
+      <stop stop-color="#F2E4FF"/>
+      <stop offset="0.34" stop-color="#B678FF"/>
+      <stop offset="1" stop-color="#2D1975"/>
+    </radialGradient>
+    <radialGradient id="nodeDark" cx="35%" cy="28%" r="70%">
+      <stop stop-color="#7364FF"/>
+      <stop offset="0.42" stop-color="#322099"/>
+      <stop offset="1" stop-color="#05051E"/>
+    </radialGradient>
+    <linearGradient id="tube" x1="82" y1="82" x2="430" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D2A2FF"/>
+      <stop offset="0.52" stop-color="#6847E8"/>
+      <stop offset="1" stop-color="#160C4A"/>
     </linearGradient>
-    <linearGradient id="cubeLeft" x1="250" y1="260" x2="560" y2="720" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#00D9C1"/>
-      <stop offset="1" stop-color="#1543C7"/>
+    <linearGradient id="tubeSoft" x1="96" y1="416" x2="416" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8C5FF"/>
+      <stop offset="1" stop-color="#7D52F2"/>
     </linearGradient>
-    <linearGradient id="cubeRight" x1="420" y1="220" x2="760" y2="640" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFE700"/>
-      <stop offset="0.42" stop-color="#FF361B"/>
-      <stop offset="1" stop-color="#18219E"/>
-    </linearGradient>
-    <filter id="logoShadow" x="160" y="85" width="720" height="650" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0E2299" flood-opacity="0.16"/>
+    <filter id="softGlow" x="16" y="16" width="480" height="480" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#9E62FF" flood-opacity="0.42"/>
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#25105C" flood-opacity="0.22"/>
     </filter>
   </defs>
 
-  <g filter="url(#logoShadow)">
-    <g transform="translate(512 405)">
-      <g transform="translate(-250 -125)">
-        <path d="M0 0L80 -45L160 0L80 45L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L80 45V135L0 90V0Z" fill="url(#cubeLeft)"/>
-        <path d="M160 0L80 45V135L160 90V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(-125 -195)">
-        <path d="M0 0L72 -40L144 0L72 40L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L72 40V120L0 80V0Z" fill="url(#cubeLeft)"/>
-        <path d="M144 0L72 40V120L144 80V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(5 -240)">
-        <path d="M0 0L78 -44L156 0L78 44L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L78 44V142L0 98V0Z" fill="url(#cubeLeft)"/>
-        <path d="M156 0L78 44V142L156 98V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(145 -195)">
-        <path d="M0 0L72 -40L144 0L72 40L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L72 40V120L0 80V0Z" fill="url(#cubeLeft)"/>
-        <path d="M144 0L72 40V120L144 80V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(250 -125)">
-        <path d="M0 0L80 -45L160 0L80 45L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L80 45V135L0 90V0Z" fill="url(#cubeLeft)"/>
-        <path d="M160 0L80 45V135L160 90V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(245 45)">
-        <path d="M0 0L76 -42L152 0L76 42L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L76 42V128L0 86V0Z" fill="url(#cubeLeft)"/>
-        <path d="M152 0L76 42V128L152 86V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(120 140)">
-        <path d="M0 0L78 -44L156 0L78 44L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L78 44V134L0 90V0Z" fill="url(#cubeLeft)"/>
-        <path d="M156 0L78 44V134L156 90V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(-65 190)">
-        <path d="M0 0L86 -48L172 0L86 48L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L86 48V144L0 96V0Z" fill="url(#cubeLeft)"/>
-        <path d="M172 0L86 48V144L172 96V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(-215 145)">
-        <path d="M0 0L74 -42L148 0L74 42L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L74 42V124L0 82V0Z" fill="url(#cubeLeft)"/>
-        <path d="M148 0L74 42V124L148 82V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(-305 35)">
-        <path d="M0 0L78 -44L156 0L78 44L0 0Z" fill="url(#cubeTop)"/>
-        <path d="M0 0L78 44V132L0 88V0Z" fill="url(#cubeLeft)"/>
-        <path d="M156 0L78 44V132L156 88V0Z" fill="url(#cubeRight)"/>
-      </g>
-      <g transform="translate(-140 8)">
-        <path d="M0 0L34 -20L68 0L34 20L0 0Z" fill="#BDFD1D"/>
-        <path d="M0 0L34 20V58L0 38V0Z" fill="#13B7D6"/>
-        <path d="M68 0L34 20V58L68 38V0Z" fill="#FF3020"/>
-      </g>
-      <g transform="translate(170 8)">
-        <path d="M0 0L34 -20L68 0L34 20L0 0Z" fill="#BDFD1D"/>
-        <path d="M0 0L34 20V58L0 38V0Z" fill="#13B7D6"/>
-        <path d="M68 0L34 20V58L68 38V0Z" fill="#FF3020"/>
-      </g>
-      <g transform="translate(-35 145)">
-        <path d="M0 0L34 -20L68 0L34 20L0 0Z" fill="#F9F21D"/>
-        <path d="M0 0L34 20V58L0 38V0Z" fill="#0EA6D0"/>
-        <path d="M68 0L34 20V58L68 38V0Z" fill="#FF3020"/>
-      </g>
-    </g>
+  <g filter="url(#softGlow)" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="256" cy="256" r="176" stroke="url(#tubeSoft)" stroke-width="15" opacity="0.72"/>
+    <circle cx="256" cy="256" r="124" stroke="url(#tube)" stroke-width="13" opacity="0.9"/>
+    <path d="M256 82L364 126L430 224L406 334L316 414H196L106 334L82 224L148 126L256 82Z" stroke="url(#tube)" stroke-width="12"/>
+    <path d="M148 126L212 162L300 162L364 126" stroke="url(#tubeSoft)" stroke-width="9" opacity="0.92"/>
+    <path d="M82 224L168 214L220 256L168 298L106 334" stroke="url(#tube)" stroke-width="11"/>
+    <path d="M430 224L344 214L292 256L344 298L406 334" stroke="url(#tube)" stroke-width="11"/>
+    <path d="M196 414L220 350L256 318L292 350L316 414" stroke="url(#tubeSoft)" stroke-width="10"/>
+    <path d="M212 162L220 256L220 350" stroke="url(#tube)" stroke-width="10"/>
+    <path d="M300 162L292 256L292 350" stroke="url(#tube)" stroke-width="10"/>
+    <path d="M168 214L212 162L256 126L300 162L344 214" stroke="url(#tube)" stroke-width="10"/>
+    <path d="M168 298L220 350L256 386L292 350L344 298" stroke="url(#tube)" stroke-width="10"/>
+    <path d="M220 256H292" stroke="url(#tubeSoft)" stroke-width="10"/>
+  </g>
+
+  <g>
+    <circle cx="256" cy="82" r="19" fill="url(#nodeLight)"/>
+    <circle cx="148" cy="126" r="21" fill="url(#nodeLight)"/>
+    <circle cx="364" cy="126" r="21" fill="url(#nodeDark)"/>
+    <circle cx="82" cy="224" r="22" fill="url(#nodeDark)"/>
+    <circle cx="430" cy="224" r="22" fill="url(#nodeLight)"/>
+    <circle cx="106" cy="334" r="21" fill="url(#nodeDark)"/>
+    <circle cx="406" cy="334" r="21" fill="url(#nodeDark)"/>
+    <circle cx="196" cy="414" r="21" fill="url(#nodeLight)"/>
+    <circle cx="316" cy="414" r="21" fill="url(#nodeDark)"/>
+    <circle cx="256" cy="430" r="20" fill="url(#nodeLight)"/>
+    <circle cx="212" cy="162" r="18" fill="url(#nodeLight)"/>
+    <circle cx="300" cy="162" r="18" fill="url(#nodeLight)"/>
+    <circle cx="256" cy="126" r="19" fill="url(#nodeDark)"/>
+    <circle cx="168" cy="214" r="19" fill="url(#nodeDark)"/>
+    <circle cx="344" cy="214" r="19" fill="url(#nodeDark)"/>
+    <circle cx="220" cy="256" r="18" fill="url(#nodeDark)"/>
+    <circle cx="292" cy="256" r="18" fill="url(#nodeLight)"/>
+    <circle cx="168" cy="298" r="18" fill="url(#nodeLight)"/>
+    <circle cx="344" cy="298" r="18" fill="url(#nodeLight)"/>
+    <circle cx="220" cy="350" r="19" fill="url(#nodeDark)"/>
+    <circle cx="292" cy="350" r="19" fill="url(#nodeDark)"/>
+    <circle cx="256" cy="386" r="18" fill="url(#nodeLight)"/>
+    <circle cx="256" cy="256" r="20" fill="url(#nodeLight)"/>
   </g>
 </svg>
