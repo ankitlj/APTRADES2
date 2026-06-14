@@ -18,18 +18,26 @@ export function Navbar() {
     );
 
   return (
-    <aside className="hidden md:flex flex-col w-70 min-w-[17.5rem] border-r bg-background flex-shrink-0 h-screen sticky top-0 overflow-y-auto scrollbar-thin">
-      <div className="px-4 pt-4 pb-4">
-        <Link to="/dashboard" className="block rounded-xl px-2 py-2">
+    <aside className="hidden h-screen w-72 flex-shrink-0 flex-col border-r bg-background md:flex">
+      <div className="px-5 pb-5 pt-5">
+        <Link to="/dashboard" className="flex items-center gap-4 rounded-xl px-1 py-2">
           <img
-            src="/oriens-wordmark.svg"
+            src="/oriens-mark.svg"
             alt="ORIENS"
-            className="h-20 w-full object-contain object-left transition-[filter] duration-300 dark:drop-shadow-[0_0_22px_rgba(74,214,228,0.35)]"
+            className="h-14 w-14 shrink-0 object-contain transition-[filter] duration-300 dark:drop-shadow-[0_0_22px_rgba(74,214,228,0.45)]"
           />
+          <span className="min-w-0">
+            <span className="block font-serif text-[2rem] font-semibold leading-none tracking-[0.08em] text-[#0e5168] dark:text-[#a9ecf8]">
+              ORIENS
+            </span>
+            <span className="mt-2 block whitespace-nowrap text-[10px] font-semibold tracking-[0.14em] text-[#8b5f38] dark:text-muted-foreground">
+              TRACK | TRADE | TRIUMPH
+            </span>
+          </span>
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 scrollbar-thin">
         {navItems.map((item) => (
           <Link
             key={item.href}
@@ -55,7 +63,7 @@ export function Navbar() {
         ))}
       </nav>
 
-      <div className="px-4 py-4 border-t">
+      <div className="border-t px-4 py-4">
         <div
           className={cn(
             "flex min-h-5 items-center gap-2 text-xs",

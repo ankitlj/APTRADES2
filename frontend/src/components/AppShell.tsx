@@ -7,7 +7,7 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 export function AppShell({ children }: PropsWithChildren) {
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen overflow-hidden bg-background">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute inset-y-0 right-[-9rem] hidden items-center justify-center md:flex">
           <img
@@ -21,9 +21,11 @@ export function AppShell({ children }: PropsWithChildren) {
 
       <Navbar />
 
-      <div className="relative flex min-h-screen flex-1 flex-col overflow-x-hidden">
+      <div className="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
         <TopHeader />
-        <main className="flex-1 px-4 py-3 pb-24 md:pb-4">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 pb-24 md:pb-4">
+          {children}
+        </main>
         <Footer />
       </div>
 
