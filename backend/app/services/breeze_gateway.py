@@ -67,7 +67,7 @@ class BreezeGateway:
     def is_configured(self) -> bool:
         return all([self.app_key, self.secret_key, self.session_token])
 
-    def auth_diagnostic(self) -> dict[str, Any]:
+    def auth_diagnostic(self, *, timeout_override: int | None = None) -> dict[str, Any]:
         if not self.is_configured():
             return {
                 "status": "not_configured",
@@ -75,7 +75,7 @@ class BreezeGateway:
                 "missing": self._missing_fields(),
             }
 
-        details = self.get_customer_details()
+        details = self.get_customer_details(timeout_override=timeout_override)
         success = details.get("Success") or {}
         return {
             "status": "ok",
@@ -120,7 +120,7 @@ class BreezeGateway:
             "symbols": diagnostics,
         }
 
-    def get_customer_details(self) -> dict[str, Any]:
+    def get_customer_details(self, *, timeout_override: int | None = None) -> dict[str, Any]:
         if self._customer_details_cache is not None:
             return self._customer_details_cache
 
@@ -131,7 +131,7 @@ class BreezeGateway:
                 "SessionToken": self.session_token,
                 "AppKey": self.app_key,
             }
-            response = self._request("GET", "/customerdetails", payload, requires_auth=False)
+            response = self._request("GET", "/customerdetails", payload, requires_auth=False, timeout_override=timeout_override)
             self._customer_details_cache = response
             return response
 

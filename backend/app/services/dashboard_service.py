@@ -103,7 +103,11 @@ class DashboardService:
     def get_alerts(self) -> dict[str, Any]:
         alerts: list[dict[str, str]] = []
         master_contract_status = self.master_contract_service.get_status()
-        auth_status = self.gateway.auth_diagnostic()
+        auth_status: dict[str, Any]
+        try:
+            auth_status = self.gateway.auth_diagnostic(timeout_override=4)
+        except Exception:
+            auth_status = {"status": "degraded"}
 
         if auth_status.get("status") == "ok":
             alerts.append(
