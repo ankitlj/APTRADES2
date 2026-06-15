@@ -1,14 +1,14 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Fix 2 — Deduplicate Breeze positions calls on dashboard (complete)
-- Last completed phase: Fix 2 — Deduplicate Breeze positions calls on dashboard
-- Planned next: Fix 3 — Reduce Breeze retry/timeout for interactive endpoints
+- Current phase: Fix 3 — Reduce Breeze retry/timeout for interactive endpoints (complete)
+- Last completed phase: Fix 3 — Reduce Breeze retry/timeout for interactive endpoints
+- Planned next: Fix 4 — Cache/protect dashboard chart historical fetch
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
 - Phase 18 (Performance/Caching): intentionally deferred until Phase 24 fixes are complete
 - Phase 22 note: First pass was rejected (treated as code audit). Rerun followed playbook strictly: 31 API routes tested with real HTTP calls, 3 cold + 3 warm timing measurements, response shape verification for all routes, diagnosis endpoint deep dive. See PHASE22_FINDINGS.md for full evidence.
 - Phase 23 note: Live deployed testing against Railway + Vercel with valid Breeze session. Found 7 real issues: 5 consistent timeouts (chart, orders, trades, cache-stats, breeze-status, symbols-search), 2 intermittent (positions, dashboard latency). Important correction: Phase 22 tested deprecated routes (/api/option-chain/bynifty, /api/orderbook, /api/tradebook) — frontend uses different endpoints (/api/option-chain, /api/orders, /api/trades). Vercel routing clean (all 11 routes HTTP 200). See PHASE23_FINDINGS.md for full evidence.
-- Fix sequence: Following strict one-at-a-time protocol. Fix 1 (parallelized batch quotes) committed 15ef402. Fix 2 (deduplicate positions) done now.
+- Fix sequence: Following strict one-at-a-time protocol. Fix 1 (parallelized batch quotes) committed 15ef402. Fix 2 (deduplicate positions) committed 426f805. Fix 3 (reduce retry/timeout) committed now.
 - Deployment status: Railway and Vercel deployed; Breeze session VALID (AJ510524); 110 backend tests pass; frontend builds 1853 modules
 
 ## Environment
@@ -1278,6 +1278,12 @@
   - Cache is automatically isolated per test (each test creates a new app instance, so no cross-test leakage)
 - Files: `backend/app/services/positions_service.py`
 - Verification: 110/110 tests pass. Cache path tested implicitly by two dashboard tests that call `/api/dashboard/alerts` with mock positions.
+
+### Fix 3: Reduce Breeze retry/timeout for interactive endpoints [IMPLEMENTED]
+- Problem: `_send()` had hardcoded 3 retry attempts × 15s timeout = 47s worst case per Breeze REST call. For interactive user-facing endpoints (quotes, positions, orders, trades, chart), this degraded dashboard load to 30s+ and caused Railway proxy timeouts.
+- Solution: Added `interactive: bool = True` parameter to `_request()` and `timeout`/`attempts` params to `_send()`. Interactive mode: 2 attempts × 10s timeout = 21s worst case (less than half the old worst case). Non-interactive mode (for background/import flows) retains 3 attempts × 15s timeout.
+- Files: `backend/app/services/breeze_gateway.py`, `backend/tests/test_breeze_gateway.py`
+- Verification: 110/110 tests pass. Existing retry test updated for interactive defaults (2 attempts, 1 sleep instead of 3 attempts, 2 sleeps).
 
 ## Phase 13 Response Examples
 

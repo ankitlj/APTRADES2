@@ -73,7 +73,7 @@ def test_request_raises_clear_error_after_retries():
 
     with patch(
         "app.services.breeze_gateway.requests.request",
-        side_effect=[ValueError("bad json"), ValueError("bad json"), ValueError("bad json")],
+        side_effect=[ValueError("bad json"), ValueError("bad json")],
     ), patch("app.services.breeze_gateway.time.sleep") as sleep_mock:
         try:
             gateway._request("GET", "/customerdetails", {}, requires_auth=False)
@@ -81,7 +81,7 @@ def test_request_raises_clear_error_after_retries():
             response_error = error
 
     assert "Breeze request failed for /customerdetails" in str(response_error)
-    assert sleep_mock.call_count == 2
+    assert sleep_mock.call_count == 1
 
 
 def test_get_order_list_calls_breeze_order_endpoint():

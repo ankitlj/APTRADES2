@@ -244,21 +244,28 @@ class BreezeGateway:
             raise BreezeGatewayError(response.get("Error") or "Breeze option-chain response missing Success field")
         return success
 
-    def _request(self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool) -> dict[str, Any]:
+    def _request(
+        self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool, interactive: bool = True
+    ) -> dict[str, Any]:
         if requires_auth and not self.is_configured():
             raise BreezeGatewayError(f"Missing Breeze configuration: {', '.join(self._missing_fields())}")
+
+        timeout = 10 if interactive else 15
+        attempts = 2 if interactive else 3
 
         # Authenticated calls retry once on a session error: the cached customer
         # session token may have expired mid-session, so drop it and re-exchange.
         for auth_attempt in range(2):
-            response = self._send(method, path, payload, requires_auth=requires_auth)
+            response = self._send(method, path, payload, requires_auth=requires_auth, timeout=timeout, attempts=attempts)
             if requires_auth and auth_attempt == 0 and self._is_session_error(response):
                 self._invalidate_session()
                 continue
             return response
         return response
 
-    def _send(self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool) -> dict[str, Any]:
+    def _send(
+        self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool, timeout: int = 10, attempts: int = 2
+    ) -> dict[str, Any]:
         payload_json = json.dumps(payload, separators=(",", ":"))
         url = f"{self.base_url}{path}"
         headers = {"Content-Type": "application/json"}
@@ -276,9 +283,9 @@ class BreezeGateway:
             )
 
         last_error: Exception | None = None
-        for attempt in range(3):
+        for attempt in range(attempts):
             try:
-                response = requests.request(method, url, headers=headers, data=payload_json, timeout=15)
+                response = requests.request(method, url, headers=headers, data=payload_json, timeout=timeout)
                 if response.status_code in (401, 403):
                     # Surface as a session error so _request can refresh and retry.
                     return {"Success": None, "Status": response.status_code, "Error": "Breeze session expired or unauthorized."}
@@ -286,7 +293,7 @@ class BreezeGateway:
                 return response.json()
             except (requests.RequestException, ValueError) as error:
                 last_error = error
-                if attempt == 2:
+                if attempt == attempts - 1:
                     break
                 time.sleep(1)
 
