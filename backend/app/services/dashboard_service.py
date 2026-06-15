@@ -1,14 +1,22 @@
 from __future__ import annotations
 
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
+
+from flask import current_app
 
 from .breeze_gateway import BreezeGateway, BreezeGatewayError
 from .master_contract_service import MasterContractService
 from .positions_service import PositionsService, PositionsServiceError
 from .quote_service import QuoteRequest, QuoteService, QuoteServiceError
 from .symbol_resolver import ResolvedInstrument
+
+_CHART_CACHE_TTL = 300  # 5 minutes — daily candles change slowly
+_CHART_CACHE_KEY_PREFIX = "_DASHBOARD_CHART_CACHE_"
+_chart_cache_lock = threading.Lock()
 
 
 class DashboardServiceError(Exception):
@@ -161,6 +169,14 @@ class DashboardService:
         if not normalized_symbol:
             raise DashboardServiceError("symbol is required.")
 
+        cache_key = _CHART_CACHE_KEY_PREFIX + normalized_symbol
+        cache_store = self._get_cache_store()
+        if cache_store is not None:
+            with _chart_cache_lock:
+                entry = cache_store.get(cache_key)
+            if entry is not None and (time.monotonic() - entry[0]) < _CHART_CACHE_TTL:
+                return entry[1]
+
         try:
             resolved = self._resolve_chart_instrument(normalized_symbol)
         except Exception as error:  # noqa: BLE001
@@ -179,18 +195,29 @@ class DashboardService:
             raise DashboardServiceError(str(error)) from error
 
         points = [self._chart_point(candle) for candle in candles if isinstance(candle, dict)]
-        return {
+        result = {
             "status": "ok",
             "symbol": normalized_symbol,
             "resolved": self._serialize_resolved(resolved),
             "interval": "day",
             "points": points,
         }
+        if cache_store is not None:
+            with _chart_cache_lock:
+                cache_store[cache_key] = (time.monotonic(), result)
+        return result
 
     def _resolve_chart_instrument(self, symbol: str) -> ResolvedInstrument:
         if symbol in {"NIFTY", "BANKNIFTY"}:
             return self.quote_service.symbol_resolver.resolve(symbol, "NFO", product_type="futures")
         return self.quote_service.symbol_resolver.resolve(symbol, "NSE", product_type="cash")
+
+    @staticmethod
+    def _get_cache_store() -> dict[str, Any] | None:
+        try:
+            return current_app.config
+        except RuntimeError:
+            return None
 
     @staticmethod
     def _market_card(result: dict[str, Any]) -> dict[str, Any]:
