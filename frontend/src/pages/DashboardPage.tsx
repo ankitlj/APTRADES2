@@ -8,7 +8,7 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   getDashboardAlerts,
@@ -230,40 +230,36 @@ export function DashboardPage() {
   );
   useLiveSubscribe(positionSubscriptions);
 
-  const loadDashboard = useCallback(async () => {
+  useEffect(() => {
     setSummaryState((current) => ({ ...current, loading: true, error: null }));
     setAlertsState((current) => ({ ...current, loading: true, error: null }));
 
-    const [summaryResult, alertsResult] = await Promise.allSettled([
-      getDashboardSummary(),
-      getDashboardAlerts(),
-    ]);
-
-    setSummaryState(
-      summaryResult.status === "fulfilled"
-        ? { data: summaryResult.value, loading: false, error: null }
-        : {
-            data: null,
-            loading: false,
-            error:
-              summaryResult.reason instanceof Error ? summaryResult.reason.message : "Unknown error",
-          }
+    getDashboardSummary().then(
+      (data) => {
+        setSummaryState({ data, loading: false, error: null });
+      },
+      (reason: unknown) => {
+        setSummaryState({
+          data: null,
+          loading: false,
+          error: reason instanceof Error ? reason.message : "Unknown error",
+        });
+      }
     );
-    setAlertsState(
-      alertsResult.status === "fulfilled"
-        ? { data: alertsResult.value, loading: false, error: null }
-        : {
-            data: null,
-            loading: false,
-            error:
-              alertsResult.reason instanceof Error ? alertsResult.reason.message : "Unknown error",
-          }
+
+    getDashboardAlerts().then(
+      (data) => {
+        setAlertsState({ data, loading: false, error: null });
+      },
+      (reason: unknown) => {
+        setAlertsState({
+          data: null,
+          loading: false,
+          error: reason instanceof Error ? reason.message : "Unknown error",
+        });
+      }
     );
   }, []);
-
-  useEffect(() => {
-    void loadDashboard();
-  }, [loadDashboard]);
 
   const metrics = summaryState.data?.metrics ?? [];
   const alerts = alertsState.data?.alerts ?? [];

@@ -56,10 +56,10 @@ class DashboardService:
         )["results"]
 
         try:
-            positions_payload = self.positions_service.get_positions()
+            positions_payload = self.positions_service.get_positions(gateway_timeout=4, gateway_attempts=1)
         except PositionsServiceError as error:
             positions_payload = {
-                "status": "error",
+                "status": "degraded",
                 "positions": [],
                 "totals": {
                     "open_positions": 0,
@@ -134,9 +134,9 @@ class DashboardService:
             }
         )
 
-        try:
-            positions_payload = self.positions_service.get_positions()
-            position_count = positions_payload["totals"]["open_positions"]
+        cached_positions = self.positions_service.get_cached_positions()
+        if cached_positions is not None:
+            position_count = cached_positions["totals"]["open_positions"]
             if position_count:
                 alerts.append(
                     {
@@ -153,12 +153,12 @@ class DashboardService:
                         "message": "Breeze returned no open positions, so the positions table will stay empty until a live position exists.",
                     }
                 )
-        except PositionsServiceError as error:
+        else:
             alerts.append(
                 {
-                    "level": "warning",
-                    "title": "Positions temporarily unavailable",
-                    "message": str(error),
+                    "level": "info",
+                    "title": "Positions snapshot pending",
+                    "message": "Position data will appear after the first positions refresh completes.",
                 }
             )
 

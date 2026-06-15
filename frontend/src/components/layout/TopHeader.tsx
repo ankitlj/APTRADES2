@@ -32,7 +32,14 @@ export function TopHeader() {
   const { connectionState } = useLiveMarketData();
 
   const isDashboard = location.pathname === "/" || location.pathname === "/dashboard";
-  const isConnected = connectionState === "live";
+
+  const badgeMap: Record<string, { dotClass: string; textClass: string; label: string }> = {
+    live: { dotClass: "bg-green-500 animate-pulse", textClass: "text-green-600", label: "Connected" },
+    connecting: { dotClass: "bg-amber-500", textClass: "text-amber-600", label: "Reconnecting" },
+    degraded: { dotClass: "bg-amber-500", textClass: "text-amber-600", label: "Degraded" },
+    offline: { dotClass: "bg-red-500", textClass: "text-red-500", label: "Offline" },
+  };
+  const badge = badgeMap[connectionState] ?? badgeMap.offline;
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -44,11 +51,11 @@ export function TopHeader() {
             <span
               className={cn(
                 "h-2 w-2 rounded-full shrink-0",
-                isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+                badge.dotClass
               )}
             />
-            <span className={cn("font-medium", isConnected ? "text-green-600" : "text-red-500")}>
-              {isConnected ? "Connected" : "Disconnected"}
+            <span className={cn("font-medium", badge.textClass)}>
+              {badge.label}
             </span>
           </div>
 

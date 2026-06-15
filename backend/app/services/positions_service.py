@@ -14,7 +14,7 @@ from .quote_service import QuoteRequest, QuoteService, QuoteServiceError
 # Short TTL cache so parallel dashboard summary + alerts requests share one
 # Breeze portfolio positions call instead of making two redundant calls.
 # Cache lives on flask.current_app.config (isolated per Flask app instance).
-_POSITIONS_CACHE_TTL = 5
+_POSITIONS_CACHE_TTL = 15
 _POSITIONS_CACHE_KEY = "_POSITIONS_CACHE"
 _positions_cache_lock = threading.Lock()
 
@@ -50,7 +50,13 @@ class PositionsService:
         self.gateway = gateway
         self.quote_service = QuoteService(database_url, gateway)
 
-    def get_positions(self, *, _force_refresh: bool = False) -> dict[str, Any]:
+    def get_positions(
+        self,
+        *,
+        _force_refresh: bool = False,
+        gateway_timeout: int | None = None,
+        gateway_attempts: int | None = None,
+    ) -> dict[str, Any]:
         if not self.gateway.is_configured():
             return {
                 "status": "not_configured",
@@ -75,7 +81,7 @@ class PositionsService:
                     return entry[1]
 
         try:
-            raw_positions = self.gateway.get_portfolio_positions()
+            raw_positions = self.gateway.get_portfolio_positions(timeout_override=gateway_timeout, attempts_override=gateway_attempts)
         except BreezeGatewayError as error:
             if "No Positions" in str(error):
                 empty = {
@@ -108,6 +114,18 @@ class PositionsService:
         }
         self._set_cache(result)
         return result
+
+    def get_cached_positions(self) -> dict[str, Any] | None:
+        cache_store = self._get_cache_store()
+        if cache_store is None:
+            return None
+        with _positions_cache_lock:
+            entry = cache_store.get(_POSITIONS_CACHE_KEY)
+        if entry is None:
+            return None
+        if (time.monotonic() - entry[0]) >= _POSITIONS_CACHE_TTL:
+            return None
+        return entry[1]
 
     @staticmethod
     def _get_cache_store() -> dict[str, Any] | None:

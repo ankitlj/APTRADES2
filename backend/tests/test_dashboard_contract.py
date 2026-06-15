@@ -229,7 +229,7 @@ def test_dashboard_alerts_endpoint_treats_no_positions_as_empty_state(tmp_path):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["status"] == "ok"
-    assert any(alert["title"] == "No active positions" for alert in payload["alerts"])
+    assert any(alert["title"] == "Positions snapshot pending" for alert in payload["alerts"])
 
 
 def test_dashboard_chart_endpoint_returns_normalized_points(tmp_path):
@@ -261,3 +261,58 @@ def test_dashboard_chart_endpoint_returns_normalized_points(tmp_path):
     assert payload["resolved"]["broker_symbol"] == "NIFTY"
     assert len(payload["points"]) == 2
     assert payload["points"][1]["close"] == 23440.0
+
+
+def test_dashboard_summary_degraded_when_positions_fail(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'dashboard.sqlite'}"
+    _seed_dashboard_data(database_url)
+
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.auth_diagnostic",
+        return_value={"status": "ok", "user_id": "AJ510524", "configured": True, "session_token_received": True},
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_portfolio_positions",
+        side_effect=BreezeGatewayError("Breeze request failed for /portfoliopositions: timeout"),
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote",
+        return_value={
+            "Success": [{"ltp": 23440.0, "close": 23451.7}],
+        },
+    ):
+        response = client.get("/api/dashboard/summary")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["positions_status"] in ("degraded", "error")
+    assert payload["positions"] == []
+    metric_keys = [m["key"] for m in payload["metrics"]]
+    assert "nifty" in metric_keys
+    assert "open_positions" in metric_keys
+    assert "total_pnl" in metric_keys
+
+
+def test_dashboard_alerts_pending_when_no_cached_positions(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'dashboard.sqlite'}"
+    _seed_dashboard_data(database_url)
+
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.auth_diagnostic",
+        return_value={"status": "ok", "user_id": "AJ510524", "configured": True, "session_token_received": True},
+    ):
+        response = client.get("/api/dashboard/alerts")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert any(alert["title"] == "Positions snapshot pending" for alert in payload["alerts"])
+    assert any(alert["title"] == "Breeze session active" for alert in payload["alerts"])
+    assert any(alert["title"] == "Master contract loaded" for alert in payload["alerts"])
+    # Verify no fresh broker call was made — positions endpoint should never be called
+    assert all("positions" not in alert["title"].lower() or alert["title"] == "Positions snapshot pending" for alert in payload["alerts"])

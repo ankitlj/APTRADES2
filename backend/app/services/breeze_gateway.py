@@ -150,8 +150,8 @@ class BreezeGateway:
             raise BreezeGatewayError(response.get("Error") or "Breeze quotes response missing Success field")
         return success
 
-    def get_portfolio_positions(self) -> Any:
-        response = self._request("GET", "/portfoliopositions", {}, requires_auth=True)
+    def get_portfolio_positions(self, *, timeout_override: int | None = None, attempts_override: int | None = None) -> Any:
+        response = self._request("GET", "/portfoliopositions", {}, requires_auth=True, timeout_override=timeout_override, attempts_override=attempts_override)
         success = response.get("Success")
         if success is None:
             raise BreezeGatewayError(response.get("Error") or "Breeze portfolio positions response missing Success field")
@@ -245,13 +245,21 @@ class BreezeGateway:
         return success
 
     def _request(
-        self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool, interactive: bool = True
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        requires_auth: bool,
+        interactive: bool = True,
+        timeout_override: int | None = None,
+        attempts_override: int | None = None,
     ) -> dict[str, Any]:
         if requires_auth and not self.is_configured():
             raise BreezeGatewayError(f"Missing Breeze configuration: {', '.join(self._missing_fields())}")
 
-        timeout = 10 if interactive else 15
-        attempts = 2 if interactive else 3
+        timeout = timeout_override if timeout_override is not None else (10 if interactive else 15)
+        attempts = attempts_override if attempts_override is not None else (2 if interactive else 3)
 
         # Authenticated calls retry once on a session error: the cached customer
         # session token may have expired mid-session, so drop it and re-exchange.
@@ -264,7 +272,14 @@ class BreezeGateway:
         return response
 
     def _send(
-        self, method: str, path: str, payload: dict[str, Any], *, requires_auth: bool, timeout: int = 10, attempts: int = 2
+        self,
+        method: str,
+        path: str,
+        payload: dict[str, Any],
+        *,
+        requires_auth: bool,
+        timeout: int = 10,
+        attempts: int = 2,
     ) -> dict[str, Any]:
         payload_json = json.dumps(payload, separators=(",", ":"))
         url = f"{self.base_url}{path}"

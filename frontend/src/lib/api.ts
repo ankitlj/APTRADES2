@@ -562,8 +562,34 @@ export function getBatchQuotes(symbols: BatchQuoteRequestItem[]) {
   });
 }
 
-export function getDashboardSummary() {
-  return requestJson<DashboardSummaryResponse>("/api/dashboard/summary");
+// In-flight + short-TTL dedupe for dashboard summary so MarketTicker and
+// DashboardPage do not fire two expensive backend requests on mount.
+const SUMMARY_CACHE_TTL = 3000;
+let dashboardSummaryCache: DashboardSummaryResponse | null = null;
+let dashboardSummaryCacheAt = 0;
+let dashboardSummaryInflight: Promise<DashboardSummaryResponse> | null = null;
+
+export function getDashboardSummary(): Promise<DashboardSummaryResponse> {
+  const now = Date.now();
+  if (dashboardSummaryCache && now - dashboardSummaryCacheAt < SUMMARY_CACHE_TTL) {
+    return Promise.resolve(dashboardSummaryCache);
+  }
+  if (dashboardSummaryInflight) {
+    return dashboardSummaryInflight;
+  }
+  dashboardSummaryInflight = requestJson<DashboardSummaryResponse>("/api/dashboard/summary").then(
+    (data) => {
+      dashboardSummaryCache = data;
+      dashboardSummaryCacheAt = Date.now();
+      dashboardSummaryInflight = null;
+      return data;
+    },
+    (error: unknown) => {
+      dashboardSummaryInflight = null;
+      throw error;
+    }
+  );
+  return dashboardSummaryInflight;
 }
 
 export function getDashboardAlerts() {

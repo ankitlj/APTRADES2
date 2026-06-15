@@ -162,3 +162,49 @@ def test_positions_endpoint_keeps_rows_when_quote_enrichment_fails():
     assert payload["positions"][0]["ltp"] == 1291.0
     assert payload["positions"][0]["quote_status"] == "error"
     assert payload["positions"][0]["quote_error"] == "quote failed"
+
+
+def test_get_cached_positions_returns_none_when_no_cache():
+    app = create_app()
+    app.config.update(
+        TESTING=True,
+        BREEZE_API_KEY="app-key",
+        BREEZE_SECRET_KEY="secret-key",
+        BREEZE_SESSION_TOKEN="session-token",
+    )
+
+    from app.services.positions_service import PositionsService
+    from app.services.breeze_gateway import BreezeGateway
+
+    gateway = BreezeGateway(app_key="app-key", secret_key="secret-key", session_token="session-token")
+    service = PositionsService(gateway, database_url=None)
+
+    with app.app_context():
+        cached = service.get_cached_positions()
+    assert cached is None
+
+
+def test_get_cached_positions_returns_data_when_cached():
+    app = create_app()
+    app.config.update(
+        TESTING=True,
+        BREEZE_API_KEY="app-key",
+        BREEZE_SECRET_KEY="secret-key",
+        BREEZE_SESSION_TOKEN="session-token",
+    )
+
+    from app.services.positions_service import PositionsService, _POSITIONS_CACHE_KEY, _positions_cache_lock
+    from app.services.breeze_gateway import BreezeGateway
+
+    gateway = BreezeGateway(app_key="app-key", secret_key="secret-key", session_token="session-token")
+    service = PositionsService(gateway, database_url=None)
+
+    sample = {"status": "ok", "positions": [], "totals": {"open_positions": 0, "long_positions": 0, "short_positions": 0, "total_pnl": 0.0}}
+    import time
+    with app.app_context():
+        with _positions_cache_lock:
+            app.config[_POSITIONS_CACHE_KEY] = (time.monotonic(), sample)
+        cached = service.get_cached_positions()
+    assert cached is not None
+    assert cached["status"] == "ok"
+    assert cached["totals"]["open_positions"] == 0

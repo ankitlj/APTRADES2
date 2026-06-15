@@ -1,15 +1,15 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Fix 6 — Change live badge semantics (complete)
-- Last completed phase: Fix 6 — Change live badge semantics
-- Planned next: End-to-end verification of all 6 fixes on deployed Railway + Vercel
+- Current phase: Dashboard Latency Fix Pass (complete)
+- Last completed phase: Dashboard Latency Fix Pass
+- Planned next: End-to-end deployed verification
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
 - Phase 18 (Performance/Caching): intentionally deferred until Phase 24 fixes are complete
 - Phase 22 note: First pass was rejected (treated as code audit). Rerun followed playbook strictly: 31 API routes tested with real HTTP calls, 3 cold + 3 warm timing measurements, response shape verification for all routes, diagnosis endpoint deep dive. See PHASE22_FINDINGS.md for full evidence.
 - Phase 23 note: Live deployed testing against Railway + Vercel with valid Breeze session. Found 7 real issues: 5 consistent timeouts (chart, orders, trades, cache-stats, breeze-status, symbols-search), 2 intermittent (positions, dashboard latency). Important correction: Phase 22 tested deprecated routes (/api/option-chain/bynifty, /api/orderbook, /api/tradebook) — frontend uses different endpoints (/api/option-chain, /api/orders, /api/trades). Vercel routing clean (all 11 routes HTTP 200). See PHASE23_FINDINGS.md for full evidence.
-- Fix sequence: All 6 fixes complete. Fix 1 (parallelized batch quotes) committed 15ef402. Fix 2 (deduplicate positions) committed 426f805. Fix 3 (reduce retry/timeout) committed 4dfcf29. Fix 4 (cache chart fetch) committed f3539f0. Fix 5 (ticker label) committed 4240f9b. Fix 6 (badge semantics) committed now.
-- Deployment status: Railway and Vercel deployed; Breeze session VALID (AJ510524); 110 backend tests pass; frontend builds 1853 modules
+- Fix sequence: 6 parallel fixes completed in prior pass (15ef402 through 2785f97). Then a combined Dashboard Latency Fix Pass addressing remaining 18-28s dashboard latency.
+- Deployment status: Railway and Vercel deployed; Breeze session likely valid; 114 backend tests pass; frontend builds 1853 modules
 
 ## Environment
 - Backend: Flask 3 skeleton
@@ -1302,6 +1302,18 @@
 - Solution: Changed badge text from "Live"/"Offline" to "Connected"/"Disconnected". Renamed `isLive` to `isConnected` for code clarity. Semantics now accurately describe WebSocket connectivity, not market state.
 - Files: `frontend/src/components/layout/TopHeader.tsx`
 - Verification: Frontend builds 1853 modules successfully. No backend changes.
+
+### Dashboard Latency Fix Pass [IMPLEMENTED]
+- Problem: Despite 6 prior fixes, dashboard still took 18-28s. Root causes: (a) summary cards blocked until alerts complete (both waited on Promise.allSettled), (b) two duplicate summary requests from DashboardPage + MarketTicker, (c) summary positions call had no timeout cap, (d) alerts triggered fresh slow broker positions call, (e) badge flickered "Disconnected" during reconnect grace.
+- Fix A (frontend): Split summary and alerts loading in DashboardPage so cards render independently of alerts. Each state updates as soon as its request settles (no more Promise.allSettled blocking).
+- Fix B (frontend): Added in-flight + 3s TTL deduplication for getDashboardSummary() in api.ts so simultaneous calls from DashboardPage and MarketTicker share one backend request.
+- Fix C (backend): PositionsService.get_positions() now accepts gateway_timeout/gateway_attempts overrides. BreezeGateway.get_portfolio_positions() threads timeout/attempts overrides through _request(). DashboardService.get_summary() calls positions with 4s timeout, 1 attempt — if it fails, returns degraded positions with empty totals instead of blocking cards for 30s.
+- Fix D (backend): Alerts now use get_cached_positions() — read-only cache check that never triggers a fresh broker call. If no cache, alerts show "Positions snapshot pending" instead of blocking on a slow Breeze positions fetch.
+- Fix E (frontend): TopHeader badge now maps all 4 connection states (live → green "Connected", connecting → amber "Reconnecting", degraded → amber "Degraded", offline → red "Offline") instead of only "live" vs "Disconnected".
+- Additional: Positions cache TTL increased from 5s to 15s so summary + alerts within a dashboard load share a single positions fetch.
+- Files: `backend/app/services/breeze_gateway.py`, `backend/app/services/positions_service.py`, `backend/app/services/dashboard_service.py`, `frontend/src/pages/DashboardPage.tsx`, `frontend/src/lib/api.ts`, `frontend/src/components/layout/TopHeader.tsx`, `backend/tests/test_dashboard_contract.py`, `backend/tests/test_positions_contract.py`
+- New tests added: 3 (dashboard degraded summary, alerts pending without cache, get_cached_positions)
+- Verification: 114/114 backend tests pass. Frontend builds 1853 modules.
 
 ## Phase 13 Response Examples
 
