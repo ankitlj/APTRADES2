@@ -32,7 +32,7 @@ export function TopHeader() {
   const { connectionState } = useLiveMarketData();
 
   const isDashboard = location.pathname === "/" || location.pathname === "/dashboard";
-  const isLive = connectionState === "live";
+  const isConnected = connectionState === "live";
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -44,11 +44,11 @@ export function TopHeader() {
             <span
               className={cn(
                 "h-2 w-2 rounded-full shrink-0",
-                isLive ? "bg-green-500 animate-pulse" : "bg-red-500"
+                isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
               )}
             />
-            <span className={cn("font-medium", isLive ? "text-green-600" : "text-red-500")}>
-              {isLive ? "Live" : "Offline"}
+            <span className={cn("font-medium", isConnected ? "text-green-600" : "text-red-500")}>
+              {isConnected ? "Connected" : "Disconnected"}
             </span>
           </div>
 

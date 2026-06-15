@@ -1,14 +1,14 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Fix 5 — Fix topbar ticker label to say "futures" (complete)
-- Last completed phase: Fix 5 — Fix topbar ticker label to say "futures"
-- Planned next: Fix 6 — Change live badge semantics
+- Current phase: Fix 6 — Change live badge semantics (complete)
+- Last completed phase: Fix 6 — Change live badge semantics
+- Planned next: End-to-end verification of all 6 fixes on deployed Railway + Vercel
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
 - Phase 18 (Performance/Caching): intentionally deferred until Phase 24 fixes are complete
 - Phase 22 note: First pass was rejected (treated as code audit). Rerun followed playbook strictly: 31 API routes tested with real HTTP calls, 3 cold + 3 warm timing measurements, response shape verification for all routes, diagnosis endpoint deep dive. See PHASE22_FINDINGS.md for full evidence.
 - Phase 23 note: Live deployed testing against Railway + Vercel with valid Breeze session. Found 7 real issues: 5 consistent timeouts (chart, orders, trades, cache-stats, breeze-status, symbols-search), 2 intermittent (positions, dashboard latency). Important correction: Phase 22 tested deprecated routes (/api/option-chain/bynifty, /api/orderbook, /api/tradebook) — frontend uses different endpoints (/api/option-chain, /api/orders, /api/trades). Vercel routing clean (all 11 routes HTTP 200). See PHASE23_FINDINGS.md for full evidence.
-- Fix sequence: Following strict one-at-a-time protocol. Fix 1 (parallelized batch quotes) committed 15ef402. Fix 2 (deduplicate positions) committed 426f805. Fix 3 (reduce retry/timeout) committed 4dfcf29. Fix 4 (cache chart fetch) committed f3539f0. Fix 5 (ticker label) committed now.
+- Fix sequence: All 6 fixes complete. Fix 1 (parallelized batch quotes) committed 15ef402. Fix 2 (deduplicate positions) committed 426f805. Fix 3 (reduce retry/timeout) committed 4dfcf29. Fix 4 (cache chart fetch) committed f3539f0. Fix 5 (ticker label) committed 4240f9b. Fix 6 (badge semantics) committed now.
 - Deployment status: Railway and Vercel deployed; Breeze session VALID (AJ510524); 110 backend tests pass; frontend builds 1853 modules
 
 ## Environment
@@ -1296,6 +1296,12 @@
 - Solution: Added `label` field to backend ticker response with `" futures"` suffix when `product_type == "futures"`. Updated frontend `DashboardTickerItem` interface and `MarketTicker.tsx` to use `item.label || item.symbol` for display while keeping `item.symbol` for WebSocket tick matching.
 - Files: `backend/app/services/dashboard_service.py`, `frontend/src/lib/api.ts`, `frontend/src/components/dashboard/MarketTicker.tsx`
 - Verification: 110/110 backend tests pass. Frontend builds 1853 modules.
+
+### Fix 6: Change live badge semantics [IMPLEMENTED]
+- Problem: Badge showed "Live" when Breeze WebSocket connected, regardless of market hours. Users interpret "Live" as "market is open and streaming", but it only means the socket is up.
+- Solution: Changed badge text from "Live"/"Offline" to "Connected"/"Disconnected". Renamed `isLive` to `isConnected` for code clarity. Semantics now accurately describe WebSocket connectivity, not market state.
+- Files: `frontend/src/components/layout/TopHeader.tsx`
+- Verification: Frontend builds 1853 modules successfully. No backend changes.
 
 ## Phase 13 Response Examples
 
