@@ -53,6 +53,21 @@ Storage uses Redis automatically when `REDIS_URL` is set, otherwise in-process m
 - `GET /api/health/deployment` — the above plus `master_contract` status.
 - `GET /api/market-data/status` — websocket worker state for the live badge.
 
+## 5. Diagnosis protocol
+
+Before making any code change to fix a performance or stability issue, follow the protocol in `DIAGNOSIS.md`:
+
+1. Collect evidence from frontend, API, backend timing, Redis/cache, websocket/worker, infra, and broker.
+2. Classify the problem type.
+3. Measure before and after the fix.
+4. Use the diagnostic API endpoints:
+   - `GET /api/diagnosis/trace?route=health` — time any route end-to-end
+   - `GET /api/diagnosis/cache` — inspect Redis tick cache
+   - `GET /api/diagnosis/broker` — test Breeze broker responsiveness
+   - `GET /api/diagnosis/worker` — check websocket worker state
+   - `GET /api/diagnosis/full` — aggregate all system checks
+   - `GET /api/diagnosis/timing` — view collected timing records
+
 All error responses across `/api/*` use one structured shape:
 
 ```json

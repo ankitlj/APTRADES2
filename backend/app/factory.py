@@ -10,6 +10,7 @@ from flask_cors import CORS
 from .api.action_centre import action_centre_bp
 from .api.dashboard import dashboard_bp
 from .api.debug import debug_bp
+from .api.diagnosis import diagnosis_bp
 from .api.health import health_bp
 from .api.logs import logs_bp
 from .api.market_data import market_data_bp
@@ -61,6 +62,7 @@ def create_app() -> Flask:
     )
     app.register_blueprint(health_bp, url_prefix=config.api_prefix)
     app.register_blueprint(debug_bp, url_prefix=config.api_prefix)
+    app.register_blueprint(diagnosis_bp, url_prefix=config.api_prefix)
     app.register_blueprint(master_contract_bp, url_prefix=config.api_prefix)
     app.register_blueprint(oi_bp, url_prefix=config.api_prefix)
     app.register_blueprint(options_bp, url_prefix=config.api_prefix)

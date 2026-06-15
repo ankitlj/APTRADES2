@@ -1,11 +1,22 @@
 from __future__ import annotations
 
+import threading
+import time
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any
 
+from flask import current_app
+
 from .breeze_gateway import BreezeGateway, BreezeGatewayError
 from .quote_service import QuoteRequest, QuoteService, QuoteServiceError
+
+# Short TTL cache so parallel dashboard summary + alerts requests share one
+# Breeze portfolio positions call instead of making two redundant calls.
+# Cache lives on flask.current_app.config (isolated per Flask app instance).
+_POSITIONS_CACHE_TTL = 5
+_POSITIONS_CACHE_KEY = "_POSITIONS_CACHE"
+_positions_cache_lock = threading.Lock()
 
 
 class PositionsServiceError(Exception):
@@ -39,7 +50,7 @@ class PositionsService:
         self.gateway = gateway
         self.quote_service = QuoteService(database_url, gateway)
 
-    def get_positions(self) -> dict[str, Any]:
+    def get_positions(self, *, _force_refresh: bool = False) -> dict[str, Any]:
         if not self.gateway.is_configured():
             return {
                 "status": "not_configured",
@@ -54,11 +65,20 @@ class PositionsService:
                 },
             }
 
+        now = time.monotonic()
+        if not _force_refresh:
+            cache_store = self._get_cache_store()
+            if cache_store is not None:
+                with _positions_cache_lock:
+                    entry = cache_store.get(_POSITIONS_CACHE_KEY)
+                if entry is not None and (now - entry[0]) < _POSITIONS_CACHE_TTL:
+                    return entry[1]
+
         try:
             raw_positions = self.gateway.get_portfolio_positions()
         except BreezeGatewayError as error:
             if "No Positions" in str(error):
-                return {
+                empty = {
                     "status": "ok",
                     "quote_status": "ok",
                     "close_actions_active": False,
@@ -70,6 +90,8 @@ class PositionsService:
                         "total_pnl": 0.0,
                     },
                 }
+                self._set_cache(empty)
+                return empty
             raise PositionsServiceError(str(error)) from error
 
         normalized = [self._normalize_position(item) for item in raw_positions if isinstance(item, dict)]
@@ -77,13 +99,28 @@ class PositionsService:
         quote_status = "ok"
         if active_positions and any(position.quote_status != "ok" for position in active_positions):
             quote_status = "partial"
-        return {
+        result = {
             "status": "ok",
             "quote_status": quote_status,
             "close_actions_active": False,
             "positions": [self._serialize_position(position) for position in active_positions],
             "totals": self._totals(active_positions),
         }
+        self._set_cache(result)
+        return result
+
+    @staticmethod
+    def _get_cache_store() -> dict[str, Any] | None:
+        try:
+            return current_app.config
+        except RuntimeError:
+            return None
+
+    def _set_cache(self, value: dict[str, Any]) -> None:
+        cache_store = self._get_cache_store()
+        if cache_store is not None:
+            with _positions_cache_lock:
+                cache_store[_POSITIONS_CACHE_KEY] = (time.monotonic(), value)
 
     def _normalize_position(self, item: dict[str, Any]) -> PositionSnapshot:
         product_type = str(item.get("product_type") or "").strip().lower() or "cash"

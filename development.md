@@ -1,16 +1,15 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current UI track: FUTURISTIC NEON GLOW PASS COMPLETE (2026-06-14) - layered on top of the full visual port. Dark mode by default, neon tokens (cyan/purple/green/red), glassmorphism panels, hover lift+glow stat boxes, neon glow-icon top-left + engraved icon bottom-right per box, glowing neon chart line, sidebar/avatar/payoff glow. Reusable glow utilities in index.css; per-box topic icons across all pages with a per-position fallback. 6 commits e288994..9bfa57e. See the 2026-06-14 entry in REBUILD.md.
-- Prior UI track: FULL VISUAL PORT (2026-06-13) - all 13 APTRADES2 pages match the old APTRADES frontend (Tailwind v4 + shadcn/ui + ported oklch theme tokens, dark/light + accent themes, sidebar/topbar shell with dark-light toggle and "A" tools/accent menu, dashboard market ticker + SVG chart). Shared helpers in `frontend/src/components/common/page.tsx`. Data layer (api.ts/realtime.ts/hooks) and all backend FROZEN/untouched. 5 commits 7cb6d2e..3b3d206.
-- Current phase: Phase 18 - Performance and Caching (Tier 1 implemented; Tiers 2-3 still planned)
-- Last completed phase: Phase 18 Tier 1 - backend caching (engine/sessionmaker singletons, idempotent ensure_tables, in-memory symbol-resolution TTL cache, shared process-wide BreezeGateway). Motivated by the live-stream live<->offline flicker: per-request engine rebuilds + per-request Breeze token exchange blocked the single gthread worker and starved the Socket.IO heartbeat.
-- Planned next: Phase 18 Tier 2 (Redis-first quote reads, option-chain strike streaming, parallel batch) and Tier 3 (frontend stale-while-revalidate / live-first render); then Phase 19 - Live-stream stability (Redis message_queue + background-task emit + ping tuning + frontend grace period + tick/gap recorder)
+- Current phase: Fix 2 — Deduplicate Breeze positions calls on dashboard (complete)
+- Last completed phase: Fix 2 — Deduplicate Breeze positions calls on dashboard
+- Planned next: Fix 3 — Reduce Breeze retry/timeout for interactive endpoints
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
-- Deployment status: Railway and Vercel deployed; DB/Redis/Breeze verified; master-contract import now uses HTTPS SecurityMaster plus repo-contained StockScriptNew.csv, Phase 6 quotes are live, Phase 7 dashboard is live, Phase 8 orderbook/tradebook runtime fix is shipped, Phase 9 positions page is shipped, Phase 10 reduced tools scope is verified, Phase 11 option-chain contracts are verified locally, Phase 13 OI tools are verified locally, Phase 14 strategy tools are verified locally, Phase 15 action-centre/logs contracts are verified locally, Phase 16 websocket live market data is verified locally, Phase 17 production hardening (rate limiting, structured errors, enriched readiness, shared error/empty UX, mobile pass) is verified locally (73 backend tests, 91-module frontend build, live HTTP smoke test)
-- Known blockers:
-  - Codex workspace permissions do not yet cover updating `C:\Users\Ankit\Desktop\Claude_Code\REBUILD.md`
-  - Live Breeze websocket numbers still need deployed verification with a fresh session token; this workspace has no Breeze secrets, so streaming was proven end-to-end with mocked Breeze plus a real socket.io transport handshake.
+- Phase 18 (Performance/Caching): intentionally deferred until Phase 24 fixes are complete
+- Phase 22 note: First pass was rejected (treated as code audit). Rerun followed playbook strictly: 31 API routes tested with real HTTP calls, 3 cold + 3 warm timing measurements, response shape verification for all routes, diagnosis endpoint deep dive. See PHASE22_FINDINGS.md for full evidence.
+- Phase 23 note: Live deployed testing against Railway + Vercel with valid Breeze session. Found 7 real issues: 5 consistent timeouts (chart, orders, trades, cache-stats, breeze-status, symbols-search), 2 intermittent (positions, dashboard latency). Important correction: Phase 22 tested deprecated routes (/api/option-chain/bynifty, /api/orderbook, /api/tradebook) — frontend uses different endpoints (/api/option-chain, /api/orders, /api/trades). Vercel routing clean (all 11 routes HTTP 200). See PHASE23_FINDINGS.md for full evidence.
+- Fix sequence: Following strict one-at-a-time protocol. Fix 1 (parallelized batch quotes) committed 15ef402. Fix 2 (deduplicate positions) done now.
+- Deployment status: Railway and Vercel deployed; Breeze session VALID (AJ510524); 110 backend tests pass; frontend builds 1853 modules
 
 ## Environment
 - Backend: Flask 3 skeleton
@@ -21,6 +20,46 @@
 - Deployment: Railway + Vercel live
 
 ## Phase Log
+
+### 2026-06-14 - Phase 21: Diagnosis-First Operating Protocol
+- Goal: Stop symptom-driven patching by establishing a diagnosis protocol with measurable evidence before any code change. Add diagnostic infrastructure (route timing, cache inspection, broker diagnostics, worker diagnostics) and a protocol document.
+- Backend changes:
+  - Created `backend/app/diagnosis.py` — Diagnostic helpers: `route_timer`, `step_timer`, `collect_timing`, `get_timing`, `clear_timing`, `diagnosis_record` template builder.
+  - Created `backend/app/api/diagnosis.py` — Diagnostic API blueprint with 6 endpoints:
+    - `GET /api/diagnosis/trace?route=<name>` — Time any known route end-to-end
+    - `GET /api/diagnosis/cache` — Check Redis cache health + tick key count
+    - `GET /api/diagnosis/broker` — Check Breeze auth + symbol diagnostics
+    - `GET /api/diagnosis/worker` — Check websocket worker state + snapshot
+    - `GET /api/diagnosis/full` — Aggregate all system checks in one call
+    - `GET /api/diagnosis/timing` / `DELETE /api/diagnosis/timing` — List/clear timing records
+  - Registered `diagnosis_bp` in `factory.py`.
+- Frontend changes:
+  - None (data-layer frozen per user instructions).
+- Files changed:
+  - `backend/app/diagnosis.py` (new)
+  - `backend/app/api/diagnosis.py` (new)
+  - `backend/app/factory.py` (register diagnosis blueprint)
+  - `backend/tests/test_diagnosis_contract.py` (new — 12 API contract tests)
+  - `backend/tests/test_diagnosis_tools.py` (new — 9 unit tests for diagnosis helpers)
+  - `DIAGNOSIS.md` (new — full protocol document)
+  - `development.md` (this entry)
+- Verification:
+  - `python -m pytest` -> 110 passed (90 existing + 20 new)
+  - `npm run build` -> 1853 modules, passes
+  - `curl http://127.0.0.1:5000/api/diagnosis/trace?route=health` -> timing payload
+  - `curl http://127.0.0.1:5000/api/diagnosis/cache` -> cache status
+  - `curl http://127.0.0.1:5000/api/diagnosis/broker` -> broker status
+  - `curl http://127.0.0.1:5000/api/diagnosis/worker` -> worker status
+  - `curl http://127.0.0.1:5000/api/diagnosis/full` -> full system check
+  - `curl http://127.0.0.1:5000/api/diagnosis/timing` -> timing records
+  - `curl -X DELETE http://127.0.0.1:5000/api/diagnosis/timing` -> clear confirmed
+- Manual user tasks:
+  - Review `DIAGNOSIS.md` and adopt the protocol when investigating future issues.
+  - Use `/api/diagnosis/trace?route=<route>` instead of guessing when pages feel slow.
+- Remaining risks:
+  - Phase 18 Tier 2-3 and Phase 19 still planned but not yet implemented.
+  - Diagnosis protocol is only as effective as the discipline to use it — no code can enforce the human process.
+- Next step: Resume Phase 18 Tier 2 (Redis-first quote reads, option-chain strike streaming, parallel batch).
 
 ### 2026-06-14 - UI Pass 3: Futuristic Neon Glow (Crypto-Trading-Dashboard-3D inspired)
 - Goal: add a futuristic glow aesthetic on top of the visual port - dark by default, neon accents, glassmorphism, hover lift+glow boxes, neon icon top-left + engraved icon bottom-right per box, glowing chart line. Backend and frontend->backend data wiring frozen.
@@ -1135,6 +1174,59 @@
   - The live-429 path is exercised in production rather than unit tests (the global limiter keeps its first default across test apps); the 429 response shape is covered by the shared 404/405 structured-error tests.
 - Next step: MVP is feature-complete through Phase 17. Remaining optional work is the deferred Phase 12 Option Greeks (to be computed inline in strategy code when needed) and the two manual deploy tasks above.
 
+### 2026-06-14 - Phase 22: Systematic Issue Discovery and Validation (RERUN)
+- Goal: Build a complete, measured, and ranked list of real issues across APTRADES2 before making any further fixes. This phase is for finding and proving problems, not solving them.
+- Methodology: Strictly followed playbook Part 4-5 methodology. Started Flask dev server, ran real HTTP requests against all 31 API endpoints, measured 3 cold + 3 warm timing on 12 priority routes, verified response shapes, degradation behavior, error formats, and frontend build. Supplemented with code-audit for issues that cannot be triggered without a browser or live credentials.
+- Backend changes: None (diagnosis-only phase, no code changes).
+- Frontend changes: None (diagnosis-only phase, no code changes).
+- Files changed:
+  - `PHASE22_FINDINGS.md` (rewritten — now evidence-based with runtime/audit separation)
+  - `development.md` (this entry — replaces previous code-audit-only entry)
+- Evidence separation in PHASE22_FINDINGS.md:
+  - **Runtime-behavior** (direct HTTP testing, timing measurements, shape verification)
+  - **Code-audit only** (source-file reading for issues needing browser/live data)
+  - **Insufficient evidence** (cannot test without browser/Railway/Vercel/Breeze credentials)
+- Runtime validation performed:
+  - 31 API routes tested via live HTTP requests (all under 32ms — excellent)
+  - 12 priority routes tested 3 cold + 3 warm (all under 32ms — excellent)
+  - Response shape verification for key routes (dashboard summary, alerts, positions, market-data, diagnosis)
+  - Error format verification (404 structured, 400 inconsistent, degraded states)
+  - Frontend build verification (1853 modules, clean)
+  - Backend tests (110 passed)
+- Key findings (1 runtime-proven, 5 code-audit-suspected):
+  - **RT-ISSUE-01 (runtime-proven)**: API 400 error responses use inconsistent shapes. Some return `error: string`, others return `error: {code, message}`. Contract documented in Phase 17 promises uniform `{code, message}` shape. Medium severity.
+  - **CA-ISSUE-05**: Race condition on `_subscriptions` dict in `_normalize_tick` — reads without lock while other threads mutate. Medium severity. (Code-audit only.)
+  - **CA-ISSUE-01**: StrategyPortfolioPage `handleDelete` empty catch block swallows errors silently. Medium severity. (Code-audit only.)
+  - **CA-ISSUE-02**: DashboardPage alerts error state silently shows empty "No active trade alerts" instead of error. Medium severity. (Code-audit only.)
+  - **CA-ISSUE-03**: `OptionChainService._list_expiries()` calls `ensure_tables()` on every request. Low severity. (Code-audit only.)
+  - **CA-ISSUE-04**: OptionChainService creates new Redis client per cache operation (no pooling). Low severity. (Code-audit only.)
+  - **CA-ISSUE-06**: Diagnostic instruments hardcode empty expiry for futures (bypasses SymbolResolver path). Low severity. (Code-audit only.)
+- Non-issues (14 items): Backend latency, dashboard degraded state, positions degraded state, market-data degraded state, frontend build, structured 404 shape, all 6 diagnosis endpoints, batch quotes degradation, `void` promise patterns, RLock pattern, supervisor startup race, `_breeze` TOCTOU, SymbolResolver hot path fix (Phase 18), chart resolution fix (Phase 7).
+- Insufficient evidence (12 items): Need browser for layout/rendering, live credentials for Breeze behavior, deployment access for Railway/Vercel, DB for data correctness.
+- Fix priority: Runtime-proven issue first (RT-ISSUE-01 error shapes), then code-audit issues in order: CA-ISSUE-05 (race), CA-ISSUE-01 (delete error), CA-ISSUE-02 (alerts error), CA-ISSUE-04 (Redis pool), CA-ISSUE-03 (ensure_tables), CA-ISSUE-06 (diagnostic expiry).
+- Next step: Begin Phase 23 — verify RT-ISSUE-01 behavior on deployed instance, then fix it and the code-audit-suspected issues.
+
+### 2026-06-15 - Phase 23: Final Live Validation Pass Before Fixing
+- Goal: Test all remaining unproven issues against the deployed Railway + Vercel application with a valid Breeze session. No code changes. Produce a final validated issue list then stop testing.
+- Execution: curl.exe against Vercel (11 SPA routes x2 runs) and Railway (17 API endpoints x2-3 runs) with live Breeze session (token provided by user, deployed to Railway).
+- Key correction: Phase 22 tested deprecated/wrong endpoints for several pages. Frontend actually calls `/api/orders` (not `/api/orderbook`), `/api/trades` (not `/api/tradebook`), `/api/option-chain?underlying=...` (not `/api/option-chain/bynifty`). These deprecated routes return 404 on Railway. All Phase 22 findings based on these routes are invalid.
+- Vercel routing: ALL PASS. 11/11 SPA routes return HTTP 200 with proper `<div id="root">` shell in <0.25s.
+- Breeze session: VALID. `session_token_received: true`, user_id=AJ510524, exchange_status: FNO=Y.
+- Live data verified: Dashboard summary returns NIFTY futures (23930.0), BANKNIFTY futures (57211.2), 0 positions, 0 P&L. Option chain grid returns 12 strikes with full bid/ask/oi/volume. Options expiries returns 10 dates.
+- Real issues found (7 total):
+  - **P23-RT-ISSUE-01** (HIGH): `/api/dashboard/chart?symbol=NIFTY` consistently times out (30s). Dashboard chart will not render.
+  - **P23-RT-ISSUE-02** (HIGH): `/api/orders?exchange=NFO&status=` consistently times out (30s). Orderbook page fails.
+  - **P23-RT-ISSUE-03** (HIGH): `/api/trades?exchange=NFO&action=` consistently times out (30s). Tradebook page fails.
+  - **P23-RT-ISSUE-04** (MEDIUM): `/api/debug/cache-stats`, `/api/breeze/status`, `/api/symbols/search?q=NIFTY` all timeout (25-30s). Diagnosis/breeze features unavailable.
+  - **P23-RT-ISSUE-05** (MEDIUM): `/api/dashboard/summary` (3.7s-14.5s) and `/api/dashboard/alerts` (9.3s-27.3s) have extreme latency variance. Dashboard may take 10-28s.
+  - **P23-RT-ISSUE-06** (MEDIUM): `/api/positions` intermittent (~33% success rate, 1.1s when working, 30s timeout otherwise).
+  - **P23-RT-ISSUE-07** (MEDIUM): `/api/options/expiries` extremely slow (28.5s). Option chain takes 30s+ to initially load.
+- Non-issues (10): Vercel routing, Breeze auth, option chain grid (3.76s acceptable), health readiness (0.5s), market-data offline state (expected), master contract (132076 instruments), dashboard summary data, dashboard alerts data, etc.
+- Blocked/insufficient evidence (6): page-shell visual rendering (no browser), Railway logs (no access), websocket/live-updates (market closed), mobile layout (out of scope), frontend error handling (no browser), real account data validation (pending user).
+- User-assisted tests pending: live market observation, real account-state validation (positions/orders/trades), desktop visual acceptance.
+- Findings document: `PHASE23_FINDINGS.md`
+- Next step: Phase 24 — fix validated issues starting with P23-RT-ISSUE-01 (chart timeout), then remaining timeout issues in priority order.
+
 ### PLANNED - Phase 18: Performance and Caching (Latency Reduction) [NOT STARTED]
 - Status: SPEC ONLY. Nothing in this section is implemented yet. This is the plan to make the dashboard fast.
 - Problem (root cause, grounded in current code):
@@ -1169,6 +1261,23 @@
 - Frontend (`frontend/src/hooks/useLiveMarketData.tsx`): grace period — on socket disconnect, keep showing "connecting" (reconnecting feel) for `graceMs` (default 2000ms) before reporting "offline", so a sub-2s reconnect never flips the badge; log `disconnect(reason)` and `connect_error` to the console for live proof; expose `lastTickAt` so pages can tell "unchanged price" from "stalled stream". Reuses the existing `connecting` visual state (no new MarketDataState literal, so no page/CSS churn).
 - Testing: recorder aggregates OHLC within a minute and flushes/prunes correctly (sqlite); history endpoint returns recorded candles; gap logger emits a warning past threshold; existing worker tests stay green (new constructor params default off). `npm run build` passes.
 - Done when: brief reconnects no longer show "offline"; cross-thread ticks arrive without buffering when Redis is configured; Railway logs show timestamped stream gaps; recorded candles are queryable for proof and history. Note: external causes (Railway proxy, Breeze upstream feed, ISP, daily token expiry, single-worker design) remain outside app control — the recorder makes them attributable.
+
+### Fix 1: Parallelize batch quote fetch [IMPLEMENTED]
+- Problem: `get_batch_quotes()` used a sequential for-loop, calling Breeze `get_quote()` for each symbol one at a time. For 2 symbols (NIFTY, BANKNIFTY) on the dashboard, this added ~6-14s serial latency (each quote takes 3-7s).
+- Solution: Replaced the sequential for-loop in `quote_service.py:get_batch_quotes()` with `ThreadPoolExecutor(max_workers=4)`. Each symbol quote is fetched in parallel. Extracted `_batch_error_item()` helper to avoid duplication.
+- Files: `backend/app/services/quote_service.py`
+- Verification: 110/110 tests pass. Batch quotes endpoint returns results from parallel workers.
+- Committed: `15ef402`
+
+### Fix 2: Deduplicate Breeze positions calls on dashboard [IMPLEMENTED]
+- Problem: Both `DashboardService.get_summary()` and `get_alerts()` call `self.positions_service.get_positions()`, causing 2 redundant Breeze `get_portfolio_positions()` calls (~6-14s each) on a single dashboard load.
+- Solution: Added a short-TTL (5s) in-memory cache on `flask.current_app.config` in `positions_service.py:get_positions()`. On cache hit within TTL, returns cached result without calling Breeze. Cache is isolated per Flask app instance (test-safe). Uses `_positions_cache_lock` for thread safety with gthread workers.
+- Details:
+  - `_get_cache_store()` — resolves `current_app.config` safely (returns `None` outside request context)
+  - `_set_cache(value)` — writes `(timestamp, value)` tuple to `current_app.config["_POSITIONS_CACHE"]` under lock
+  - Cache is automatically isolated per test (each test creates a new app instance, so no cross-test leakage)
+- Files: `backend/app/services/positions_service.py`
+- Verification: 110/110 tests pass. Cache path tested implicitly by two dashboard tests that call `/api/dashboard/alerts` with mock positions.
 
 ## Phase 13 Response Examples
 
@@ -1242,6 +1351,41 @@
 - Request: no body
 - Response: `{ "status": "ok|error", "configured": true|false, "symbols": [{ "symbol": "SBIN", "broker_symbol": "STABAN", "status": "ok|error", "exchange": "NSE", "product_type": "cash", "quote": "<optional>", "error": "<optional>" }] }`
 - Test command: `curl http://127.0.0.1:5000/api/debug/breeze-test`
+
+- Endpoint: `GET /api/diagnosis/trace?route=<route>`
+- Request: query param `route` (required) — one of: health, readiness, breeze-auth, breeze-test
+- Response: `{ "status": "ok", "route": "health", "elapsed_ms": 1.23, "result": { ... } }`
+- Test command: `curl "http://127.0.0.1:5000/api/diagnosis/trace?route=health"`
+
+- Endpoint: `GET /api/diagnosis/cache`
+- Request: no body
+- Response: `{ "status": "online|offline|not_configured", "tick_keys": 4, "tick_keys_sample": ["md:tick:NFO:62329", "md:tick:NSE:2885"], "dbsize": 10, "timestamp": "..." }`
+- Test command: `curl http://127.0.0.1:5000/api/diagnosis/cache`
+
+- Endpoint: `GET /api/diagnosis/broker`
+- Request: no body
+- Response: `{ "status": "ok", "configured": true, "auth": { ... }, "symbols": { "count": 5, "results": [...] }, "timestamp": "..." }`
+- Test command: `curl http://127.0.0.1:5000/api/diagnosis/broker`
+
+- Endpoint: `GET /api/diagnosis/worker`
+- Request: no body
+- Response: `{ "state": "offline|connecting|live|degraded", "configured": false, "subscriptions": 0, "symbols": [], "snapshot_count": 0, "timestamp": "..." }`
+- Test command: `curl http://127.0.0.1:5000/api/diagnosis/worker`
+
+- Endpoint: `GET /api/diagnosis/full`
+- Request: no body
+- Response: `{ "status": "ok", "checks": { "api": "online", "postgres": "online", "redis": "online", "breeze": "configured" }, "breeze_auth": {...}, "worker": {...}, "timing": [...], "timestamp": "..." }`
+- Test command: `curl http://127.0.0.1:5000/api/diagnosis/full`
+
+- Endpoint: `GET /api/diagnosis/timing`
+- Request: optional query param `name` to filter
+- Response: `{ "records": [{"name": "trace:health", "elapsed_ms": 1.23, "steps": []}] }`
+- Test command: `curl http://127.0.0.1:5000/api/diagnosis/timing`
+
+- Endpoint: `DELETE /api/diagnosis/timing`
+- Request: optional query param `name` to clear specific
+- Response: `{ "status": "ok", "cleared": true }`
+- Test command: `curl -X DELETE http://127.0.0.1:5000/api/diagnosis/timing`
 
 - Endpoint: `GET /api/master-contract/status`
 - Request: no body
