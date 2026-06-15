@@ -33,7 +33,7 @@ export function MarketTicker() {
   const quotes: TickerQuote[] = (summary?.ticker ?? []).map((item) => {
     const live = ticks[item.symbol.toUpperCase()];
     return {
-      label: item.symbol,
+      label: item.label || item.symbol,
       ltp: live?.ltp ?? item.ltp,
       changePercent: live?.change_percent ?? item.change_percent,
     };

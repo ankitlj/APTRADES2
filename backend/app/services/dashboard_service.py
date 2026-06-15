@@ -247,8 +247,10 @@ class DashboardService:
         change_percent = None
         if ltp is not None and previous_close not in (None, 0):
             change_percent = round(((ltp - previous_close) / previous_close) * 100, 2)
+        suffix = " futures" if resolved.get("product_type") == "futures" else ""
         return {
             "symbol": result["symbol"],
+            "label": result["symbol"] + suffix,
             "broker_symbol": resolved.get("broker_symbol"),
             "ltp": ltp,
             "change_percent": change_percent,

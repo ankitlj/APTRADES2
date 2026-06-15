@@ -132,6 +132,7 @@ export interface DashboardMetric {
 
 export interface DashboardTickerItem {
   symbol: string;
+  label?: string | null;
   broker_symbol?: string | null;
   ltp: number | null;
   change_percent: number | null;
