@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -56,25 +57,43 @@ class QuoteService:
         }
 
     def get_batch_quotes(self, requests: list[QuoteRequest]) -> dict[str, Any]:
-        results: list[dict[str, Any]] = []
-        for request in requests:
-            try:
-                results.append(self.get_quote(request))
-            except QuoteServiceError as error:
-                results.append(
-                    {
-                        "status": "error",
-                        "symbol": request.symbol.upper(),
-                        "resolved": self._serialize_resolved(error.resolved) if error.resolved else None,
-                        "exchange_code": request.exchange_code.upper(),
-                        "product_type": (request.product_type or "").lower() or None,
-                        "error": str(error),
-                    }
-                )
+        count = len(requests)
+        if count <= 1:
+            results: list[dict[str, Any]] = []
+            for request in requests:
+                try:
+                    results.append(self.get_quote(request))
+                except QuoteServiceError as error:
+                    results.append(self._batch_error_item(request, error))
+            return {
+                "status": "ok" if any(item["status"] == "ok" for item in results) else "error",
+                "results": results,
+            }
+
+        results = [None] * count
+        with ThreadPoolExecutor(max_workers=count) as executor:
+            future_map = {executor.submit(self.get_quote, request): idx for idx, request in enumerate(requests)}
+            for future in as_completed(future_map):
+                idx = future_map[future]
+                try:
+                    results[idx] = future.result()
+                except QuoteServiceError as error:
+                    results[idx] = self._batch_error_item(requests[idx], error)
 
         return {
-            "status": "ok" if any(item["status"] == "ok" for item in results) else "error",
+            "status": "ok" if any(item["status"] == "ok" for item in results if item is not None) else "error",
             "results": results,
+        }
+
+    @staticmethod
+    def _batch_error_item(request: QuoteRequest, error: QuoteServiceError) -> dict[str, Any]:
+        return {
+            "status": "error",
+            "symbol": request.symbol.upper(),
+            "resolved": QuoteService._serialize_resolved(error.resolved) if error.resolved else None,
+            "exchange_code": request.exchange_code.upper(),
+            "product_type": (request.product_type or "").lower() or None,
+            "error": str(error),
         }
 
     @staticmethod
