@@ -1553,13 +1553,14 @@
   | `GET /api/orders?exchange=NFO` | 30s timeout | **1.3s** (warm, 3-run avg) |
   | `GET /api/trades?exchange=NFO` | 30s timeout | **1.4s** (warm, 3-run avg) |
   | `GET /api/positions` | 30s timeout | **0.9s** (warm, 3-run avg) |
-  | `GET /api/action-centre?status=pending` | ~80s (4×20s) | **3.7s** (warm, 3-run avg) |
+   | `GET /api/action-centre?status=pending` | ~80s (4×20s) | **4.10s** (warm, 3-run avg, 2026-06-16 re-verify) |
 - Contract correctness: All 4 return HTTP 200, `status: ok`, valid stats/actions/orders/trades arrays, no errors. Empty states correct.
-- **Part A decision**: Action-centre ACCEPTED (warm 3.7s ≤ 5s threshold). No further code changes needed.
+- **Part A decision**: Action-centre ACCEPTED (warm 4.10s ≤ 5s threshold). No further code changes needed.
 - Remaining risks: Real Breeze errors still propagate correctly — only "No Data Found" is normalized. The 8s cap applies per Breeze call.
+- Railway hardening: Added `backend/Procfile` with same gthread worker config as root Procfile to prevent silent fallback to sync workers if Railway root directory changes.
 
 ## Deployment Notes
-- Last commit: `e743ca2` (Fix Pass Part 3: Action-centre sync timeout override)
+- Last commit: `0633e53` (Part A verification + reproof Procfile in backend/)
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
 - Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded
