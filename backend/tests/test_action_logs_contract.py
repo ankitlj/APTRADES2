@@ -10,7 +10,7 @@ def _client_with_db(database_url: str):
 def test_action_centre_sync_and_approve_flow(tmp_path, monkeypatch):
     database_url = f"sqlite:///{tmp_path / 'action.sqlite'}"
 
-    def fake_get_order_list(self, *, exchange_code, from_date, to_date):
+    def fake_get_order_list(self, *, exchange_code, from_date, to_date, timeout_override=None, attempts_override=None):
         if exchange_code != "NFO":
             return []
         return [

@@ -1523,6 +1523,18 @@
 - Verification: `python -m pytest` — 114/114 passed (unchanged). Frontend build — 1853 modules passed.
 - Remaining risks: If Breeze is genuinely slow, positions will degrade gracefully (same as dashboard already does). The 4s cap applies only to the Breeze call; SymbolResolver + DB resolution still runs before that.
 
+### 2026-06-16 — Fix Pass Part 2: Orderbook + Tradebook Empty-State and Latency
+- Root cause (correctness): Breeze returns `{"Success": null, "Error": "No Data Found"}` as a valid empty-state response when no orders/trades match the query. `BreezeGateway.get_order_list()` and `get_trade_list()` treated any `Success=None` as a hard error, raising `BreezeGatewayError`. The API routes returned HTTP 400, causing frontend to show error state instead of empty state.
+- Root cause (latency): Order and trade list calls had no timeout override, using default interactive policy (10s×2 attempts) plus unbounded `get_customer_details()` — measured 22-34s for orders, 17-34s for trades.
+- Files changed:
+  - `backend/app/services/breeze_gateway.py` — `get_order_list()` and `get_trade_list()`: (a) added `timeout_override`/`attempts_override` params passed to `_request()`, (b) "No Data Found" now returns `[]` instead of raising error
+  - `backend/app/services/orders_service.py` — `get_orders()`: added `gateway_timeout`/`gateway_attempts` params, threaded to gateway
+  - `backend/app/services/trades_service.py` — `get_trades()`: same pattern
+  - `backend/app/api/orders.py` — both route handlers pass `gateway_timeout=8, gateway_attempts=1`
+  - `backend/tests/test_action_logs_contract.py` — mock signature updated to accept new params
+- Verification: `python -m pytest` — 114/114 passed. Frontend build — 1853 modules passed.
+- Remaining risks: Real Breeze errors (auth failure, bad session, network failure) still raise correctly — only "No Data Found" is normalized. The 8s cap applies per call.
+
 ## Deployment Notes
 - Last commit: pending next fix pass commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`

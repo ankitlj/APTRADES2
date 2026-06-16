@@ -60,7 +60,7 @@ def _trade_query_from_args() -> TradeQuery:
 @orders_bp.get("/orders")
 def get_orders() -> tuple[object, int]:
     try:
-        payload = _orders_service().get_orders(_order_query_from_args())
+        payload = _orders_service().get_orders(_order_query_from_args(), gateway_timeout=8, gateway_attempts=1)
     except (OrdersServiceError, ValueError) as error:
         return jsonify({"status": "error", "error": str(error)}), 400
     return jsonify(payload), 200
@@ -97,7 +97,7 @@ def cancel_all_orders() -> tuple[object, int]:
 @orders_bp.get("/trades")
 def get_trades() -> tuple[object, int]:
     try:
-        payload = _trades_service().get_trades(_trade_query_from_args())
+        payload = _trades_service().get_trades(_trade_query_from_args(), gateway_timeout=8, gateway_attempts=1)
     except (TradesServiceError, ValueError) as error:
         return jsonify({"status": "error", "error": str(error)}), 400
     return jsonify(payload), 200

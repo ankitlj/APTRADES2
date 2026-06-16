@@ -41,7 +41,7 @@ class OrdersService:
     def __init__(self, gateway: BreezeGateway):
         self.gateway = gateway
 
-    def get_orders(self, query: OrderQuery) -> dict[str, Any]:
+    def get_orders(self, query: OrderQuery, *, gateway_timeout: int | None = None, gateway_attempts: int | None = None) -> dict[str, Any]:
         exchange_code = (query.exchange_code or "NFO").strip().upper()
         from_date, to_date = self._date_window(query.from_date, query.to_date)
 
@@ -50,6 +50,8 @@ class OrdersService:
                 exchange_code=exchange_code,
                 from_date=from_date,
                 to_date=to_date,
+                timeout_override=gateway_timeout,
+                attempts_override=gateway_attempts,
             )
         except BreezeGatewayError as error:
             raise OrdersServiceError(str(error)) from error

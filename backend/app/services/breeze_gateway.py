@@ -157,16 +157,27 @@ class BreezeGateway:
             raise BreezeGatewayError(response.get("Error") or "Breeze portfolio positions response missing Success field")
         return success
 
-    def get_order_list(self, *, exchange_code: str, from_date: datetime, to_date: datetime) -> Any:
+    def get_order_list(
+        self,
+        *,
+        exchange_code: str,
+        from_date: datetime,
+        to_date: datetime,
+        timeout_override: int | None = None,
+        attempts_override: int | None = None,
+    ) -> Any:
         payload = {
             "exchange_code": exchange_code,
             "from_date": self._format_datetime(from_date),
             "to_date": self._format_datetime(to_date),
         }
-        response = self._request("GET", "/order", payload, requires_auth=True)
+        response = self._request("GET", "/order", payload, requires_auth=True, timeout_override=timeout_override, attempts_override=attempts_override)
         success = response.get("Success")
         if success is None:
-            raise BreezeGatewayError(response.get("Error") or "Breeze order list response missing Success field")
+            error_text = response.get("Error") or ""
+            if "no data found" in error_text.lower():
+                return []
+            raise BreezeGatewayError(error_text or "Breeze order list response missing Success field")
         return success
 
     def cancel_order(self, *, exchange_code: str, order_id: str) -> Any:
@@ -189,6 +200,8 @@ class BreezeGateway:
         product_type: str = "",
         action: str = "",
         stock_code: str = "",
+        timeout_override: int | None = None,
+        attempts_override: int | None = None,
     ) -> Any:
         payload = {
             "from_date": self._format_datetime(from_date),
@@ -198,10 +211,13 @@ class BreezeGateway:
             "action": action,
             "stock_code": stock_code,
         }
-        response = self._request("GET", "/trades", payload, requires_auth=True)
+        response = self._request("GET", "/trades", payload, requires_auth=True, timeout_override=timeout_override, attempts_override=attempts_override)
         success = response.get("Success")
         if success is None:
-            raise BreezeGatewayError(response.get("Error") or "Breeze trade list response missing Success field")
+            error_text = response.get("Error") or ""
+            if "no data found" in error_text.lower():
+                return []
+            raise BreezeGatewayError(error_text or "Breeze trade list response missing Success field")
         return success
 
     def get_historical_charts(

@@ -25,7 +25,7 @@ class TradesService:
     def __init__(self, gateway: BreezeGateway):
         self.gateway = gateway
 
-    def get_trades(self, query: TradeQuery) -> dict[str, Any]:
+    def get_trades(self, query: TradeQuery, *, gateway_timeout: int | None = None, gateway_attempts: int | None = None) -> dict[str, Any]:
         exchange_code = (query.exchange_code or "NFO").strip().upper()
         from_date, to_date = self._date_window(query.from_date, query.to_date)
 
@@ -37,6 +37,8 @@ class TradesService:
                 product_type=(query.product_type or "").strip().lower(),
                 action=(query.action or "").strip().upper(),
                 stock_code=(query.stock_code or "").strip().upper(),
+                timeout_override=gateway_timeout,
+                attempts_override=gateway_attempts,
             )
         except BreezeGatewayError as error:
             raise TradesServiceError(str(error)) from error
