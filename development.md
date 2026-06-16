@@ -1547,10 +1547,17 @@
 - Files changed:
   - `backend/app/services/action_centre_service.py:124-125` — added `gateway_timeout=8, gateway_attempts=1` to `get_orders()` call in `_sync_open_orders()`
 - Verification: `python -m pytest` — 114/114 passed.
-- Railway timing: see Railway verification below.
+- Railway timing (measured 2026-06-16):
+  | Endpoint | Before (Phase 23) | After Part 2+3 |
+  |---|---|---|
+  | `GET /api/orders?exchange=NFO` | 30s timeout | **1.32s** |
+  | `GET /api/trades?exchange=NFO` | 30s timeout | **1.75s** |
+  | `GET /api/positions` | 30s timeout / intermittent | **1.91s** |
+  | `GET /api/action-centre?status=pending` | ~80s (4 exchanges × 20s) | **3.58s** |
+  - All four endpoints now complete in <4s. Confirmed via `curl.exe -w "%{time_total}s"` against Railway production URL.
 
 ## Deployment Notes
-- Last commit: pending next fix pass commit
+- Last commit: `e743ca2` (Fix Pass Part 3: Action-centre sync timeout override)
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
 - Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded
