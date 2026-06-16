@@ -1572,8 +1572,18 @@
 - **Part B decision**: All endpoints ACCEPTED. No code changes applied.
 - Tests: 6/6 option-chain and OI contract tests passed.
 
+### 2026-06-16 — Fix Pass Part C: Shared Expiries / Strategy Builder Verification
+- Pre-fix endpoint timings:
+  | Endpoint | Timing |
+  |---|---|
+  | `GET /api/options/expiries?underlying=NIFTY&exchange=NFO` (from Part B) | **0.52s** |
+  | `POST /api/strategies/payoff` (sample 2-leg payload) | **0.54s** (3-run avg) |
+- Decision: Both well under 3s threshold. No code changes needed.
+- Shared expiries improvement (already fast) automatically benefits strategy builder — no separate fix required.
+- Tests: 7/7 strategy contract tests passed.
+
 ## Deployment Notes
-- Last commit: `c983b01` (Part A docs update)
+- Last commit: `e009442` (Part B docs update)
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
 - Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded
