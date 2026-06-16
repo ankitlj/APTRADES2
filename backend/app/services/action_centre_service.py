@@ -124,7 +124,9 @@ class ActionCentreService:
                             exchange_code=exchange_code,
                             from_date=datetime.now(timezone.utc) - timedelta(days=2),
                             to_date=datetime.now(timezone.utc),
-                        )
+                        ),
+                        gateway_timeout=8,
+                        gateway_attempts=1,
                     )
                 except Exception as error:
                     self.logs.safe_record_app_event(

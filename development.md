@@ -1533,7 +1533,21 @@
   - `backend/app/api/orders.py` — both route handlers pass `gateway_timeout=8, gateway_attempts=1`
   - `backend/tests/test_action_logs_contract.py` — mock signature updated to accept new params
 - Verification: `python -m pytest` — 114/114 passed. Frontend build — 1853 modules passed.
+- Railway timing (measured 2026-06-16):
+  | Endpoint | Before (Phase 23) | After Part 2 |
+  |---|---|---|
+  | `GET /api/orders?exchange=NFO` | 30s timeout | **1.66s** |
+  | `GET /api/trades?exchange=NFO` | 30s timeout | **1.42s** |
+  | `GET /api/positions` | 30s timeout / intermittent | **1.57s** |
+  - All three now complete in ~1.4-1.7s, well within the 8s cap. Confirmed via `curl.exe -w "%{time_total}s"` against Railway production URL.
 - Remaining risks: Real Breeze errors (auth failure, bad session, network failure) still raise correctly — only "No Data Found" is normalized. The 8s cap applies per call.
+
+### 2026-06-16 — Fix Pass Part 3: Action-Centre Sync Timeout Override
+- Root cause: `ActionCentreService._sync_open_orders()` called `OrdersService.get_orders()` without `gateway_timeout`/`gateway_attempts` params, defaulting to 10s×2 attempts per exchange. Since the sync runs across 4 exchanges (NFO, NSE, BFO, BSE) sequentially, worst case was 80s before any action data reached the frontend.
+- Files changed:
+  - `backend/app/services/action_centre_service.py:124-125` — added `gateway_timeout=8, gateway_attempts=1` to `get_orders()` call in `_sync_open_orders()`
+- Verification: `python -m pytest` — 114/114 passed.
+- Railway timing: see Railway verification below.
 
 ## Deployment Notes
 - Last commit: pending next fix pass commit
