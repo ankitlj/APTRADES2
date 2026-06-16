@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from flask import Flask, current_app, request
 from flask_socketio import SocketIO
+
+logger = logging.getLogger(__name__)
 
 from .services.market_data_worker import MarketDataWorker
 from .services.symbol_resolver import SymbolResolver, SymbolResolverError
@@ -101,6 +104,7 @@ def _subscribe_requests(requests: list[dict[str, Any]]) -> dict[str, Any]:
     if worker is None:
         return {"accepted": [], "skipped": [], "count": 0}
     items = resolve_subscription_items(current_app.config.get("DATABASE_URL"), requests)
+    logger.info("market-data subscribe requests=%d resolved=%d requests=%s", len(requests), len(items), [r.get("symbol") for r in requests])
     return worker.subscribe(items)
 
 

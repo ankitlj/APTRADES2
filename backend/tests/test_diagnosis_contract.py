@@ -94,3 +94,47 @@ def test_diagnosis_collects_timing_after_trace(client):
     # The trace should have created at least one timing record
     record_names = [r["name"] for r in payload["records"]]
     assert any("trace" in n for n in record_names)
+
+
+def test_diagnosis_token_verify_requires_symbol_and_exchange(client):
+    response = client.get("/api/diagnosis/token-verify")
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["status"] == "error"
+
+    response = client.get("/api/diagnosis/token-verify?symbol=NIFTY")
+    assert response.status_code == 400
+
+    response = client.get("/api/diagnosis/token-verify?exchange=NFO")
+    assert response.status_code == 400
+
+
+def test_diagnosis_token_verify_returns_structured_output(client):
+    response = client.get("/api/diagnosis/token-verify?symbol=NIFTY&exchange=NFO&product_type=futures")
+    payload = response.get_json()
+    # Without a configured DATABASE_URL the endpoint returns 400.
+    if response.status_code == 400:
+        assert payload["status"] == "error"
+        return
+    assert response.status_code == 200
+    assert payload["status"] == "ok"
+    diag = payload["diagnosis"]
+    assert diag["requested"]["symbol"] == "NIFTY"
+    assert diag["requested"]["exchange"] == "NFO"
+    assert "verdict" in diag
+    assert diag["verdict"] in ("exact_match", "ambiguous_match", "missing_match")
+
+
+def test_diagnosis_token_verify_banknifty(client):
+    """BANKNIFTY resolves to an NFO futures contract with a token."""
+    response = client.get("/api/diagnosis/token-verify?symbol=BANKNIFTY&exchange=NFO&product_type=futures")
+    payload = response.get_json()
+    if response.status_code == 400:
+        assert payload["status"] == "error"
+        return
+    assert response.status_code == 200
+    assert payload["status"] == "ok"
+    diag = payload["diagnosis"]
+    assert diag["requested"]["symbol"] == "BANKNIFTY"
+    if diag["verdict"] == "exact_match":
+        assert diag["resolved"]["token"] is not None

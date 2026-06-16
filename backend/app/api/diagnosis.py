@@ -5,11 +5,16 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify, request
 
+from sqlalchemy import func, select
+
 from ..cache import check_redis, create_redis_client
 from ..db import check_database
 from ..diagnosis import clear_timing, get_timing, route_timer
 from ..realtime import get_worker
 from ..services.breeze_gateway import BreezeGatewayError, get_gateway
+from ..services.symbol_resolver import SymbolResolver, SymbolResolverError
+from ..models import Instrument
+from ..db import create_session_factory
 
 diagnosis_bp = Blueprint("diagnosis", __name__)
 
@@ -64,6 +69,91 @@ def trace() -> tuple[object, int]:
         elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
 
     return jsonify({"status": "ok", "route": target, "elapsed_ms": elapsed_ms, "result": result}), status_code
+
+
+@diagnosis_bp.get("/diagnosis/token-verify")
+def token_verify() -> tuple[object, int]:
+    """Verify how a symbol is resolved for streaming subscription.
+
+    Returns the full resolution chain so we can prove whether the token used
+    for websocket subscribe matches the expected instrument row in the DB.
+    Query params: symbol (required), exchange (required), product_type (optional).
+    """
+    symbol = str(request.args.get("symbol", "")).strip().upper()
+    exchange = str(request.args.get("exchange", "")).strip().upper()
+    product_type = request.args.get("product_type")
+    if not symbol or not exchange:
+        return jsonify({"status": "error", "error": {"code": 400, "message": "symbol and exchange are required"}}), 400
+
+    database_url = current_app.config.get("DATABASE_URL")
+    if not database_url:
+        return jsonify({"status": "error", "error": {"code": 400, "message": "DATABASE_URL is not configured"}}), 400
+
+    result: dict[str, object] = {
+        "requested": {"symbol": symbol, "exchange": exchange, "product_type": product_type},
+    }
+
+    # 1. Resolve through SymbolResolver (same path used by subscribe)
+    resolver = SymbolResolver(database_url)
+    try:
+        resolved = resolver.resolve(symbol, exchange, product_type=product_type)
+        result["resolved"] = {
+            "display_symbol": resolved.display_symbol,
+            "broker_symbol": resolved.broker_symbol,
+            "exchange_code": resolved.exchange_code,
+            "product_type": resolved.product_type,
+            "token": resolved.token,
+            "contract_code": resolved.contract_code,
+            "expiry_date": resolved.expiry_date.isoformat() if resolved.expiry_date else None,
+            "right": resolved.right,
+            "strike_price": resolved.strike_price,
+            "resolution_source": resolved.resolution_source,
+            "stock_token": f"4.1!{resolved.token}" if resolved.exchange_code in ("NSE", "NFO") and resolved.token else None,
+        }
+        verdict = "exact_match"
+    except SymbolResolverError as e:
+        result["resolved"] = None
+        result["resolver_error"] = str(e)
+        verdict = "missing_match"
+
+    # 2. Count candidate rows in the DB matching the request
+    try:
+        session_factory = create_session_factory(database_url)
+        with session_factory() as session:
+            base = select(Instrument).where(
+                Instrument.is_active.is_(True),
+            )
+            # For derivatives, also find NSE cash with the same symbol
+            candidates_query = select(Instrument).where(
+                (func.upper(Instrument.broker_symbol) == symbol)
+                | (func.upper(Instrument.contract_code) == symbol)
+                | (func.upper(Instrument.display_symbol) == symbol),
+                Instrument.is_active.is_(True),
+            )
+            candidates = list(session.scalars(candidates_query.order_by(Instrument.exchange_code, Instrument.product_type, Instrument.expiry_date.desc()).limit(20)).all())
+            result["candidate_count"] = len(candidates)
+            result["candidates"] = [
+                {
+                    "id": c.id,
+                    "broker_symbol": c.broker_symbol,
+                    "display_symbol": c.display_symbol,
+                    "contract_code": c.contract_code,
+                    "exchange_code": c.exchange_code,
+                    "product_type": c.product_type,
+                    "token": c.token,
+                    "expiry_date": c.expiry_date.isoformat() if c.expiry_date else None,
+                    "is_active": c.is_active,
+                }
+                for c in candidates
+            ]
+
+            if len(candidates) > 1:
+                verdict = "ambiguous_match"
+    except Exception as e:
+        result["candidate_error"] = str(e)
+
+    result["verdict"] = verdict
+    return jsonify({"status": "ok", "diagnosis": result}), 200
 
 
 @diagnosis_bp.get("/diagnosis/cache")

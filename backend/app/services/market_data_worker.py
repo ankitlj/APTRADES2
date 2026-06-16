@@ -31,6 +31,14 @@ STATE_CONNECTING = "connecting"
 STATE_LIVE = "live"
 STATE_DEGRADED = "degraded"  # connect/stream failed — REST keeps serving
 
+# Diagnostic freshness classification (never emitted to frontend badge; exposed
+# via the status endpoint so we can distinguish "transport alive but no data"
+# from "active streaming").
+FRESHNESS_NO_TICKS_EVER = "no_ticks_ever"
+FRESHNESS_STALE = "stale"         # last tick older than freshness threshold
+FRESHNESS_ACTIVE = "active"       # recent ticks flowing
+_FRESHNESS_THRESHOLD_SECONDS = 30  # no tick in 30s → stale
+
 # Type of the optional publish callback (Socket.IO emit): publish(event, payload).
 PublishFn = Callable[[str, dict[str, Any]], None]
 # Type of the optional Breeze client factory (injected in tests).
@@ -116,6 +124,15 @@ class MarketDataWorker:
         self._subscriptions: dict[str, Subscription] = {}
         # display_symbol -> last normalized tick (in-memory snapshot fallback)
         self._last_ticks: dict[str, dict[str, Any]] = {}
+
+        # ----- diagnostic counters (never emitted to badge, exposed in status) ----
+        self._ticks_received_ever: bool = False
+        self._first_tick_at: str | None = None
+        self._tick_count_total: int = 0
+        self._per_symbol_tick_counts: dict[str, int] = {}
+        self._subscribe_requests_total: int = 0      # total subscribe() calls
+        self._subscribe_attempt_count: int = 0        # total _feed_subscribe calls
+        self._subscribe_error_count: int = 0          # failed _feed_subscribe calls
 
     # ----- configuration -------------------------------------------------
 
@@ -237,6 +254,7 @@ class MarketDataWorker:
         Each item must provide ``token`` and ``exchange_code``; the broker key
         ``stock_token`` is derived from them. Returns a summary of what was
         accepted and skipped (skips never raise — degraded-safe)."""
+        self._subscribe_requests_total += 1
         accepted: list[str] = []
         skipped: list[dict[str, str]] = []
         new_subscriptions: list[Subscription] = []
@@ -256,6 +274,13 @@ class MarketDataWorker:
                     accepted.append(subscription.stock_token)
                     continue
                 self._subscriptions[subscription.stock_token] = subscription
+            logger.info(
+                "market-data subscribe: %s -> stock_token=%s display_symbol=%s broker_symbol=%s",
+                item.get("display_symbol") or item.get("symbol") or "?",
+                subscription.stock_token,
+                subscription.display_symbol,
+                subscription.broker_symbol,
+            )
             new_subscriptions.append(subscription)
             accepted.append(subscription.stock_token)
 
@@ -285,13 +310,17 @@ class MarketDataWorker:
             self._feed_subscribe(subscription)
 
     def _feed_subscribe(self, subscription: Subscription) -> None:
+        self._subscribe_attempt_count += 1
         with self._lock:
             breeze = self._breeze
         if breeze is None:
+            logger.warning("market-data feed subscribe skipped: breeze not connected for %s", subscription.stock_token)
             return
         try:
             breeze.subscribe_feeds(stock_token=subscription.stock_token)
         except Exception as error:  # noqa: BLE001 — one bad symbol must not kill the stream
+            self._subscribe_error_count += 1
+            logger.error("market-data feed subscribe failed for %s: %s", subscription.stock_token, error)
             self._set_state(self._state, error=f"subscribe failed for {subscription.stock_token}: {error}")
 
     def _feed_unsubscribe(self, subscription: Subscription) -> None:
@@ -324,6 +353,21 @@ class MarketDataWorker:
 
     # ----- tick handling -------------------------------------------------
 
+    def _freshness(self) -> str:
+        """Diagnostic classification: no_ticks_ever / stale / active."""
+        if not self._ticks_received_ever:
+            return FRESHNESS_NO_TICKS_EVER
+        if self._last_tick_at is None:
+            return FRESHNESS_NO_TICKS_EVER
+        try:
+            last = datetime.fromisoformat(self._last_tick_at.replace("Z", "+00:00"))
+            age = (datetime.now(timezone.utc) - last).total_seconds()
+            if age > _FRESHNESS_THRESHOLD_SECONDS:
+                return FRESHNESS_STALE
+        except (ValueError, TypeError):
+            pass
+        return FRESHNESS_ACTIVE
+
     def _on_ticks(self, tick: Any) -> None:
         """Breeze on_ticks callback. Runs on the breeze-connect socket thread."""
         if not isinstance(tick, dict):
@@ -332,9 +376,17 @@ class MarketDataWorker:
         if normalized is None:
             return
         self._log_gap()
-        self._last_tick_at = normalized["ts"]
+        now_ts = normalized["ts"]
+        self._last_tick_at = now_ts
+        if not self._ticks_received_ever:
+            self._ticks_received_ever = True
+            self._first_tick_at = now_ts
+            logger.info("market-data first tick received for %s at %s", normalized["symbol"], now_ts)
+        self._tick_count_total += 1
+        sym = normalized["symbol"]
         with self._lock:
-            self._last_ticks[normalized["symbol"]] = normalized
+            self._last_ticks[sym] = normalized
+            self._per_symbol_tick_counts[sym] = self._per_symbol_tick_counts.get(sym, 0) + 1
         self._write_redis(normalized)
         self._recorder.record(normalized)
         self._emit(normalized)
@@ -417,8 +469,11 @@ class MarketDataWorker:
 
     def _set_state(self, state: str, *, error: str | None) -> None:
         with self._lock:
+            old = self._state
             self._state = state
             self._error = error
+        if state != old:
+            logger.info("market-data worker state %s -> %s (error=%s)", old, state, error)
         with self._lock:
             publish = self._publish
         if publish is not None:
@@ -435,6 +490,14 @@ class MarketDataWorker:
                 "subscriptions": len(self._subscriptions),
                 "symbols": sorted({sub.display_symbol for sub in self._subscriptions.values()}),
                 "last_tick_at": self._last_tick_at,
+                "first_tick_at": self._first_tick_at,
+                "tick_count_total": self._tick_count_total,
+                "per_symbol_tick_counts": dict(self._per_symbol_tick_counts),
+                "subscribe_requests_total": self._subscribe_requests_total,
+                "subscribe_attempt_count": self._subscribe_attempt_count,
+                "subscribe_error_count": self._subscribe_error_count,
+                "ticks_received_ever": self._ticks_received_ever,
+                "freshness": self._freshness(),
                 "error": self._error,
             }
 
