@@ -1516,8 +1516,15 @@
 - Socket.IO: connect to `/socket.io` (websocket or polling). On connect the server streams the default watchlist and emits `status` (MarketDataStatus) plus `tick` events. Client may emit `subscribe` / `unsubscribe` with `{ "symbols": [{ "symbol": "SBIN", "exchange": "NSE", "product_type": "cash" }] }`.
 - Test command: `curl "http://127.0.0.1:5000/socket.io/?EIO=4&transport=polling"`
 
+### 2026-06-16 — Fix Pass Part 1: Positions Latency
+- Root cause: `/api/positions` route called `PositionsService.get_positions()` without `gateway_timeout`/`gateway_attempts` overrides. The default interactive Breeze policy is 10s timeout × 2 attempts (max 20s), compounded by the `_customer_session_token()` call inside `_send()` which calls `get_customer_details()` unbounded. Deployed cold-start took 28-34s.
+- Files changed: `backend/app/api/positions.py:24` — added `gateway_timeout=4, gateway_attempts=1`
+- Reuses the exact same bounded pattern already proven in `DashboardService.get_summary()` line 59.
+- Verification: `python -m pytest` — 114/114 passed (unchanged). Frontend build — 1853 modules passed.
+- Remaining risks: If Breeze is genuinely slow, positions will degrade gracefully (same as dashboard already does). The 4s cap applies only to the Breeze call; SymbolResolver + DB resolution still runs before that.
+
 ## Deployment Notes
-- Last commit: pending Phase 17 production hardening commit
+- Last commit: pending next fix pass commit
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
 - Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded

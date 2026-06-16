@@ -21,7 +21,7 @@ def _positions_service() -> PositionsService:
 @positions_bp.get("/positions")
 def get_positions() -> tuple[object, int]:
     try:
-        payload = _positions_service().get_positions()
+        payload = _positions_service().get_positions(gateway_timeout=4, gateway_attempts=1)
     except PositionsServiceError as error:
         return jsonify({"status": "error", "error": str(error)}), 400
     return jsonify(payload), 200
