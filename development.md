@@ -1559,8 +1559,21 @@
 - Remaining risks: Real Breeze errors still propagate correctly — only "No Data Found" is normalized. The 8s cap applies per Breeze call.
 - Railway hardening: Added `backend/Procfile` with same gthread worker config as root Procfile to prevent silent fallback to sync workers if Railway root directory changes.
 
+### 2026-06-16 — Fix Pass Part B: Option-Chain Family Latency Verification
+- Root cause: No code changes needed — all endpoints already under threshold.
+- Railway verification (measured 2026-06-16):
+  | Endpoint | Cold R1 | Warm avg (R2+R3) | Contract |
+  |---|---|---|---|
+  | `GET /api/options/expiries?underlying=NIFTY&exchange=NFO` | 0.56s | **0.52s** | OK |
+  | `GET /api/option-chain?underlying=NIFTY&exchange=NFO&expiry=2026-06-23&strike_count=12` | 3.13s | **0.58s** | OK |
+  | `GET /api/oi/tracker?underlying=NIFTY&expiry=2026-06-23&exchange=NFO` | 2.86s | **0.55s** | OK |
+  | `GET /api/oi/profile?underlying=NIFTY&expiry=2026-06-23&exchange=NFO` | 2.62s | **0.55s** | OK |
+- All warm averages ≤ 3s target. Cold R1 (first call after cache miss) also ≤ 3.2s across all endpoints.
+- **Part B decision**: All endpoints ACCEPTED. No code changes applied.
+- Tests: 6/6 option-chain and OI contract tests passed.
+
 ## Deployment Notes
-- Last commit: `0633e53` (Part A verification + reproof Procfile in backend/)
+- Last commit: `c983b01` (Part A docs update)
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
 - Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded
