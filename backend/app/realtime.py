@@ -113,6 +113,7 @@ def _handle_connect() -> None:
     worker = _worker
     if worker is None:
         return
+    logger.info("socket client connected sid=%s", request.sid)
     worker.ensure_started()
     # Stream the default dashboard watchlist to every client and send the
     # current connection status so the topbar badge can render immediately.
@@ -122,11 +123,19 @@ def _handle_connect() -> None:
         socketio.emit("tick", tick, to=request.sid)
 
 
+@socketio.on("disconnect")
+def _handle_disconnect() -> None:
+    logger.info("socket client disconnected sid=%s", request.sid)
+
+
 @socketio.on("subscribe")
 def _handle_subscribe(data: Any) -> None:
     requests = _coerce_requests(data)
     if not requests:
+        logger.warning("socket subscribe with empty payload sid=%s", request.sid)
         return
+    symbols = [str(r.get("symbol") or r.get("display_symbol") or "?") for r in requests]
+    logger.info("socket subscribe sid=%s symbols=%s count=%d", request.sid, symbols, len(requests))
     _subscribe_requests(requests)
 
 
@@ -137,7 +146,10 @@ def _handle_unsubscribe(data: Any) -> None:
         return
     requests = _coerce_requests(data)
     if not requests:
+        logger.warning("socket unsubscribe with empty payload sid=%s", request.sid)
         return
+    symbols = [str(r.get("symbol") or r.get("display_symbol") or "?") for r in requests]
+    logger.info("socket unsubscribe sid=%s symbols=%s count=%d", request.sid, symbols, len(requests))
     items = resolve_subscription_items(current_app.config.get("DATABASE_URL"), requests)
     worker.unsubscribe(items)
 

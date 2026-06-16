@@ -110,27 +110,38 @@ def token_verify() -> tuple[object, int]:
             "resolution_source": resolved.resolution_source,
             "stock_token": f"4.1!{resolved.token}" if resolved.exchange_code in ("NSE", "NFO") and resolved.token else None,
         }
-        verdict = "exact_match"
+        resolver_succeeded = True
     except SymbolResolverError as e:
         result["resolved"] = None
         result["resolver_error"] = str(e)
-        verdict = "missing_match"
+        resolver_succeeded = False
 
-    # 2. Count candidate rows in the DB matching the request
+    # 2. Scan candidate rows in the DB matching the request symbol
+    verdict: str = "candidate_scan_failed"
+    result["candidates"] = []
+    result["candidate_count"] = 0
+    result["exact_candidate_count"] = 0
+    result["related_candidate_count"] = 0
+    result["matching_candidate_ids"] = []
+    result["resolved_token_found_in_candidates"] = False
+    result["verdict_reason"] = ""
+
     try:
         session_factory = create_session_factory(database_url)
         with session_factory() as session:
-            base = select(Instrument).where(
-                Instrument.is_active.is_(True),
-            )
-            # For derivatives, also find NSE cash with the same symbol
             candidates_query = select(Instrument).where(
                 (func.upper(Instrument.broker_symbol) == symbol)
                 | (func.upper(Instrument.contract_code) == symbol)
                 | (func.upper(Instrument.display_symbol) == symbol),
                 Instrument.is_active.is_(True),
             )
-            candidates = list(session.scalars(candidates_query.order_by(Instrument.exchange_code, Instrument.product_type, Instrument.expiry_date.desc()).limit(20)).all())
+            candidates = list(session.scalars(
+                candidates_query.order_by(
+                    Instrument.exchange_code,
+                    Instrument.product_type,
+                    Instrument.expiry_date.desc().nullslast(),
+                ).limit(50).all()
+            ))
             result["candidate_count"] = len(candidates)
             result["candidates"] = [
                 {
@@ -147,10 +158,55 @@ def token_verify() -> tuple[object, int]:
                 for c in candidates
             ]
 
-            if len(candidates) > 1:
-                verdict = "ambiguous_match"
+            if not resolver_succeeded:
+                verdict = "missing_match"
+                result["verdict_reason"] = "SymbolResolver could not resolve the symbol"
+            else:
+                resolved_token = resolved.token
+                resolved_exchange_code = resolved.exchange_code
+                resolved_product_type = resolved.product_type
+
+                # Exact candidates: same token + exchange_code + product_type
+                exact_matches = [
+                    c for c in candidates
+                    if c.token == resolved_token
+                    and c.exchange_code == resolved_exchange_code
+                    and c.product_type == resolved_product_type
+                ]
+                # Related candidates: symbol match but different token/expiry/product
+                related_matches = [
+                    c for c in candidates
+                    if not (c.token == resolved_token
+                            and c.exchange_code == resolved_exchange_code
+                            and c.product_type == resolved_product_type)
+                ]
+
+                exact_count = len(exact_matches)
+                related_count = len(related_matches)
+                result["exact_candidate_count"] = exact_count
+                result["related_candidate_count"] = related_count
+                result["matching_candidate_ids"] = [c.id for c in exact_matches]
+                result["resolved_token_found_in_candidates"] = exact_count > 0
+
+                if exact_count > 0 and related_count == 0:
+                    verdict = "exact_match"
+                    result["verdict_reason"] = f"exact match in DB for token={resolved_token} exchange={resolved_exchange_code} product={resolved_product_type}"
+                elif exact_count > 0 and related_count > 0:
+                    verdict = "resolved_but_multiple_related_rows"
+                    result["verdict_reason"] = (
+                        f"exact match found (token={resolved_token}) but {related_count} related rows also exist "
+                        f"(different expiries/exchanges/types) — normal for derivatives"
+                    )
+                else:
+                    verdict = "stale_token_suspected"
+                    result["verdict_reason"] = (
+                        f"resolved token={resolved_token} for {resolved_exchange_code}/{resolved_product_type} "
+                        f"not found in any candidate row — token may be stale or from old SecurityMaster import"
+                    )
     except Exception as e:
         result["candidate_error"] = str(e)
+        if not resolver_succeeded:
+            verdict = "missing_match"
 
     result["verdict"] = verdict
     return jsonify({"status": "ok", "diagnosis": result}), 200

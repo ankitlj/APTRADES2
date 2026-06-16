@@ -122,7 +122,15 @@ def test_diagnosis_token_verify_returns_structured_output(client):
     assert diag["requested"]["symbol"] == "NIFTY"
     assert diag["requested"]["exchange"] == "NFO"
     assert "verdict" in diag
-    assert diag["verdict"] in ("exact_match", "ambiguous_match", "missing_match")
+    assert diag["verdict"] in ("exact_match", "resolved_but_multiple_related_rows", "stale_token_suspected", "missing_match", "candidate_scan_failed")
+    # Additional comparison fields must be present
+    assert "exact_candidate_count" in diag
+    assert "related_candidate_count" in diag
+    assert "matching_candidate_ids" in diag
+    assert "resolved_token_found_in_candidates" in diag
+    assert isinstance(diag["resolved_token_found_in_candidates"], bool)
+    assert "verdict_reason" in diag
+    assert isinstance(diag["verdict_reason"], str)
 
 
 def test_diagnosis_token_verify_banknifty(client):
@@ -136,5 +144,23 @@ def test_diagnosis_token_verify_banknifty(client):
     assert payload["status"] == "ok"
     diag = payload["diagnosis"]
     assert diag["requested"]["symbol"] == "BANKNIFTY"
-    if diag["verdict"] == "exact_match":
+    if diag["verdict"] in ("exact_match", "resolved_but_multiple_related_rows"):
         assert diag["resolved"]["token"] is not None
+
+
+def test_diagnosis_token_verify_verdict_includes_comparison_fields(client):
+    """Verdict must include exact/related counts and a reason string regardless of outcome."""
+    response = client.get("/api/diagnosis/token-verify?symbol=SOMETHING_UNLIKELY&exchange=NFO&product_type=futures")
+    payload = response.get_json()
+    if response.status_code == 400:
+        assert payload["status"] == "error"
+        return
+    assert response.status_code == 200
+    diag = payload["diagnosis"]
+    assert "exact_candidate_count" in diag
+    assert "related_candidate_count" in diag
+    assert "matching_candidate_ids" in diag
+    assert "resolved_token_found_in_candidates" in diag
+    assert "verdict_reason" in diag
+    # The verdict should be one of the valid values
+    assert diag["verdict"] in ("exact_match", "resolved_but_multiple_related_rows", "stale_token_suspected", "missing_match", "candidate_scan_failed")
