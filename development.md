@@ -1546,11 +1546,20 @@
 - Root cause: `ActionCentreService._sync_open_orders()` called `OrdersService.get_orders()` without `gateway_timeout`/`gateway_attempts` params, defaulting to 10s×2 attempts per exchange. Since the sync runs across 4 exchanges (NFO, NSE, BFO, BSE) sequentially, worst case was 80s before any action data reached the frontend.
 - Files changed:
   - `backend/app/services/action_centre_service.py:124-125` — added `gateway_timeout=8, gateway_attempts=1` to `get_orders()` call in `_sync_open_orders()`
-- Verification: `python -m pytest` — 114/114 passed.
-- Railway timing: see Railway verification below.
+- Verification: `python -m pytest` — 114/114 passed. Relevant action-centre/orders/trades/positions contract tests: 12/12 passed.
+- Railway verification (measured 2026-06-16):
+  | Endpoint | Before (Phase 23) | After Part 2+3 |
+  |---|---|---|
+  | `GET /api/orders?exchange=NFO` | 30s timeout | **1.3s** (warm, 3-run avg) |
+  | `GET /api/trades?exchange=NFO` | 30s timeout | **1.4s** (warm, 3-run avg) |
+  | `GET /api/positions` | 30s timeout | **0.9s** (warm, 3-run avg) |
+  | `GET /api/action-centre?status=pending` | ~80s (4×20s) | **3.7s** (warm, 3-run avg) |
+- Contract correctness: All 4 return HTTP 200, `status: ok`, valid stats/actions/orders/trades arrays, no errors. Empty states correct.
+- **Part A decision**: Action-centre ACCEPTED (warm 3.7s ≤ 5s threshold). No further code changes needed.
+- Remaining risks: Real Breeze errors still propagate correctly — only "No Data Found" is normalized. The 8s cap applies per Breeze call.
 
 ## Deployment Notes
-- Last commit: pending next fix pass commit
+- Last commit: `e743ca2` (Fix Pass Part 3: Action-centre sync timeout override)
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
 - Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded
