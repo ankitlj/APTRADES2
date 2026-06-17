@@ -1693,3 +1693,13 @@ From this point onward, the project is renamed ORIENS.
 - Routes preserved: `/optionchain`, `/oi-tracker`, `/oi-profile`, `/strategy-builder`, `/strategy-portfolio`
 - Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1853 modules, clean
 - Remaining risks: None — purely a navigation visibility change, no functionality removed.
+
+### 2026-06-17 - Step 2: Dashboard Chart Hover Tooltip + X-Axis Time Labels
+- Added x-axis time labels at the bottom of the dashboard chart (HH:MM for intraday intervals, DD/MMM for daily).
+- Added hover crosshair: vertical dashed line + highlighted circle at the nearest data point.
+- Added floating tooltip showing price + formatted datetime.
+- Chart now uses actual `point.time` from the backend API (previously discarded, used index).
+- Files changed:
+  - `frontend/src/components/dashboard/DashboardMarketChart.tsx` — full rewrite of SVG rendering
+- Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1853 modules, clean
+- Remaining risks: None — frontend-only rendering change, no backend or data fetching changes.

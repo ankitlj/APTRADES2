@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,14 +7,52 @@ import { getDashboardChart, type DashboardChartResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface ChartPoint {
-  time: number;
+  time: string | null;
   value: number;
+}
+
+interface Coordinate {
+  x: number;
+  y: number;
 }
 
 const SUGGESTED_SYMBOLS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"];
 
+function formatTimeLabel(time: string | null, interval: string): string {
+  if (!time) return "";
+  try {
+    const d = new Date(time);
+    if (isNaN(d.getTime())) return "";
+    const isIntraday =
+      interval.toLowerCase().includes("minute") || interval.toLowerCase().includes("min");
+    if (isIntraday) {
+      return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+    }
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+  } catch {
+    return "";
+  }
+}
+
+function formatTooltipTime(time: string | null): string {
+  if (!time) return "";
+  try {
+    const d = new Date(time);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  } catch {
+    return "";
+  }
+}
+
 function buildSvgPath(points: ChartPoint[], width: number, height: number) {
-  if (points.length === 0) return { line: "", area: "" };
+  if (points.length === 0) return { line: "", area: "", coordinates: [] as Coordinate[] };
 
   const values = points.map((point) => point.value);
   const minValue = Math.min(...values);
@@ -33,7 +71,7 @@ function buildSvgPath(points: ChartPoint[], width: number, height: number) {
     .join(" ");
   const area = `${line} L${width} ${height} L0 ${height} Z`;
 
-  return { line, area };
+  return { line, area, coordinates };
 }
 
 export function DashboardMarketChart() {
@@ -42,13 +80,16 @@ export function DashboardMarketChart() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<DashboardChartResponse | null>(null);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const chartData: ChartPoint[] = useMemo(
     () =>
       (response?.points ?? [])
-        .map((point, index) => {
+        .map((point) => {
           const value = Number(point.close);
-          return Number.isFinite(value) ? { time: index, value } : null;
+          return Number.isFinite(value) ? { time: point.time, value } : null;
         })
         .filter((point): point is ChartPoint => point !== null),
     [response]
@@ -61,7 +102,19 @@ export function DashboardMarketChart() {
     return ((latestValue - first) / first) * 100;
   }, [chartData, latestValue]);
 
-  const { line, area } = useMemo(() => buildSvgPath(chartData, 900, 220), [chartData]);
+  const { line, area, coordinates } = useMemo(() => buildSvgPath(chartData, 900, 220), [chartData]);
+
+  const xAxisLabels = useMemo(() => {
+    if (chartData.length === 0) return [];
+    const count = Math.min(6, chartData.length);
+    const indices: number[] = [];
+    for (let i = 0; i < count; i++) {
+      indices.push(Math.round((i * (chartData.length - 1)) / (count - 1)));
+    }
+    return indices.map((i) => ({
+      label: formatTimeLabel(chartData[i].time, response?.interval ?? "day"),
+    }));
+  }, [chartData, response?.interval]);
 
   const loadHistory = useCallback(async () => {
     setIsLoading(true);
@@ -91,6 +144,27 @@ export function DashboardMarketChart() {
     }
     setSearchValue(normalized || symbol);
   };
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      const svg = svgRef.current;
+      if (!svg || chartData.length === 0) return;
+      const rect = svg.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      setMousePos({ x: mouseX, y: mouseY });
+      const viewBoxX = (mouseX / rect.width) * 900;
+      const xStep = chartData.length > 1 ? 900 / (chartData.length - 1) : 900;
+      const index = Math.round(viewBoxX / xStep);
+      setHoverIndex(Math.max(0, Math.min(chartData.length - 1, index)));
+    },
+    [chartData]
+  );
+
+  const handleMouseLeave = useCallback(() => {
+    setHoverIndex(null);
+    setMousePos(null);
+  }, []);
 
   const displaySymbol = response?.resolved.display_symbol ?? symbol;
 
@@ -149,10 +223,14 @@ export function DashboardMarketChart() {
 
       <CardContent className="relative h-[250px] p-0">
         <svg
+          ref={svgRef}
           className="h-full w-full px-4 py-3"
           viewBox="0 0 900 220"
           preserveAspectRatio="none"
           aria-label={`${displaySymbol} chart`}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          style={{ cursor: chartData.length > 0 ? "crosshair" : "default" }}
         >
           <defs>
             <linearGradient id="dashboard-chart-area" x1="0" x2="0" y1="0" y2="1">
@@ -176,7 +254,62 @@ export function DashboardMarketChart() {
               className="glow-line"
             />
           )}
+          {hoverIndex !== null && coordinates[hoverIndex] && (
+            <>
+              <line
+                x1={coordinates[hoverIndex].x}
+                y1="0"
+                x2={coordinates[hoverIndex].x}
+                y2="220"
+                stroke="#00f2ff"
+                strokeWidth="1"
+                strokeDasharray="4 3"
+                opacity="0.5"
+              />
+              <circle
+                cx={coordinates[hoverIndex].x}
+                cy={coordinates[hoverIndex].y}
+                r="4"
+                fill="#00f2ff"
+                stroke="#0f172a"
+                strokeWidth="2"
+              />
+            </>
+          )}
         </svg>
+
+        {xAxisLabels.length > 0 && (
+          <div className="pointer-events-none absolute bottom-1 left-4 right-4 flex justify-between">
+            {xAxisLabels.map((item, i) => (
+              <span
+                key={i}
+                className="text-[10px] leading-none text-muted-foreground/60 tabular-nums"
+              >
+                {item.label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {hoverIndex !== null && mousePos && chartData[hoverIndex] && (
+          <div
+            className="pointer-events-none absolute z-10 rounded-md border bg-card px-2 py-1.5 text-xs shadow-lg tabular-nums"
+            style={{
+              left: Math.max(10, Math.min(mousePos.x, 280)),
+              top: Math.max(5, Math.min(mousePos.y - 48, 190)),
+              transform: "translateX(-50%)",
+            }}
+          >
+            <div className="font-semibold text-foreground">
+              {chartData[hoverIndex].value.toLocaleString("en-IN", {
+                maximumFractionDigits: 2,
+              })}
+            </div>
+            <div className="text-muted-foreground">
+              {formatTooltipTime(chartData[hoverIndex].time)}
+            </div>
+          </div>
+        )}
 
         {latestValue !== null && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-[#00f2ff] px-2 py-1 text-[11px] font-semibold text-slate-900 tabular-nums">

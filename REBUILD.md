@@ -766,6 +766,14 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 From this point onward, the project is renamed ORIENS.
 
+## 2026-06-17 - Step 2: Dashboard Chart Hover Tooltip + X-Axis Time Labels
+
+- Added x-axis time labels (HH:MM / DD MMM) along the chart bottom.
+- Added hover crosshair with vertical dashed line, circle highlight at nearest point, and floating tooltip (price + datetime).
+- Chart now uses actual `point.time` from the API instead of index.
+- Files changed: `frontend/src/components/dashboard/DashboardMarketChart.tsx`
+- Verification: `python -m pytest` -> 124 passed; `npm.cmd run build` -> 1853 modules.
+
 ## 2026-06-17 - Step 1: Remove Redundant Sidebar Items
 
 - Moved Option Chain, OI Tracker, OI Profile, Strategy Builder, and Strategy Portfolio out of the left sidebar. These tools remain accessible via the Tools page and direct URLs.
