@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { navItems, utilityItems, isActiveRoute } from "@/config/navigation";
+import { navItems, isActiveRoute } from "@/config/navigation";
 import { useLiveMarketData } from "@/hooks/useLiveMarketData";
 import { cn } from "@/lib/utils";
 
@@ -39,19 +39,6 @@ export function Navbar() {
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 scrollbar-thin">
         {navItems.map((item) => (
-          <Link
-            key={item.href}
-            to={item.href}
-            className={linkClass(isActiveRoute(location.pathname, item.href))}
-          >
-            <item.icon className="h-4 w-4 shrink-0" />
-            {item.label}
-          </Link>
-        ))}
-
-        <div className="my-2 border-t" />
-
-        {utilityItems.map((item) => (
           <Link
             key={item.href}
             to={item.href}

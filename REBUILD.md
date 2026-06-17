@@ -765,3 +765,11 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - Live HTTP smoke test: enriched readiness/deployment fields present, structured 404 shape, `X-RateLimit-Limit: 600` on a limited route, `/api/health` exempt from the limit.
 
 From this point onward, the project is renamed ORIENS.
+
+## 2026-06-17 - Step 1: Remove Redundant Sidebar Items
+
+- Moved Option Chain, OI Tracker, OI Profile, Strategy Builder, and Strategy Portfolio out of the left sidebar. These tools remain accessible via the Tools page and direct URLs.
+- Sidebar now shows only: Dashboard, Orderbook, Tradebook, Positions, Action Centre, Logs, Tools.
+- Top-header avatar menu still lists the 5 tools.
+- Files changed: `frontend/src/components/layout/Navbar.tsx`
+- Verification: `python -m pytest` -> 124 passed; `npm.cmd run build` -> 1853 modules.

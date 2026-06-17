@@ -1680,3 +1680,16 @@ From this point onward, the project is renamed ORIENS.
   - `flask-socketio async_mode="threading"` + WebSocket transport under gunicorn (even gthread) can still cause worker thread blocking via `simple_websocket.ws.receive()`. If timeouts persist, the next step should be disabling WebSocket transport (`transports: ["polling"]` on frontend) or switching to eventlet/gevent workers.
   - The `message_queue=redis_url` path relies on Redis pub/sub; Redis availability is a runtime factor.
 - Next step recommendation: **A. Live market retest** — deploy these fixes, wait for market hours, monitor Railway logs for WORKER TIMEOUT and the new `redis write failed` / `emit failed` warnings, and check `/api/diagnosis/worker` for non-zero error counters.
+
+### 2026-06-17 - Step 1: Remove Redundant Sidebar Items (5 tools moved to /tools only)
+- Root cause: Option Chain, OI Tracker, OI Profile, Strategy Builder, and Strategy Portfolio appeared in both the left sidebar and the top-header avatar menu. The left sidebar was getting cluttered with tools that are accessible from the Tools page. These remain accessible via direct URLs and the /tools page.
+- Files changed:
+  - `frontend/src/components/layout/Navbar.tsx` — removed divider + utilityItems section from sidebar (stopped importing utilityItems)
+- NOT changed:
+  - `frontend/src/config/navigation.ts` — utilityItems kept intact for TopHeader avatar menu
+  - `frontend/src/pages/ToolsPage.tsx` — tool cards/lists still present
+  - `frontend/src/App.tsx` — all routes still registered
+  - All 5 page components — untouched
+- Routes preserved: `/optionchain`, `/oi-tracker`, `/oi-profile`, `/strategy-builder`, `/strategy-portfolio`
+- Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1853 modules, clean
+- Remaining risks: None — purely a navigation visibility change, no functionality removed.
