@@ -458,6 +458,20 @@ class MarketDataWorker:
                 type(exc).__name__,
                 exc,
             )
+            # Reset cached client and retry once — handles stale connections
+            with self._lock:
+                self._redis = None
+            try:
+                client = self._redis_client()
+                client.set(key, json.dumps(tick), ex=self._tick_ttl_seconds)
+            except Exception as retry_exc:  # noqa: BLE001
+                logger.warning(
+                    "redis write retry also failed sym=%s key=%s: %s %s",
+                    tick.get("symbol", "?"),
+                    key,
+                    type(retry_exc).__name__,
+                    retry_exc,
+                )
 
     def _redis_client(self) -> Any:
         if self._redis is None:

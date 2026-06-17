@@ -242,3 +242,48 @@ def test_set_publish_can_be_attached_later() -> None:
     worker._on_ticks({"symbol": "4.1!2885", "stock_code": "RELIND", "last": "1209.05", "close": "1234.85"})
 
     assert any(event == "tick" for event, _ in published)
+
+
+def test_redis_write_retries_with_fresh_client() -> None:
+    """On first Redis failure, cached client is reset and a fresh client is
+    created for the retry. The second attempt succeeds."""
+    class FirstFailRedis:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, int]] = []
+            self._attempt = 0
+
+        def set(self, key, value, ex=None) -> None:
+            self._attempt += 1
+            if self._attempt == 1:
+                raise ConnectionError("first attempt fails")
+            self.calls.append((key, value, ex))
+
+    fake = FirstFailRedis()
+    worker = _configured_worker(redis_url="redis://localhost:6379/0")
+    worker.subscribe([{"display_symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "product_type": "futures", "token": "62329"}])
+
+    with patch("app.services.market_data_worker.create_redis_client", return_value=fake):
+        worker._on_ticks({"symbol": "4.1!62329", "last": "23440.0", "close": "23451.7"})
+
+    assert len(fake.calls) == 1, "expected retry to succeed"
+    assert fake.calls[0][0] == "md:tick:NFO:62329"
+    # After retry succeeds, snapshot must still work
+    assert len(worker.snapshot()) == 1
+
+
+def test_redis_write_retry_does_not_crash_on_second_failure() -> None:
+    """Both Redis attempts fail — worker must not crash and must still
+    update the in-memory snapshot."""
+    worker = _configured_worker(redis_url="redis://localhost:6379/0")
+    worker.subscribe([{"display_symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "product_type": "futures", "token": "62329"}])
+
+    with patch("app.services.market_data_worker.create_redis_client") as mock_factory:
+        mock_factory.return_value.set.side_effect = RuntimeError("persistent failure")
+        worker._on_ticks({"symbol": "4.1!62329", "last": "23440.0", "close": "23451.7"})
+
+    # create_redis_client must have been called twice (original + retry)
+    assert mock_factory.call_count == 2
+    # In-memory snapshot must still be written
+    snapshot = worker.snapshot()
+    assert len(snapshot) == 1
+    assert snapshot[0]["symbol"] == "NIFTY"
