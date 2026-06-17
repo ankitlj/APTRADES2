@@ -287,3 +287,21 @@ def test_redis_write_retry_does_not_crash_on_second_failure() -> None:
     snapshot = worker.snapshot()
     assert len(snapshot) == 1
     assert snapshot[0]["symbol"] == "NIFTY"
+
+
+def test_on_ticks_survives_emit_failure() -> None:
+    """_on_ticks must not crash when the publish callback raises, and the
+    in-memory snapshot path must still work."""
+    def failing_publish(event: str, payload: dict) -> None:
+        raise RuntimeError("emit failed")
+
+    worker = _configured_worker(publish=failing_publish)
+    worker.subscribe([{"display_symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "product_type": "futures", "token": "62329"}])
+
+    worker._on_ticks({"symbol": "4.1!62329", "last": "23440.0", "close": "23451.7"})
+
+    # In-memory snapshot must still be written despite emit failure
+    snapshot = worker.snapshot()
+    assert len(snapshot) == 1
+    assert snapshot[0]["symbol"] == "NIFTY"
+    assert snapshot[0]["ltp"] == 23440.0

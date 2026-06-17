@@ -485,8 +485,15 @@ class MarketDataWorker:
             return
         try:
             publish("tick", tick)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "emit failed event=tick sym=%s ex=%s token=%s: %s %s",
+                tick.get("symbol", "?"),
+                tick.get("exchange_code", "?"),
+                tick.get("token", "?"),
+                type(exc).__name__,
+                exc,
+            )
 
     # ----- status --------------------------------------------------------
 
