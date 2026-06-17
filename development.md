@@ -21,6 +21,24 @@
 
 ## Phase Log
 
+### 2026-06-17 - Dashboard Card Submetric Rendering Fix
+- Goal: Make the ORIENS dashboard cards match the requested reference card details without changing the wider dashboard layout.
+- Root cause:
+  - Backend already exposed the requested submetric values, but the frontend rendered every submetric as `Label: value`, so the Open Positions card did not match the required `0 Options | 0 Future | 0 Equity` reference format.
+  - The card submetric row was also slightly too small and easy to miss in the dark ORIENS card style.
+- Frontend changes:
+  - Day's P&L now renders `Realized: <value> | Unrealized: <value>`.
+  - Open Positions now renders value-first position buckets: `<value> Options | <value> Future | <value> Equity`.
+  - Monthly ROI continues to render `Annual ROI (FY): <value>`.
+  - Submetric spacing and nowrap behavior were tightened so the row remains visible and aligned inside the cards.
+- Backend changes:
+  - None required; the dashboard summary contract already supplied the required submetric values from `PositionsService` totals.
+- Verification:
+  - `python -m pytest` -> 124 passed.
+  - `npm.cmd run build` -> 1853 modules, passes after rerunning outside the known local Vite/esbuild sandbox denial.
+- Remaining risks:
+  - Realized P&L, monthly ROI, annual ROI, and margin used remain placeholders until a real account/funds and capital-history contract is implemented.
+
 ### 2026-06-17 - Dashboard Portfolio Cards + Plain Dark Background
 - Goal: Replace duplicate NIFTY/BANKNIFTY futures dashboard cards with portfolio-focused cards while preserving the ORIENS dark aesthetic.
 - Root cause:

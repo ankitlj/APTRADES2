@@ -3,6 +3,19 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
+## 2026-06-17 - Dashboard Card Submetric Rendering Fix
+
+- Tightened the ORIENS dashboard card submetric rendering to match the user's
+  white-card reference while keeping the current dark ORIENS aesthetic.
+- Day's P&L now shows `Realized` and `Unrealized`; Open Positions now shows
+  value-first buckets (`0 Options | 0 Future | 0 Equity`); Monthly ROI now
+  keeps `Annual ROI (FY)` visible.
+- Backend already supplied these fields through the dashboard summary contract,
+  so no backend changes were required in this follow-up.
+- Verification: `python -m pytest` -> 124 passed; `npm.cmd run build` -> 1853
+  modules passed after rerunning outside the known local Vite/esbuild sandbox
+  denial.
+
 ## 2026-06-17 - Dashboard Portfolio Cards + Plain Dark Background
 
 - Replaced duplicate dashboard futures quote metric cards with the requested

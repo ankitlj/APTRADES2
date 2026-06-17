@@ -85,6 +85,17 @@ function submetricValue(submetric: NonNullable<DashboardMetric["submetrics"]>[nu
   return formatNumber(submetric.value, 0);
 }
 
+function submetricLabel(submetric: NonNullable<DashboardMetric["submetrics"]>[number]) {
+  const value = submetricValue(submetric);
+  if (
+    submetric.format === "number" &&
+    ["Options", "Future", "Equity"].includes(submetric.label)
+  ) {
+    return `${value} ${submetric.label}`;
+  }
+  return `${submetric.label}: ${value}`;
+}
+
 function toneColor(tone: string | undefined) {
   if (tone === "positive") return "text-green-600 dark:text-green-400";
   if (tone === "negative") return "text-red-500";
@@ -281,15 +292,17 @@ export function DashboardPage() {
                     {metric ? metricValue(metric) : "..."}
                   </p>
                   {metric?.submetrics?.length ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:text-[13px]">
                       {metric.submetrics.map((submetric, submetricIndex) => (
-                        <span key={`${metric.key}-${submetric.label}`} className="inline-flex items-center gap-2">
-                          {submetricIndex > 0 ? <span className="text-border">|</span> : null}
-                          <span>
-                            {submetric.label}:{" "}
-                            <span className={cn("tabular-nums", toneColor(submetric.tone))}>
-                              {submetricValue(submetric)}
-                            </span>
+                        <span
+                          key={`${metric.key}-${submetric.label}`}
+                          className="inline-flex items-center gap-2 whitespace-nowrap"
+                        >
+                          {submetricIndex > 0 ? (
+                            <span className="text-muted-foreground/45">|</span>
+                          ) : null}
+                          <span className={cn("tabular-nums", toneColor(submetric.tone))}>
+                            {submetricLabel(submetric)}
                           </span>
                         </span>
                       ))}
