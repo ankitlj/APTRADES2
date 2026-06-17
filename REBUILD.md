@@ -766,6 +766,13 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 From this point onward, the project is renamed ORIENS.
 
+## 2026-06-17 - Step 3: Reorder Dashboard Sections (Positions Above Chart)
+
+- Reordered the "Active Positions" table above the chart + alerts section.
+- New order: metric cards -> positions -> chart + alerts.
+- Files changed: `frontend/src/pages/DashboardPage.tsx`
+- Verification: `python -m pytest` -> 124 passed; `npm.cmd run build` -> 1853 modules.
+
 ## 2026-06-17 - Step 2: Dashboard Chart Hover Tooltip + X-Axis Time Labels
 
 - Added x-axis time labels (HH:MM / DD MMM) along the chart bottom.

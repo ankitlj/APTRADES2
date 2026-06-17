@@ -325,6 +325,14 @@ export function DashboardPage() {
         </div>
       )}
 
+      <Card className="min-h-[306px] overflow-hidden">
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+          <CardTitle className="text-sm">Active Positions</CardTitle>
+          <Badge variant="secondary">{positions.length}</Badge>
+        </CardHeader>
+        <PositionsTable positions={positions} status={summaryState.data?.positions_status} />
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2.2fr)_minmax(280px,0.8fr)]">
         <DashboardMarketChart />
 
@@ -366,14 +374,6 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Card className="min-h-[306px] overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
-          <CardTitle className="text-sm">Active Positions</CardTitle>
-          <Badge variant="secondary">{positions.length}</Badge>
-        </CardHeader>
-        <PositionsTable positions={positions} status={summaryState.data?.positions_status} />
-      </Card>
     </div>
   );
 }

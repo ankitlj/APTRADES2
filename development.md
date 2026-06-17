@@ -1703,3 +1703,10 @@ From this point onward, the project is renamed ORIENS.
   - `frontend/src/components/dashboard/DashboardMarketChart.tsx` — full rewrite of SVG rendering
 - Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1853 modules, clean
 - Remaining risks: None — frontend-only rendering change, no backend or data fetching changes.
+
+### 2026-06-17 - Step 3: Reorder Dashboard Sections (Positions Above Chart)
+- Reordered dashboard sections: metric cards -> positions table -> chart+alerts (was metric cards -> chart+alerts -> positions).
+- Files changed:
+  - `frontend/src/pages/DashboardPage.tsx` — moved Positions card JSX block above chart+alerts grid
+- Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1853 modules, clean
+- Remaining risks: None — purely a JSX reorder, no logic changes.
