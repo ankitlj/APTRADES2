@@ -1601,3 +1601,36 @@
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded
 
 From this point onward, the project is renamed ORIENS.
+
+### 2026-06-17 - Websocket Fix Pass: Live Update / Deployment Consistency
+- Goal: Make hidden websocket/Redis failures visible and diagnosable so the next market session produces decisive evidence instead of ambiguity.
+- Root causes handled:
+  - **Part 0-1**: Both Procfiles already specify `--worker-class gthread --threads 8 --workers 1`. No code change needed. Railway `sync` fallback is a deployment config issue, not a repo issue.
+  - **Part 2**: `_write_redis()` silent `except Exception: pass` replaced with structured logging: symbol, broker_symbol, exchange_code, token, redis key, exception class, exception message.
+  - **Part 3**: On Redis write failure, cached client is reset (`self._redis = None`) and retried once with a fresh client. Second failure is also logged. No infinite retry.
+  - **Part 4**: `_emit()` silent `except Exception: pass` replaced with structured logging: event name, symbol, exchange_code, token, exception class, exception message.
+  - **Part 5**: Added 5 in-memory error counters exposed in `status()`: `redis_write_error_count`, `redis_write_retry_count`, `last_redis_write_error_at`, `emit_error_count`, `last_emit_error_at`.
+- Files changed:
+  - `backend/app/services/market_data_worker.py` — _write_redis (logging + retry + counters), _emit (logging + counters), __init__ (counter fields), status() (counter exposure)
+  - `backend/tests/test_market_data_worker.py` — 6 new tests added
+- Tests run: 124/124 backend tests pass. Frontend build: 1853 modules, clean.
+- Commits (4 total, all pushed to origin/main):
+  - `7f6d480` — fix: log websocket redis cache write failures
+  - `1c37dd1` — fix: refresh websocket redis client after write failure
+  - `1580a9d` — fix: log websocket tick emit failures
+  - `b83e22e` — feat: expose websocket emit and redis error counters
+- Proven locally:
+  - Redis write failure is now logged with full tick context (symbol, exchange, token, key)
+  - Stale Redis client is invalidated and retried once automatically
+  - Socket emit failure is logged with full tick context
+  - Error counters are visible in `/api/diagnosis/worker` and `/api/market-data/status`
+  - Worker never crashes on Redis or emit failure — in-memory snapshot and publish path continue
+- Still requires live-market confirmation:
+  - Whether the Redis message_queue + gunicorn gthread combination now keeps ticks flowing to the frontend
+  - Whether the WORKER TIMEOUT cycle from Railway stops (this is a Railway deploy config issue, not a repo issue)
+  - Whether the error counters report real failures during market hours
+- Remaining risks:
+  - Railway's `Using worker: sync` fallback must be fixed on the Railway dashboard (set NIXPACKS_BUILD_CMD or verify Procfile root detection)
+  - `flask-socketio async_mode="threading"` + WebSocket transport under gunicorn (even gthread) can still cause worker thread blocking via `simple_websocket.ws.receive()`. If timeouts persist, the next step should be disabling WebSocket transport (`transports: ["polling"]` on frontend) or switching to eventlet/gevent workers.
+  - The `message_queue=redis_url` path relies on Redis pub/sub; Redis availability is a runtime factor.
+- Next step recommendation: **A. Live market retest** — deploy these fixes, wait for market hours, monitor Railway logs for WORKER TIMEOUT and the new `redis write failed` / `emit failed` warnings, and check `/api/diagnosis/worker` for non-zero error counters.
