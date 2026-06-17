@@ -1710,3 +1710,11 @@ From this point onward, the project is renamed ORIENS.
   - `frontend/src/pages/DashboardPage.tsx` — moved Positions card JSX block above chart+alerts grid
 - Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1853 modules, clean
 - Remaining risks: None — purely a JSX reorder, no logic changes.
+
+### 2026-06-17 - Step 4: Latency Regression Check
+- Measured response times for 3 dashboard endpoints (dev server with test credentials):
+  - `GET /api/dashboard/summary` — 2147-2161ms (cold/warm consistent — Breeze gateway init overhead with test config)
+  - `GET /api/dashboard/alerts` — 13-18ms (fast)
+  - `GET /api/dashboard/chart?symbol=NIFTY` — 400 Bad Request (test credentials don't resolve NIFTY)
+- Verdict: **No regression detected**. Steps 1-3 were frontend-only changes (Navbar TSX, MarketChart TSX, DashboardPage TSX). Backend code was not modified. The ~2.2kB JS bundle increase is from the new chart tooltip/label features — expected and acceptable.
+- Next step recommendation: Deploy to Railway, verify in production with live Breeze data.

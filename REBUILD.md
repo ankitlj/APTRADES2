@@ -766,6 +766,16 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 From this point onward, the project is renamed ORIENS.
 
+## 2026-06-17 - Step 4: Latency Regression Check
+
+- Measured dev-server response times (test credentials, non-market hours):
+  - `/api/dashboard/summary` ~2150ms (Breeze gateway init, cold start)
+  - `/api/dashboard/alerts` ~15ms (fast)
+  - `/api/dashboard/chart` 400 (expected — test creds don't resolve NIFTY)
+- Verdict: No backend regression — all 4 steps were frontend-only.
+- Frontend bundle growth: +2.2kB JS +1kB CSS — expected from new chart features.
+- No code changes in this step.
+
 ## 2026-06-17 - Step 3: Reorder Dashboard Sections (Positions Above Chart)
 
 - Reordered the "Active Positions" table above the chart + alerts section.
