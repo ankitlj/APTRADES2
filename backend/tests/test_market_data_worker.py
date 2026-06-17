@@ -211,6 +211,29 @@ def test_on_ticks_writes_to_redis_when_configured() -> None:
     assert ttl == 60
 
 
+def test_on_ticks_survives_redis_write_failure() -> None:
+    """_on_ticks must not crash when Redis write fails, and the in-memory
+    snapshot path must still work."""
+    published: list[tuple[str, dict]] = []
+    worker = _configured_worker(
+        redis_url="redis://localhost:6379/0",
+        publish=lambda event, payload: published.append((event, payload)),
+    )
+    worker.subscribe([{"display_symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "product_type": "futures", "token": "62329"}])
+
+    with patch("app.services.market_data_worker.MarketDataWorker._redis_client") as mock_client:
+        mock_client.side_effect = RuntimeError("connection refused")
+        worker._on_ticks({"symbol": "4.1!62329", "last": "23440.0", "close": "23451.7"})
+
+    # In-memory snapshot must still be written despite Redis failure
+    snapshot = worker.snapshot()
+    assert len(snapshot) == 1
+    assert snapshot[0]["symbol"] == "NIFTY"
+    assert snapshot[0]["ltp"] == 23440.0
+    # Publish must still fire despite Redis failure
+    assert any(event == "tick" for event, _ in published)
+
+
 def test_set_publish_can_be_attached_later() -> None:
     published: list[tuple[str, dict]] = []
     worker = _configured_worker()

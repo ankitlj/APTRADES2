@@ -443,12 +443,21 @@ class MarketDataWorker:
     def _write_redis(self, tick: dict[str, Any]) -> None:
         if not self._redis_url:
             return
+        key = f"md:tick:{tick['exchange_code']}:{tick['token']}" if tick["token"] else f"md:tick:{tick['symbol']}"
         try:
             client = self._redis_client()
-            key = f"md:tick:{tick['exchange_code']}:{tick['token']}" if tick["token"] else f"md:tick:{tick['symbol']}"
             client.set(key, json.dumps(tick), ex=self._tick_ttl_seconds)
-        except Exception:  # noqa: BLE001 — Redis is a best-effort cache
-            pass
+        except Exception as exc:  # noqa: BLE001 — Redis is a best-effort cache
+            logger.warning(
+                "redis write failed sym=%s broker=%s ex=%s token=%s key=%s: %s %s",
+                tick.get("symbol", "?"),
+                tick.get("broker_symbol", "?"),
+                tick.get("exchange_code", "?"),
+                tick.get("token", "?"),
+                key,
+                type(exc).__name__,
+                exc,
+            )
 
     def _redis_client(self) -> Any:
         if self._redis is None:
