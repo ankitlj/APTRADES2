@@ -181,8 +181,23 @@ def test_dashboard_summary_endpoint_returns_metrics_and_positions(tmp_path):
     payload = response.get_json()
     assert payload["status"] == "ok"
     assert len(payload["metrics"]) == 4
-    assert payload["metrics"][0]["label"] == "NIFTY futures"
-    assert payload["metrics"][2]["label"] == "Open positions"
+    assert [metric["key"] for metric in payload["metrics"]] == [
+        "day_pnl",
+        "open_positions",
+        "monthly_roi",
+        "margin_used",
+    ]
+    assert payload["metrics"][0]["label"] == "Day's P&L"
+    assert payload["metrics"][0]["format"] == "currency"
+    assert payload["metrics"][0]["submetrics"][0]["label"] == "Realized"
+    assert payload["metrics"][0]["submetrics"][1]["label"] == "Unrealized"
+    assert payload["metrics"][1]["label"] == "Open positions"
+    assert payload["metrics"][1]["submetrics"][0]["label"] == "Options"
+    assert payload["metrics"][1]["submetrics"][1]["label"] == "Future"
+    assert payload["metrics"][1]["submetrics"][2]["label"] == "Equity"
+    assert payload["metrics"][2]["label"] == "Monthly ROI"
+    assert payload["metrics"][2]["submetrics"][0]["label"] == "Annual ROI (FY)"
+    assert payload["metrics"][3]["label"] == "Margin used"
     assert payload["positions"][0]["symbol"] == "SBIN"
     assert payload["positions"][0]["pnl"] == 130.0
 
@@ -290,9 +305,10 @@ def test_dashboard_summary_degraded_when_positions_fail(tmp_path):
     assert payload["positions_status"] in ("degraded", "error")
     assert payload["positions"] == []
     metric_keys = [m["key"] for m in payload["metrics"]]
-    assert "nifty" in metric_keys
+    assert "day_pnl" in metric_keys
     assert "open_positions" in metric_keys
-    assert "total_pnl" in metric_keys
+    assert "monthly_roi" in metric_keys
+    assert "margin_used" in metric_keys
 
 
 def test_dashboard_alerts_pending_when_no_cached_positions(tmp_path):

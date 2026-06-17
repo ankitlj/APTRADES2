@@ -95,6 +95,12 @@ def test_positions_endpoint_returns_quote_enriched_rows():
     assert payload["totals"]["open_positions"] == 2
     assert payload["totals"]["long_positions"] == 1
     assert payload["totals"]["short_positions"] == 1
+    assert payload["totals"]["option_positions"] == 0
+    assert payload["totals"]["future_positions"] == 1
+    assert payload["totals"]["equity_positions"] == 1
+    assert payload["totals"]["realized_pnl"] == 0.0
+    assert payload["totals"]["unrealized_pnl"] == 12023.0
+    assert payload["totals"]["day_pnl"] == 12023.0
     assert payload["positions"][0]["ltp"] == 23440.0
     assert payload["positions"][0]["direction"] == "long"
     assert payload["positions"][0]["token"] == "62329"

@@ -9,7 +9,7 @@
 - Phase 22 note: First pass was rejected (treated as code audit). Rerun followed playbook strictly: 31 API routes tested with real HTTP calls, 3 cold + 3 warm timing measurements, response shape verification for all routes, diagnosis endpoint deep dive. See PHASE22_FINDINGS.md for full evidence.
 - Phase 23 note: Live deployed testing against Railway + Vercel with valid Breeze session. Found 7 real issues: 5 consistent timeouts (chart, orders, trades, cache-stats, breeze-status, symbols-search), 2 intermittent (positions, dashboard latency). Important correction: Phase 22 tested deprecated routes (/api/option-chain/bynifty, /api/orderbook, /api/tradebook) — frontend uses different endpoints (/api/option-chain, /api/orders, /api/trades). Vercel routing clean (all 11 routes HTTP 200). See PHASE23_FINDINGS.md for full evidence.
 - Fix sequence: 6 parallel fixes completed in prior pass (15ef402 through 2785f97). Then a combined Dashboard Latency Fix Pass addressing remaining 18-28s dashboard latency.
-- Deployment status: Railway and Vercel deployed; Breeze session likely valid; 114 backend tests pass; frontend builds 1853 modules
+- Deployment status: Railway and Vercel deployed; Breeze session likely valid; 124 backend tests pass; frontend builds 1853 modules
 
 ## Environment
 - Backend: Flask 3 skeleton
@@ -20,6 +20,34 @@
 - Deployment: Railway + Vercel live
 
 ## Phase Log
+
+### 2026-06-17 - Dashboard Portfolio Cards + Plain Dark Background
+- Goal: Replace duplicate NIFTY/BANKNIFTY futures dashboard cards with portfolio-focused cards while preserving the ORIENS dark aesthetic.
+- Root cause:
+  - Dashboard summary still returned futures quote cards even though the top ticker already shows NIFTY/BANKNIFTY futures.
+  - Dashboard metric cards rendered oversized engraved icons, and the global dark shell still had radial ambience that created a distracting cube-like background artifact.
+- Backend changes:
+  - `DashboardService.get_summary()` now returns exactly four metric cards in this order: `day_pnl`, `open_positions`, `monthly_roi`, `margin_used`.
+  - `PositionsService` now exposes portfolio totals needed by the new cards: option/future/equity position counts, realized P&L, unrealized P&L, and day P&L.
+  - Current limitation: realized P&L is `0.0`, monthly ROI/annual ROI are unavailable placeholders, and margin used is `0.0` until a dedicated account/funds contract is added.
+- Frontend changes:
+  - Dashboard cards now render the four requested cards: Day's P&L, Open Positions, Monthly ROI, Margin Used.
+  - Cards support currency/percent/number formatting and small submetrics.
+  - Removed oversized dashboard metric-card engraved icons.
+  - Removed dark-mode radial background ambience so the workspace background stays plain black/dark.
+- Files changed:
+  - `backend/app/services/dashboard_service.py`
+  - `backend/app/services/positions_service.py`
+  - `backend/tests/test_dashboard_contract.py`
+  - `backend/tests/test_positions_contract.py`
+  - `frontend/src/lib/api.ts`
+  - `frontend/src/pages/DashboardPage.tsx`
+  - `frontend/src/index.css`
+- Verification:
+  - `python -m pytest` -> 124 passed.
+  - `npm.cmd run build` -> 1853 modules, passes. First sandboxed build hit the known local Vite/esbuild filesystem denial; rerun outside sandbox passed.
+- Remaining risks:
+  - Margin and ROI cards are UI/API placeholders until the app adds a real Breeze/account funds and capital history contract.
 
 ### 2026-06-14 - Phase 21: Diagnosis-First Operating Protocol
 - Goal: Stop symptom-driven patching by establishing a diagnosis protocol with measurable evidence before any code change. Add diagnostic infrastructure (route timing, cache inspection, broker diagnostics, worker diagnostics) and a protocol document.

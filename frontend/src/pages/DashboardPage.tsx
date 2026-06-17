@@ -2,11 +2,6 @@ import {
   AlertTriangle,
   Bell,
   CircleAlert,
-  Layers,
-  type LucideIcon,
-  Percent,
-  TrendingUp,
-  Wallet,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -46,59 +41,55 @@ function formatNumber(value: number | string | null | undefined, maximumFraction
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(numeric);
 }
 
-function formatSignedNumber(value: number | null | undefined) {
-  if (value === null || value === undefined) {
-    return "Flat";
+function formatCurrency(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") {
+    return "--";
   }
-  const prefix = value > 0 ? "+" : "";
-  return `${prefix}${formatNumber(value)}`;
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return String(value);
+  }
+  return `₹${new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(numeric)}`;
+}
+
+function formatPercent(value: number | string | null | undefined) {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return String(value);
+  }
+  return `${formatNumber(numeric)}%`;
 }
 
 function metricValue(metric: DashboardSummaryResponse["metrics"][number]) {
-  if (metric.key === "open_positions") {
-    return formatNumber(metric.value, 0);
+  switch (metric.format) {
+    case "currency":
+      return formatCurrency(metric.value);
+    case "percent":
+      return formatPercent(metric.value);
+    case "number":
+      return formatNumber(metric.value, 0);
+    default:
+      return formatNumber(metric.value);
   }
-  return formatNumber(metric.value);
 }
 
-function metricChangeText(metric: DashboardSummaryResponse["metrics"][number]) {
-  if (metric.key === "open_positions" || metric.key === "total_pnl") {
-    return metric.meta;
-  }
-  if (metric.change === null || metric.change === undefined) {
-    return metric.meta;
-  }
-  return `${formatSignedNumber(metric.change)} vs prev close`;
+function submetricValue(submetric: NonNullable<DashboardMetric["submetrics"]>[number]) {
+  if (submetric.format === "currency") return formatCurrency(submetric.value);
+  if (submetric.format === "percent") return formatPercent(submetric.value);
+  return formatNumber(submetric.value, 0);
 }
 
 function toneColor(tone: string | undefined) {
   if (tone === "positive") return "text-green-600 dark:text-green-400";
   if (tone === "negative") return "text-red-500";
+  if (tone === "warning") return "text-amber-500";
   return "text-foreground";
-}
-
-// Distinct topic icons per box position, used when a metric is still loading or
-// its key is unmapped, so the four boxes never share the same icon.
-const FALLBACK_METRIC_ICONS: LucideIcon[] = [TrendingUp, Layers, Percent, Wallet];
-
-function metricIcon(key: string | undefined, index: number): LucideIcon {
-  switch (key) {
-    case "total_pnl":
-    case "day_pnl":
-      return TrendingUp;
-    case "open_positions":
-      return Layers;
-    case "margin":
-    case "margin_used":
-    case "utilised_margin":
-      return Wallet;
-    case "monthly_roi":
-    case "annual_roi":
-    case "roi":
-      return Percent;
-    default:
-      return FALLBACK_METRIC_ICONS[index % FALLBACK_METRIC_ICONS.length];
-  }
 }
 
 function pnlColor(value: number | null | undefined) {
@@ -271,36 +262,47 @@ export function DashboardPage() {
         {(metrics.length
           ? metrics
           : (Array.from({ length: 4 }, () => undefined) as (DashboardMetric | undefined)[])
-        ).map((metric, index) => {
-          const Icon = metricIcon(metric?.key, index);
-          return (
+        ).map((metric, index) => (
             <Card
               key={metric?.key ?? `loading-${index}`}
-              className="glow-card overflow-hidden dark:bg-white/[0.04] dark:backdrop-blur-md"
+              className="glow-card overflow-hidden dark:bg-white/[0.035] dark:backdrop-blur-md"
             >
-              <CardContent className="relative p-5">
-                <Icon className="engraved-icon h-28 w-28" aria-hidden="true" />
-                <div className="relative flex items-center gap-2">
-                  <Icon className="glow-icon h-4 w-4 shrink-0" aria-hidden="true" />
+              <CardContent className="flex min-h-[126px] flex-col justify-center p-5">
+                <div>
                   <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
                     {metric?.label ?? "Loading"}
                   </p>
+                  <p
+                    className={cn(
+                      "mt-3 text-2xl font-bold tabular-nums",
+                      toneColor(metric?.tone)
+                    )}
+                  >
+                    {metric ? metricValue(metric) : "..."}
+                  </p>
+                  {metric?.submetrics?.length ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                      {metric.submetrics.map((submetric, submetricIndex) => (
+                        <span key={`${metric.key}-${submetric.label}`} className="inline-flex items-center gap-2">
+                          {submetricIndex > 0 ? <span className="text-border">|</span> : null}
+                          <span>
+                            {submetric.label}:{" "}
+                            <span className={cn("tabular-nums", toneColor(submetric.tone))}>
+                              {submetricValue(submetric)}
+                            </span>
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : metric?.meta ? (
+                    <p className="mt-2 text-xs text-muted-foreground">{metric.meta}</p>
+                  ) : !metric ? (
+                    <p className="mt-2 text-xs text-muted-foreground">Syncing dashboard summary...</p>
+                  ) : null}
                 </div>
-                <p
-                  className={cn(
-                    "relative mt-2 text-2xl font-bold tabular-nums",
-                    toneColor(metric?.tone)
-                  )}
-                >
-                  {metric ? metricValue(metric) : "..."}
-                </p>
-                <p className="relative mt-1 text-xs text-muted-foreground">
-                  {metric ? metricChangeText(metric) : "Syncing dashboard summary..."}
-                </p>
               </CardContent>
             </Card>
-          );
-        })}
+          ))}
       </div>
 
       {summaryState.error && (

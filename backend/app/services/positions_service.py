@@ -63,12 +63,7 @@ class PositionsService:
                 "quote_status": "not_configured",
                 "close_actions_active": False,
                 "positions": [],
-                "totals": {
-                    "open_positions": 0,
-                    "long_positions": 0,
-                    "short_positions": 0,
-                    "total_pnl": 0.0,
-                },
+                "totals": self._empty_totals(),
             }
 
         now = time.monotonic()
@@ -89,12 +84,7 @@ class PositionsService:
                     "quote_status": "ok",
                     "close_actions_active": False,
                     "positions": [],
-                    "totals": {
-                        "open_positions": 0,
-                        "long_positions": 0,
-                        "short_positions": 0,
-                        "total_pnl": 0.0,
-                    },
+                    "totals": self._empty_totals(),
                 }
                 self._set_cache(empty)
                 return empty
@@ -241,12 +231,44 @@ class PositionsService:
 
     @staticmethod
     def _totals(positions: list[PositionSnapshot]) -> dict[str, Any]:
+        unrealized_pnl = round(sum(position.pnl or 0.0 for position in positions), 2)
         return {
             "open_positions": len(positions),
             "long_positions": sum(1 for position in positions if position.quantity > 0),
             "short_positions": sum(1 for position in positions if position.quantity < 0),
-            "total_pnl": round(sum(position.pnl or 0.0 for position in positions), 2),
+            "option_positions": sum(1 for position in positions if PositionsService._position_bucket(position) == "option"),
+            "future_positions": sum(1 for position in positions if PositionsService._position_bucket(position) == "future"),
+            "equity_positions": sum(1 for position in positions if PositionsService._position_bucket(position) == "equity"),
+            "realized_pnl": 0.0,
+            "unrealized_pnl": unrealized_pnl,
+            "day_pnl": unrealized_pnl,
+            "total_pnl": unrealized_pnl,
         }
+
+    @staticmethod
+    def _empty_totals() -> dict[str, Any]:
+        return {
+            "open_positions": 0,
+            "long_positions": 0,
+            "short_positions": 0,
+            "option_positions": 0,
+            "future_positions": 0,
+            "equity_positions": 0,
+            "realized_pnl": 0.0,
+            "unrealized_pnl": 0.0,
+            "day_pnl": 0.0,
+            "total_pnl": 0.0,
+        }
+
+    @staticmethod
+    def _position_bucket(position: PositionSnapshot) -> str:
+        product_type = (position.product_type or "").lower()
+        right = (position.right or "").lower()
+        if product_type in {"options", "option"} or right in {"call", "put"}:
+            return "option"
+        if product_type in {"futures", "future"} or (position.expiry_date and position.exchange_code in {"NFO", "BFO"}):
+            return "future"
+        return "equity"
 
     @staticmethod
     def _parse_expiry_date(value: str | None) -> date | None:

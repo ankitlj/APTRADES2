@@ -122,12 +122,19 @@ export interface DashboardMetric {
   key: string;
   label: string;
   value: number | string | null;
+  format?: "number" | "currency" | "percent";
   change?: number | null;
   previous_close?: number | null;
   expiry_date?: string | null;
   meta: string;
   tone: string;
   status?: string;
+  submetrics?: Array<{
+    label: string;
+    value: number | string | null;
+    format?: "number" | "currency" | "percent";
+    tone?: string;
+  }>;
 }
 
 export interface DashboardTickerItem {

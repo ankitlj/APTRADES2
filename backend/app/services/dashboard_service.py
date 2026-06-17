@@ -61,34 +61,12 @@ class DashboardService:
             positions_payload = {
                 "status": "degraded",
                 "positions": [],
-                "totals": {
-                    "open_positions": 0,
-                    "long_positions": 0,
-                    "short_positions": 0,
-                    "total_pnl": 0.0,
-                },
+                "totals": self._empty_position_totals(),
                 "error": str(error),
             }
 
-        market_cards = [self._market_card(result) for result in quote_results]
         totals = positions_payload["totals"]
-        metrics = [
-            *market_cards,
-            {
-                "key": "open_positions",
-                "label": "Open positions",
-                "value": totals["open_positions"],
-                "meta": f"{totals['long_positions']} long / {totals['short_positions']} short",
-                "tone": "neutral",
-            },
-            {
-                "key": "total_pnl",
-                "label": "Total p&l",
-                "value": totals["total_pnl"],
-                "meta": "Breeze portfolio positions",
-                "tone": "positive" if totals["total_pnl"] > 0 else "negative" if totals["total_pnl"] < 0 else "neutral",
-            },
-        ]
+        metrics = self._portfolio_metrics(totals)
 
         return {
             "status": "ok",
@@ -224,23 +202,87 @@ class DashboardService:
             return None
 
     @staticmethod
-    def _market_card(result: dict[str, Any]) -> dict[str, Any]:
-        resolved = result.get("resolved") or {}
-        quote = result.get("quote") or {}
-        ltp = DashboardService._to_float(quote.get("ltp"))
-        previous_close = DashboardService._to_float(quote.get("previous_close"))
-        change = round(ltp - previous_close, 2) if ltp is not None and previous_close is not None else None
+    def _portfolio_metrics(totals: dict[str, Any]) -> list[dict[str, Any]]:
+        day_pnl = DashboardService._to_float(totals.get("day_pnl")) or 0.0
+        realized_pnl = DashboardService._to_float(totals.get("realized_pnl")) or 0.0
+        unrealized_pnl = DashboardService._to_float(totals.get("unrealized_pnl")) or 0.0
+        open_positions = int(DashboardService._to_float(totals.get("open_positions")) or 0)
+        option_positions = int(DashboardService._to_float(totals.get("option_positions")) or 0)
+        future_positions = int(DashboardService._to_float(totals.get("future_positions")) or 0)
+        equity_positions = int(DashboardService._to_float(totals.get("equity_positions")) or 0)
+        return [
+            {
+                "key": "day_pnl",
+                "label": "Day's P&L",
+                "value": day_pnl,
+                "format": "currency",
+                "meta": "",
+                "tone": DashboardService._value_tone(day_pnl),
+                "submetrics": [
+                    {"label": "Realized", "value": realized_pnl, "format": "currency", "tone": DashboardService._value_tone(realized_pnl)},
+                    {
+                        "label": "Unrealized",
+                        "value": unrealized_pnl,
+                        "format": "currency",
+                        "tone": DashboardService._value_tone(unrealized_pnl),
+                    },
+                ],
+            },
+            {
+                "key": "open_positions",
+                "label": "Open positions",
+                "value": open_positions,
+                "format": "number",
+                "meta": "",
+                "tone": "neutral",
+                "submetrics": [
+                    {"label": "Options", "value": option_positions, "format": "number", "tone": "neutral"},
+                    {"label": "Future", "value": future_positions, "format": "number", "tone": "neutral"},
+                    {"label": "Equity", "value": equity_positions, "format": "number", "tone": "neutral"},
+                ],
+            },
+            {
+                "key": "monthly_roi",
+                "label": "Monthly ROI",
+                "value": None,
+                "format": "percent",
+                "meta": "",
+                "tone": "neutral",
+                "submetrics": [{"label": "Annual ROI (FY)", "value": None, "format": "percent", "tone": "neutral"}],
+            },
+            {
+                "key": "margin_used",
+                "label": "Margin used",
+                "value": 0.0,
+                "format": "currency",
+                "meta": "",
+                "tone": "warning",
+                "submetrics": [],
+            },
+        ]
+
+    @staticmethod
+    def _empty_position_totals() -> dict[str, Any]:
         return {
-            "key": result["symbol"].lower(),
-            "label": f"{result['symbol']} futures",
-            "value": ltp,
-            "change": change,
-            "previous_close": previous_close,
-            "expiry_date": quote.get("expiry_date") or resolved.get("expiry_date"),
-            "meta": f"token {resolved.get('token') or 'n/a'}",
-            "tone": "positive" if change and change > 0 else "negative" if change and change < 0 else "neutral",
-            "status": result["status"],
+            "open_positions": 0,
+            "long_positions": 0,
+            "short_positions": 0,
+            "option_positions": 0,
+            "future_positions": 0,
+            "equity_positions": 0,
+            "realized_pnl": 0.0,
+            "unrealized_pnl": 0.0,
+            "day_pnl": 0.0,
+            "total_pnl": 0.0,
         }
+
+    @staticmethod
+    def _value_tone(value: float) -> str:
+        if value > 0:
+            return "positive"
+        if value < 0:
+            return "negative"
+        return "neutral"
 
     @staticmethod
     def _ticker_item(result: dict[str, Any]) -> dict[str, Any]:

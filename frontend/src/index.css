@@ -248,12 +248,10 @@
   --neon-danger: #ff0055;    /* red */
 }
 
-/* Radial neon ambience on the dark page background */
+/* Keep the ORIENS dark shell clean; page-level graphics should not leak into the workspace. */
 .dark body {
-  background-image:
-    radial-gradient(circle at 8% 12%, rgba(0, 242, 255, 0.08) 0%, transparent 24%),
-    radial-gradient(circle at 92% 88%, rgba(188, 19, 254, 0.08) 0%, transparent 24%);
-  background-attachment: fixed;
+  background-image: none;
+  background-color: hsl(var(--background));
 }
 
 /* Glow card: subtle lift + neon edge glow on hover. Works on any bordered card. */

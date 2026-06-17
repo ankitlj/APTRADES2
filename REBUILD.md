@@ -3,6 +3,21 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
+## 2026-06-17 - Dashboard Portfolio Cards + Plain Dark Background
+
+- Replaced duplicate dashboard futures quote metric cards with the requested
+  portfolio card order: Day's P&L, Open Positions, Monthly ROI, Margin Used.
+- Kept the NIFTY/BANKNIFTY futures values in the top ticker; the card grid now
+  focuses on portfolio metrics instead of repeating ticker data.
+- Added backend totals for option/future/equity position counts and day P&L
+  breakdown. Realized P&L, ROI, and margin are safe placeholders until a real
+  account/funds contract is added.
+- Removed oversized engraved icons from dashboard metric cards and removed the
+  dark radial page-background ambience so the workspace background stays plain.
+- Verification: `python -m pytest` -> 124 passed; `npm.cmd run build` -> 1853
+  modules passed after rerunning outside the known local Vite/esbuild sandbox
+  denial.
+
 ## 2026-06-14 - Futuristic Neon Glow Pass (Crypto-Trading-Dashboard-3D inspired)
 
 - Goal: layer a futuristic look on top of the APTRADES visual port, inspired by
