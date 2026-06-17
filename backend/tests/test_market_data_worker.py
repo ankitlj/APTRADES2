@@ -305,3 +305,45 @@ def test_on_ticks_survives_emit_failure() -> None:
     assert len(snapshot) == 1
     assert snapshot[0]["symbol"] == "NIFTY"
     assert snapshot[0]["ltp"] == 23440.0
+
+
+def test_status_exposes_error_counters() -> None:
+    """Status payload must include the five error-counter fields with correct
+    initial values, and they must update after failures."""
+    worker = _configured_worker(redis_url="redis://localhost:6379/0")
+    worker.subscribe([{"display_symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "product_type": "futures", "token": "62329"}])
+
+    status = worker.status()
+    assert status["redis_write_error_count"] == 0
+    assert status["redis_write_retry_count"] == 0
+    assert status["last_redis_write_error_at"] is None
+    assert status["emit_error_count"] == 0
+    assert status["last_emit_error_at"] is None
+
+    # Trigger a Redis failure and verify counters update
+    with patch("app.services.market_data_worker.create_redis_client") as mock_factory:
+        mock_factory.return_value.set.side_effect = RuntimeError("fail")
+        worker._on_ticks({"symbol": "4.1!62329", "last": "23440.0", "close": "23451.7"})
+
+    status = worker.status()
+    assert status["redis_write_error_count"] == 2  # initial + retry
+    assert status["redis_write_retry_count"] == 1
+    assert status["last_redis_write_error_at"] is not None
+
+
+def test_status_exposes_emit_error_counters() -> None:
+    """Emit error counters must update after a publish failure."""
+    def failing_publish(event: str, payload: dict) -> None:
+        raise RuntimeError("emit failed")
+
+    worker = _configured_worker(publish=failing_publish)
+    worker.subscribe([{"display_symbol": "NIFTY", "broker_symbol": "NIFTY", "exchange_code": "NFO", "product_type": "futures", "token": "62329"}])
+
+    assert worker.status()["emit_error_count"] == 0
+    assert worker.status()["last_emit_error_at"] is None
+
+    worker._on_ticks({"symbol": "4.1!62329", "last": "23440.0", "close": "23451.7"})
+
+    status = worker.status()
+    assert status["emit_error_count"] == 1
+    assert status["last_emit_error_at"] is not None

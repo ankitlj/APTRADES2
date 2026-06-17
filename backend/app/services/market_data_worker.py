@@ -133,6 +133,11 @@ class MarketDataWorker:
         self._subscribe_requests_total: int = 0      # total subscribe() calls
         self._subscribe_attempt_count: int = 0        # total _feed_subscribe calls
         self._subscribe_error_count: int = 0          # failed _feed_subscribe calls
+        self._redis_write_error_count: int = 0
+        self._redis_write_retry_count: int = 0
+        self._last_redis_write_error_at: str | None = None
+        self._emit_error_count: int = 0
+        self._last_emit_error_at: str | None = None
 
     # ----- configuration -------------------------------------------------
 
@@ -448,6 +453,10 @@ class MarketDataWorker:
             client = self._redis_client()
             client.set(key, json.dumps(tick), ex=self._tick_ttl_seconds)
         except Exception as exc:  # noqa: BLE001 — Redis is a best-effort cache
+            now = self._utc_now()
+            with self._lock:
+                self._redis_write_error_count += 1
+                self._last_redis_write_error_at = now
             logger.warning(
                 "redis write failed sym=%s broker=%s ex=%s token=%s key=%s: %s %s",
                 tick.get("symbol", "?"),
@@ -461,10 +470,14 @@ class MarketDataWorker:
             # Reset cached client and retry once — handles stale connections
             with self._lock:
                 self._redis = None
+                self._redis_write_retry_count += 1
             try:
                 client = self._redis_client()
                 client.set(key, json.dumps(tick), ex=self._tick_ttl_seconds)
             except Exception as retry_exc:  # noqa: BLE001
+                with self._lock:
+                    self._redis_write_error_count += 1
+                    self._last_redis_write_error_at = self._utc_now()
                 logger.warning(
                     "redis write retry also failed sym=%s key=%s: %s %s",
                     tick.get("symbol", "?"),
@@ -486,6 +499,9 @@ class MarketDataWorker:
         try:
             publish("tick", tick)
         except Exception as exc:  # noqa: BLE001
+            with self._lock:
+                self._emit_error_count += 1
+                self._last_emit_error_at = self._utc_now()
             logger.warning(
                 "emit failed event=tick sym=%s ex=%s token=%s: %s %s",
                 tick.get("symbol", "?"),
@@ -526,6 +542,11 @@ class MarketDataWorker:
                 "subscribe_requests_total": self._subscribe_requests_total,
                 "subscribe_attempt_count": self._subscribe_attempt_count,
                 "subscribe_error_count": self._subscribe_error_count,
+                "redis_write_error_count": self._redis_write_error_count,
+                "redis_write_retry_count": self._redis_write_retry_count,
+                "last_redis_write_error_at": self._last_redis_write_error_at,
+                "emit_error_count": self._emit_error_count,
+                "last_emit_error_at": self._last_emit_error_at,
                 "ticks_received_ever": self._ticks_received_ever,
                 "freshness": self._freshness(),
                 "error": self._error,
