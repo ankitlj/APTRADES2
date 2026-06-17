@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
+import { PageLayout } from "@/components/ui/page-layout";
 
 type LegDraft = {
   action: string;
@@ -176,7 +177,7 @@ export function StrategyBuilderPage() {
   const payoffUid = state.payoff ? `builder-${state.legs.map((l) => l.strike).join("-")}` : "builder";
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Strategy tools"
         title="Strategy Builder"
@@ -357,6 +358,6 @@ export function StrategyBuilderPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </PageLayout>
   );
 }

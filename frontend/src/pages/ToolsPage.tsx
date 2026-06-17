@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageLayout } from "@/components/ui/page-layout";
 import { PageHeader } from "@/components/common/page";
 
 interface Tool {
@@ -67,7 +68,7 @@ const tools: Tool[] = [
 
 export function ToolsPage() {
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Reduced tools scope"
         title="Tools"
@@ -112,6 +113,6 @@ export function ToolsPage() {
         Removed from the visible MVP tools flow: Max Pain, Straddle Chart, Straddle P&amp;L, Vol
         Surface, GEX, and IV Smile.
       </p>
-    </div>
+    </PageLayout>
   );
 }

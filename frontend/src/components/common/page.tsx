@@ -4,6 +4,8 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
+export { tone, pnlColor, toneColor } from "@/lib/format";
+
 export function PageHeader({
   kicker,
   title,
@@ -80,15 +82,3 @@ export function Field({ label, children }: PropsWithChildren<{ label: string }>)
 
 export const selectClass =
   "h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
-export function tone(value: number | null | undefined): StatTone {
-  if ((value ?? 0) > 0) return "positive";
-  if ((value ?? 0) < 0) return "negative";
-  return "neutral";
-}
-
-export function pnlColor(value: number | null | undefined) {
-  if ((value ?? 0) > 0) return "text-green-600 dark:text-green-400";
-  if ((value ?? 0) < 0) return "text-red-500";
-  return "text-foreground";
-}

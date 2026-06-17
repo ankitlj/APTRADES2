@@ -766,6 +766,16 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
 From this point onward, the project is renamed ORIENS.
 
+## 2026-06-17 - UI Quality Pass: Shared Components + Page Adoption
+
+- Created shared utilities: `lib/format.ts` (formatNumber, formatCurrency, formatPercent, pnlColor, tone, toneColor, alertDotColor), `types/async.ts` (AsyncState<T>, createInitialState)
+- Created reusable components: PageLayout (page wrapper), DataTableShell (table card with loading/error/empty), LoadingState, BuySellBadge, SymbolCell
+- Improved EmptyState (icon prop, action slot), ErrorState, ErrorBoundary (uses UI components)
+- Adopted PageLayout in all 12 pages, DataTableShell in 8 pages, BuySellBadge in 3 pages, SymbolCell in 4 pages
+- Removed duplicated formatNumber from 8 pages (~120 lines)
+- Files changed: 16 modified + 7 new
+- Verification: `python -m pytest` -> 124 passed; `npm.cmd run build` -> 1859 modules.
+
 ## 2026-06-17 - Step 4: Latency Regression Check
 
 - Measured dev-server response times (test credentials, non-market hours):

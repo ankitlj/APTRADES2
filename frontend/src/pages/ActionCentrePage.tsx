@@ -9,9 +9,12 @@ import {
   type ActionCentreResponse,
 } from "@/lib/api";
 import { ErrorState } from "@/components/ErrorState";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { BuySellBadge } from "@/components/ui/buy-sell-badge";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { PageLayout } from "@/components/ui/page-layout";
+import { SymbolCell } from "@/components/ui/symbol-cell";
 import { PageHeader, StatCard } from "@/components/common/page";
 import { cn } from "@/lib/utils";
 
@@ -25,9 +28,7 @@ type ActionCentreState = {
 const tabs = ["pending", "approved", "rejected", "all"] as const;
 
 function formatDateTime(value: string | null) {
-  if (!value) {
-    return "n/a";
-  }
+  if (!value) return "n/a";
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(
     new Date(value)
   );
@@ -78,7 +79,7 @@ export function ActionCentrePage() {
   const stats = state.data?.stats ?? { pending: 0, approved: 0, rejected: 0, all: 0 };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Broker actions"
         title="Action Centre"
@@ -133,107 +134,99 @@ export function ActionCentrePage() {
       ) : null}
       {state.error ? <ErrorState title="Action Centre unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
-          <CardTitle className="text-sm">Action queue</CardTitle>
-          <Badge variant="secondary">{actions.length}</Badge>
-        </CardHeader>
-        {state.loading ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading action queue...</p>
-        ) : !actions.length && !state.error ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">No rows returned for this status.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Symbol</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
-                  <th className="px-4 py-3 font-medium">Order ID</th>
-                  <th className="px-4 py-3 text-right font-medium">Qty</th>
-                  <th className="px-4 py-3 font-medium">Requested</th>
-                  <th className="px-4 py-3 font-medium">Reviewed</th>
-                  <th className="px-4 py-3 font-medium">Controls</th>
+      <DataTableShell
+        title="Action queue"
+        count={actions.length}
+        loading={state.loading}
+        error={state.error}
+        onRetry={() => void load()}
+        emptyMessage="No rows returned for this status."
+        emptyTitle="No actions"
+        minWidth="1000px"
+      >
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Symbol</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Action</th>
+              <th className="px-4 py-3 font-medium">Order ID</th>
+              <th className="px-4 py-3 text-right font-medium">Qty</th>
+              <th className="px-4 py-3 font-medium">Requested</th>
+              <th className="px-4 py-3 font-medium">Reviewed</th>
+              <th className="px-4 py-3 font-medium">Controls</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {actions.map((row) => (
+              <Fragment key={row.id}>
+                <tr className="hover:bg-muted/20">
+                  <SymbolCell symbol={row.symbol} exchange={row.exchange_code} product={row.product_type} />
+                  <td className="px-4 py-3 text-muted-foreground">{row.status}</td>
+                  <td className="px-4 py-3">
+                    <BuySellBadge action={row.action_type} />
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">{row.order_id}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{row.quantity ?? "n/a"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(row.requested_at)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDateTime(row.reviewed_at)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" onClick={() => void mutate(row, "approve")} disabled={!row.can_approve}>
+                        Approve
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => void mutate(row, "reject")} disabled={!row.can_reject}>
+                        Reject
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setExpandedId((current) => (current === row.id ? null : row.id))}
+                      >
+                        {expandedId === row.id ? "Hide" : "Details"}
+                      </Button>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y">
-                {actions.map((row) => (
-                  <Fragment key={row.id}>
-                    <tr className="hover:bg-muted/20">
-                      <td className="px-4 py-3">
-                        <div className="font-semibold">{row.symbol}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {row.exchange_code} · {row.product_type ?? "n/a"}
+                {expandedId === row.id ? (
+                  <tr className="bg-muted/20">
+                    <td colSpan={8} className="px-4 py-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Requested by</p>
+                          <p className="mt-0.5 text-sm font-medium">{row.requested_by}</p>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.status}</td>
-                      <td className="px-4 py-3">
-                        <span className={row.action_type === "BUY" ? "badge-buy" : "badge-sell"}>{row.action_type}</span>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">{row.order_id}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{row.quantity ?? "n/a"}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDateTime(row.requested_at)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDateTime(row.reviewed_at)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => void mutate(row, "approve")} disabled={!row.can_approve}>
-                            Approve
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => void mutate(row, "reject")} disabled={!row.can_reject}>
-                            Reject
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setExpandedId((current) => (current === row.id ? null : row.id))}
-                          >
-                            {expandedId === row.id ? "Hide" : "Details"}
-                          </Button>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Created from</p>
+                          <p className="mt-0.5 text-sm font-medium">{row.created_from}</p>
                         </div>
-                      </td>
-                    </tr>
-                    {expandedId === row.id ? (
-                      <tr className="bg-muted/20">
-                        <td colSpan={8} className="px-4 py-4">
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Requested by</p>
-                              <p className="mt-0.5 text-sm font-medium">{row.requested_by}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Created from</p>
-                              <p className="mt-0.5 text-sm font-medium">{row.created_from}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Note</p>
-                              <p className="mt-0.5 text-sm font-medium">{row.resolution_note ?? "Awaiting review"}</p>
-                            </div>
-                          </div>
-                          <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                            <div>
-                              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Request payload</p>
-                              <pre className="overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
-                                {JSON.stringify(row.request_payload ?? {}, null, 2)}
-                              </pre>
-                            </div>
-                            <div>
-                              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Broker result</p>
-                              <pre className="overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
-                                {JSON.stringify(row.broker_result ?? {}, null, 2)}
-                              </pre>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Note</p>
+                          <p className="mt-0.5 text-sm font-medium">{row.resolution_note ?? "Awaiting review"}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <div>
+                          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Request payload</p>
+                          <pre className="overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
+                            {JSON.stringify(row.request_payload ?? {}, null, 2)}
+                          </pre>
+                        </div>
+                        <div>
+                          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Broker result</p>
+                          <pre className="overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
+                            {JSON.stringify(row.broker_result ?? {}, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </DataTableShell>
+    </PageLayout>
   );
 }

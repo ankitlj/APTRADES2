@@ -5,11 +5,13 @@ import { getPositions, type PositionRecord, type PositionsResponse } from "@/lib
 import { useLiveMarketData, useLiveSubscribe } from "@/hooks/useLiveMarketData";
 import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
-import { EmptyState } from "@/components/EmptyState";
+import { formatNumber, pnlColor, tone } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, PageHeader, StatCard, pnlColor, selectClass, tone } from "@/components/common/page";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { PageLayout } from "@/components/ui/page-layout";
+import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 import { cn } from "@/lib/utils";
 
 function applyLiveTick(position: PositionRecord, tick: LiveTick | undefined): PositionRecord {
@@ -35,13 +37,6 @@ type PositionsState = {
 
 type GroupBy = "none" | "exchange" | "product" | "direction";
 type DirectionFilter = "all" | "long" | "short";
-
-function formatNumber(value: number | null | undefined, maximumFractionDigits = 2) {
-  if (value === null || value === undefined) {
-    return "n/a";
-  }
-  return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(value);
-}
 
 function exportCsv(rows: PositionRecord[]) {
   const headers = ["Symbol", "Broker Symbol", "Exchange", "Product", "Direction", "Qty", "Avg", "LTP", "P&L", "P&L%", "Expiry", "Quote Status", "Source"];
@@ -115,15 +110,9 @@ export function PositionsPage() {
     const rows = state.data?.positions ?? [];
     return rows
       .filter((position) => {
-        if (productFilter !== "all" && position.product_type !== productFilter) {
-          return false;
-        }
-        if (directionFilter !== "all" && position.direction !== directionFilter) {
-          return false;
-        }
-        if (exchangeFilter !== "all" && position.exchange_code !== exchangeFilter) {
-          return false;
-        }
+        if (productFilter !== "all" && position.product_type !== productFilter) return false;
+        if (directionFilter !== "all" && position.direction !== directionFilter) return false;
+        if (exchangeFilter !== "all" && position.exchange_code !== exchangeFilter) return false;
         return true;
       })
       .map((position) => applyLiveTick(position, ticks[position.symbol.toUpperCase()]));
@@ -135,31 +124,22 @@ export function PositionsPage() {
     const shortPositions = positions.filter((position) => position.quantity < 0).length;
     const totalPnl = positions.reduce((sum, position) => sum + (position.pnl ?? 0), 0);
     return [
-      { label: "Open positions", value: openPositions, tone: tone(undefined), icon: Layers },
-      { label: "Long", value: longPositions, tone: tone(undefined), icon: TrendingUp },
-      { label: "Short", value: shortPositions, tone: tone(undefined), icon: TrendingDown },
-      { label: "Total P&L", value: formatNumber(totalPnl), tone: tone(totalPnl), icon: Wallet },
+      { label: "Open positions", value: openPositions, toneValue: tone(undefined), icon: Layers },
+      { label: "Long", value: longPositions, toneValue: tone(undefined), icon: TrendingUp },
+      { label: "Short", value: shortPositions, toneValue: tone(undefined), icon: TrendingDown },
+      { label: "Total P&L", value: formatNumber(totalPnl), toneValue: tone(totalPnl), icon: Wallet },
     ];
   }, [positions]);
 
   const groups = useMemo(() => {
-    if (groupBy === "none") {
-      return [{ key: "all", label: "All positions", items: positions }];
-    }
-
+    if (groupBy === "none") return [{ key: "all", label: "All positions", items: positions }];
     const mapped = new Map<string, PositionRecord[]>();
     for (const position of positions) {
-      const key =
-        groupBy === "exchange"
-          ? position.exchange_code
-          : groupBy === "product"
-            ? position.product_type
-            : position.direction;
+      const key = groupBy === "exchange" ? position.exchange_code : groupBy === "product" ? position.product_type : position.direction;
       const current = mapped.get(key) ?? [];
       current.push(position);
       mapped.set(key, current);
     }
-
     return Array.from(mapped.entries()).map(([key, items]) => ({ key, label: key, items }));
   }, [groupBy, positions]);
 
@@ -178,7 +158,7 @@ export function PositionsPage() {
   const isLive = state.data?.status === "ok";
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Broker positions"
         title="Positions"
@@ -246,96 +226,93 @@ export function PositionsPage() {
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {stats.map((item) => (
-          <StatCard key={item.label} label={item.label} value={item.value} tone={item.tone} icon={item.icon} />
+          <StatCard key={item.label} label={item.label} value={item.value} tone={item.toneValue} icon={item.icon} />
         ))}
       </div>
 
       <p className="text-xs text-muted-foreground">{quoteMessage}</p>
       {state.error ? <ErrorState title="Positions unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
-          <CardTitle className="text-sm">Active Positions</CardTitle>
-          <Badge variant="secondary">{positions.length}</Badge>
-        </CardHeader>
-        {state.loading ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading positions...</p>
-        ) : !positions.length && !state.error ? (
-          <EmptyState title="No open positions" message="No open positions returned for this filtered view." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Symbol</th>
-                  <th className="px-4 py-3 font-medium">Exchange</th>
-                  <th className="px-4 py-3 font-medium">Product</th>
-                  <th className="px-4 py-3 text-right font-medium">Qty</th>
-                  <th className="px-4 py-3 text-right font-medium">Avg</th>
-                  <th className="px-4 py-3 text-right font-medium">LTP</th>
-                  <th className="px-4 py-3 text-right font-medium">P&amp;L</th>
-                  <th className="px-4 py-3 text-right font-medium">P&amp;L%</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {groups.map((group) =>
-                  group.items.flatMap((position, index) => {
-                    const groupHeader =
-                      groupBy !== "none" && index === 0 ? (
-                        <tr key={`${group.key}-header`} className="bg-muted/50">
-                          <td colSpan={9} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {group.label}
-                          </td>
-                        </tr>
-                      ) : null;
+      <DataTableShell
+        title="Active Positions"
+        count={positions.length}
+        loading={state.loading}
+        error={state.error}
+        onRetry={() => void load()}
+        emptyMessage="No open positions returned for this filtered view."
+        emptyTitle="No open positions"
+        minWidth="1000px"
+      >
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Symbol</th>
+              <th className="px-4 py-3 font-medium">Exchange</th>
+              <th className="px-4 py-3 font-medium">Product</th>
+              <th className="px-4 py-3 text-right font-medium">Qty</th>
+              <th className="px-4 py-3 text-right font-medium">Avg</th>
+              <th className="px-4 py-3 text-right font-medium">LTP</th>
+              <th className="px-4 py-3 text-right font-medium">P&amp;L</th>
+              <th className="px-4 py-3 text-right font-medium">P&amp;L%</th>
+              <th className="px-4 py-3 font-medium">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {groups.map((group) =>
+              group.items.flatMap((position, index) => {
+                const groupHeader =
+                  groupBy !== "none" && index === 0 ? (
+                    <tr key={`${group.key}-header`} className="bg-muted/50">
+                      <td colSpan={9} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {group.label}
+                      </td>
+                    </tr>
+                  ) : null;
 
-                    const dataRow = (
-                      <tr
-                        key={`${group.key}-${position.symbol}-${position.exchange_code}-${position.product_type}-${index}`}
-                        className="hover:bg-muted/20"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="font-semibold">{position.symbol}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {position.broker_symbol}
-                            {position.token ? ` · token ${position.token}` : ""}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{position.exchange_code}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{position.product_type}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatNumber(position.quantity, 0)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatNumber(position.average_price)}</td>
-                        <td
-                          className={cn(
-                            "px-4 py-3 text-right tabular-nums",
-                            ticks[position.symbol.toUpperCase()] && "font-medium"
-                          )}
-                        >
-                          {formatNumber(position.ltp)}
-                        </td>
-                        <td className={cn("px-4 py-3 text-right font-medium tabular-nums", pnlColor(position.pnl))}>
-                          {formatNumber(position.pnl)}
-                        </td>
-                        <td className={cn("px-4 py-3 text-right font-medium tabular-nums", pnlColor(position.pnl_percent))}>
-                          {position.pnl_percent === null ? "n/a" : `${formatNumber(position.pnl_percent)}%`}
-                        </td>
-                        <td className="px-4 py-3">
-                          <Button variant="outline" size="sm" disabled>
-                            Close
-                          </Button>
-                        </td>
-                      </tr>
-                    );
+                const dataRow = (
+                  <tr
+                    key={`${group.key}-${position.symbol}-${position.exchange_code}-${position.product_type}-${index}`}
+                    className="hover:bg-muted/20"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-semibold">{position.symbol}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {position.broker_symbol}
+                        {position.token ? ` · token ${position.token}` : ""}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{position.exchange_code}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{position.product_type}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(position.quantity, 0)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(position.average_price)}</td>
+                    <td
+                      className={cn(
+                        "px-4 py-3 text-right tabular-nums",
+                        ticks[position.symbol.toUpperCase()] && "font-medium"
+                      )}
+                    >
+                      {formatNumber(position.ltp)}
+                    </td>
+                    <td className={cn("px-4 py-3 text-right font-medium tabular-nums", pnlColor(position.pnl))}>
+                      {formatNumber(position.pnl)}
+                    </td>
+                    <td className={cn("px-4 py-3 text-right font-medium tabular-nums", pnlColor(position.pnl_percent))}>
+                      {position.pnl_percent === null ? "n/a" : `${formatNumber(position.pnl_percent)}%`}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button variant="outline" size="sm" disabled>
+                        Close
+                      </Button>
+                    </td>
+                  </tr>
+                );
 
-                    return groupHeader ? [groupHeader, dataRow] : [dataRow];
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </div>
+                return groupHeader ? [groupHeader, dataRow] : [dataRow];
+              })
+            )}
+          </tbody>
+        </table>
+      </DataTableShell>
+    </PageLayout>
   );
 }

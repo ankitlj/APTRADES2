@@ -6,6 +6,8 @@ import { ErrorState } from "@/components/ErrorState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { PageLayout } from "@/components/ui/page-layout";
 import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 
 type LogsState = {
@@ -16,9 +18,7 @@ type LogsState = {
 };
 
 function formatDateTime(value: string | null) {
-  if (!value) {
-    return "n/a";
-  }
+  if (!value) return "n/a";
   return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(
     new Date(value)
   );
@@ -26,7 +26,7 @@ function formatDateTime(value: string | null) {
 
 function formatPathEvent(row: LogRow) {
   if (row.kind === "api") {
-    return [row.method, row.path, row.status_code].filter(Boolean).join(" · ");
+    return [row.method, row.path, row.status_code].filter(Boolean).join(" \u00B7 ");
   }
   return row.event_type;
 }
@@ -67,7 +67,7 @@ export function LogsPage() {
   }, [rows]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Operational logs"
         title="Logs"
@@ -117,50 +117,41 @@ export function LogsPage() {
       {state.error ? <ErrorState title="Logs unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-        <Card className="overflow-hidden">
-          <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
-            <CardTitle className="text-sm">Log rows</CardTitle>
-            <Badge variant="secondary">{rows.length}</Badge>
-          </CardHeader>
-          {state.loading && !rows.length ? (
-            <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading logs...</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">Time</th>
-                    <th className="px-4 py-3 font-medium">Level</th>
-                    <th className="px-4 py-3 font-medium">Kind</th>
-                    <th className="px-4 py-3 font-medium">Source</th>
-                    <th className="px-4 py-3 font-medium">Message</th>
-                    <th className="px-4 py-3 font-medium">Path/Event</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {!rows.length ? (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                        No logs returned for this filter.
-                      </td>
-                    </tr>
-                  ) : (
-                    rows.map((row) => (
-                      <tr key={row.id} className="hover:bg-muted/20">
-                        <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{formatDateTime(row.created_at)}</td>
-                        <td className="px-4 py-3">{row.level}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.kind}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{row.source}</td>
-                        <td className="px-4 py-3">{row.message}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatPathEvent(row)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
+        <DataTableShell
+          title="Log rows"
+          count={rows.length}
+          loading={state.loading && !rows.length}
+          error={state.error}
+          onRetry={() => void load()}
+          emptyMessage="No logs returned for this filter."
+          emptyTitle="No logs"
+          minWidth="700px"
+        >
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Time</th>
+                <th className="px-4 py-3 font-medium">Level</th>
+                <th className="px-4 py-3 font-medium">Kind</th>
+                <th className="px-4 py-3 font-medium">Source</th>
+                <th className="px-4 py-3 font-medium">Message</th>
+                <th className="px-4 py-3 font-medium">Path/Event</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {rows.map((row) => (
+                <tr key={row.id} className="hover:bg-muted/20">
+                  <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{formatDateTime(row.created_at)}</td>
+                  <td className="px-4 py-3">{row.level}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{row.kind}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{row.source}</td>
+                  <td className="px-4 py-3">{row.message}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatPathEvent(row)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DataTableShell>
 
         <Card className="overflow-hidden">
           <CardHeader className="flex-row items-center justify-between gap-2 border-b px-4 py-3">
@@ -174,6 +165,6 @@ export function LogsPage() {
           </div>
         </Card>
       </div>
-    </div>
+    </PageLayout>
   );
 }

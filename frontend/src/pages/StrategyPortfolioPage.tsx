@@ -13,6 +13,7 @@ import {
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageLayout } from "@/components/ui/page-layout";
 import { PageHeader, StatCard } from "@/components/common/page";
 import { cn } from "@/lib/utils";
 
@@ -119,7 +120,7 @@ export function StrategyPortfolioPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Strategy tools"
         title="Strategy Portfolio"
@@ -211,7 +212,7 @@ export function StrategyPortfolioPage() {
             </CardContent>
           </Card>
         );
-      })}
-    </div>
+      }      )}
+    </PageLayout>
   );
 }

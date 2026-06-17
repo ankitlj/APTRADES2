@@ -1718,3 +1718,15 @@ From this point onward, the project is renamed ORIENS.
   - `GET /api/dashboard/chart?symbol=NIFTY` — 400 Bad Request (test credentials don't resolve NIFTY)
 - Verdict: **No regression detected**. Steps 1-3 were frontend-only changes (Navbar TSX, MarketChart TSX, DashboardPage TSX). Backend code was not modified. The ~2.2kB JS bundle increase is from the new chart tooltip/label features — expected and acceptable.
 - Next step recommendation: Deploy to Railway, verify in production with live Breeze data.
+
+### 2026-06-17 - UI Quality Pass: Shared Components + Page Adoption
+- Created shared utilities: `lib/format.ts` (formatNumber, formatCurrency, formatPercent, pnlColor, tone, toneColor, alertDotColor), `types/async.ts` (AsyncState<T>, createInitialState)
+- Created reusable components: `PageLayout`, `DataTableShell`, `LoadingState`, `BuySellBadge`, `SymbolCell`
+- Improved existing: `EmptyState` (icon prop, action slot), `ErrorState`, `ErrorBoundary` (uses UI components)
+- Removed local `formatNumber` duplication from 8 pages (~120 lines removed)
+- Adopted PageLayout in all 12 pages
+- Adopted DataTableShell in 8 table-based pages (eliminates ~240 lines of Card+Header+loading/empty/error boilerplate)
+- Adopted BuySellBadge in 3 order/action pages
+- Adopted SymbolCell in 4 pages
+- Files changed: 16 modified + 7 new
+- Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1859 modules, clean

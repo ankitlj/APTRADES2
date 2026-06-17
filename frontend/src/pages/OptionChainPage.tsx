@@ -9,10 +9,13 @@ import {
 } from "@/lib/api";
 import { useLiveMarketData } from "@/hooks/useLiveMarketData";
 import { ErrorState } from "@/components/ErrorState";
+import { formatNumber, tone, toneColor } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, PageHeader, StatCard, selectClass, tone } from "@/components/common/page";
+import { Card } from "@/components/ui/card";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { PageLayout } from "@/components/ui/page-layout";
+import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 import { cn } from "@/lib/utils";
 
 type OptionChainState = {
@@ -30,13 +33,6 @@ function liveBadgeLabel(state: string): string {
   if (state === "live") return "Live feed";
   if (state === "connecting") return "Connecting";
   return "REST only";
-}
-
-function formatNumber(value: number | null | undefined, maximumFractionDigits = 2) {
-  if (value === null || value === undefined) {
-    return "n/a";
-  }
-  return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(value);
 }
 
 function LegCells({ row, side }: { row: OptionChainRow; side: "ce" | "pe" }) {
@@ -105,7 +101,6 @@ export function OptionChainPage() {
 
   const loadChain = async () => {
     if (!selectedExpiry) return;
-
     setState((current) => ({ ...current, loadingChain: true, error: null }));
     try {
       const payload = await getOptionChain({
@@ -132,14 +127,12 @@ export function OptionChainPage() {
   const { connectionState } = useLiveMarketData();
 
   const previousCloseDelta = useMemo(() => {
-    if (!state.data?.underlying_ltp || !state.data.previous_close) {
-      return null;
-    }
+    if (!state.data?.underlying_ltp || !state.data.previous_close) return null;
     return state.data.underlying_ltp - state.data.previous_close;
   }, [state.data]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Options data"
         title="Option Chain"
@@ -198,12 +191,7 @@ export function OptionChainPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatCard
-          label="Spot"
-          value={formatNumber(state.data?.underlying_ltp)}
-          tone={tone(previousCloseDelta)}
-          icon={TrendingUp}
-        />
+        <StatCard label="Spot" value={formatNumber(state.data?.underlying_ltp)} tone={tone(previousCloseDelta)} icon={TrendingUp} />
         <StatCard label="ATM strike" value={formatNumber(state.data?.atm_strike, 0)} icon={Target} />
         <StatCard
           label="PCR"
@@ -217,17 +205,17 @@ export function OptionChainPage() {
         <ErrorState title="Option chain unavailable" message={state.error} onRetry={() => void loadChain()} />
       ) : null}
 
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <TrendingUp className="h-4 w-4" />
-            Strike grid
-          </CardTitle>
-          {selectedExpiry ? <Badge variant="secondary">{selectedExpiry}</Badge> : null}
-        </CardHeader>
-        {state.loadingChain && !state.data ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading option chain...</p>
-        ) : state.data ? (
+      <DataTableShell
+        title="Strike grid"
+        loading={state.loadingChain && !state.data}
+        error={state.error}
+        onRetry={() => void loadChain()}
+        emptyMessage="Select an expiry to load the chain."
+        emptyTitle="No data"
+      >
+        {!state.data ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Select an expiry to load the chain.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[920px] text-sm">
               <thead>
@@ -279,10 +267,8 @@ export function OptionChainPage() {
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Select an expiry to load the chain.</p>
         )}
-      </Card>
-    </div>
+      </DataTableShell>
+    </PageLayout>
   );
 }

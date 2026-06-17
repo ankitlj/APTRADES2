@@ -3,9 +3,12 @@ import { useEffect, useState } from "react";
 
 import { getOptionExpiries, getOIProfile, type OIProfileResponse, type OIRow } from "@/lib/api";
 import { ErrorState } from "@/components/ErrorState";
+import { formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { PageLayout } from "@/components/ui/page-layout";
 import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 import { cn } from "@/lib/utils";
 
@@ -18,13 +21,6 @@ type OIProfileState = {
 };
 
 const underlyingOptions = ["NIFTY", "BANKNIFTY"];
-
-function formatNumber(value: number | null | undefined, maximumFractionDigits = 2) {
-  if (value === null || value === undefined) {
-    return "n/a";
-  }
-  return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(value);
-}
 
 function OIProfileRow({ row, atmStrike, maxTotalOI }: { row: OIRow; atmStrike: number; maxTotalOI: number }) {
   const isAtm = row.strike_price === atmStrike;
@@ -39,10 +35,7 @@ function OIProfileRow({ row, atmStrike, maxTotalOI }: { row: OIRow; atmStrike: n
         <div className="flex items-center justify-end gap-2">
           <span className="tabular-nums text-green-600 dark:text-green-400">{formatNumber(row.ce_oi, 0)}</span>
           <div className="h-2.5 w-32 overflow-hidden rounded-full bg-muted">
-            <div
-              className="ml-auto h-full rounded-full bg-green-500/80"
-              style={{ width: `${ceBarWidth.toFixed(1)}%` }}
-            />
+            <div className="ml-auto h-full rounded-full bg-green-500/80" style={{ width: `${ceBarWidth.toFixed(1)}%` }} />
           </div>
         </div>
       </td>
@@ -129,7 +122,7 @@ export function OIProfilePage() {
     : 1;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Open interest"
         title="OI Profile"
@@ -192,17 +185,17 @@ export function OIProfilePage() {
         <ErrorState title="OI Profile unavailable" message={state.error} onRetry={() => void loadData()} />
       ) : null}
 
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Layers className="h-4 w-4" />
-            OI distribution
-          </CardTitle>
-          {selectedExpiry ? <Badge variant="secondary">{selectedExpiry}</Badge> : null}
-        </CardHeader>
-        {state.loadingData && !state.data ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading OI profile...</p>
-        ) : state.data ? (
+      <DataTableShell
+        title="OI distribution"
+        loading={state.loadingData && !state.data}
+        error={state.error}
+        onRetry={() => void loadData()}
+        emptyMessage="Select an expiry to load OI profile."
+        emptyTitle="No data"
+      >
+        {!state.data ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Select an expiry to load OI profile.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
@@ -216,20 +209,13 @@ export function OIProfilePage() {
               </thead>
               <tbody className="divide-y">
                 {state.data.rows.map((row) => (
-                  <OIProfileRow
-                    key={row.strike_price}
-                    row={row}
-                    atmStrike={state.data!.atm_strike}
-                    maxTotalOI={maxTotalOI}
-                  />
+                  <OIProfileRow key={row.strike_price} row={row} atmStrike={state.data!.atm_strike} maxTotalOI={maxTotalOI} />
                 ))}
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Select an expiry to load OI profile.</p>
         )}
-      </Card>
-    </div>
+      </DataTableShell>
+    </PageLayout>
   );
 }

@@ -3,9 +3,12 @@ import { useEffect, useState } from "react";
 
 import { getOptionExpiries, getOITracker, type OITrackerResponse, type OIRow } from "@/lib/api";
 import { ErrorState } from "@/components/ErrorState";
+import { formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { PageLayout } from "@/components/ui/page-layout";
 import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 import { cn } from "@/lib/utils";
 
@@ -19,18 +22,9 @@ type OITrackerState = {
 
 const underlyingOptions = ["NIFTY", "BANKNIFTY"];
 
-function formatNumber(value: number | null | undefined, maximumFractionDigits = 2) {
-  if (value === null || value === undefined) {
-    return "n/a";
-  }
-  return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(value);
-}
-
 function OISplitBar({ ceOi, peOi }: { ceOi: number; peOi: number }) {
   const total = ceOi + peOi;
-  if (total === 0) {
-    return <div className="h-2 w-full rounded-full bg-muted" />;
-  }
+  if (total === 0) return <div className="h-2 w-full rounded-full bg-muted" />;
   const cePercent = (ceOi / total) * 100;
   return (
     <div className="flex h-2 w-full overflow-hidden rounded-full bg-red-500/70">
@@ -125,7 +119,7 @@ export function OITrackerPage() {
   }, [selectedExpiry]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Open interest"
         title="OI Tracker"
@@ -184,17 +178,17 @@ export function OITrackerPage() {
         <ErrorState title="OI Tracker unavailable" message={state.error} onRetry={() => void loadData()} />
       ) : null}
 
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <BarChart3 className="h-4 w-4" />
-            Open interest by strike
-          </CardTitle>
-          {selectedExpiry ? <Badge variant="secondary">{selectedExpiry}</Badge> : null}
-        </CardHeader>
-        {state.loadingData && !state.data ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading OI data...</p>
-        ) : state.data ? (
+      <DataTableShell
+        title="Open interest by strike"
+        loading={state.loadingData && !state.data}
+        error={state.error}
+        onRetry={() => void loadData()}
+        emptyMessage="Select an expiry to load OI data."
+        emptyTitle="No data"
+      >
+        {!state.data ? (
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Select an expiry to load OI data.</p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-sm">
               <thead>
@@ -215,10 +209,8 @@ export function OITrackerPage() {
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Select an expiry to load OI data.</p>
         )}
-      </Card>
-    </div>
+      </DataTableShell>
+    </PageLayout>
   );
 }

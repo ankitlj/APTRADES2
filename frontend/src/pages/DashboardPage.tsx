@@ -16,8 +16,10 @@ import {
 import { useLiveMarketData, useLiveSubscribe } from "@/hooks/useLiveMarketData";
 import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
 import { DashboardMarketChart } from "@/components/dashboard/DashboardMarketChart";
+import { formatNumber, formatCurrency, formatPercent, pnlColor, toneColor, alertDotColor } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageLayout } from "@/components/ui/page-layout";
 import { cn } from "@/lib/utils";
 
 type AsyncState<T> = {
@@ -28,42 +30,6 @@ type AsyncState<T> = {
 
 function createInitialState<T>(): AsyncState<T> {
   return { data: null, loading: true, error: null };
-}
-
-function formatNumber(value: number | string | null | undefined, maximumFractionDigits = 2) {
-  if (value === null || value === undefined || value === "") {
-    return "n/a";
-  }
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) {
-    return String(value);
-  }
-  return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(numeric);
-}
-
-function formatCurrency(value: number | string | null | undefined) {
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) {
-    return String(value);
-  }
-  return `₹${new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(numeric)}`;
-}
-
-function formatPercent(value: number | string | null | undefined) {
-  if (value === null || value === undefined || value === "") {
-    return "--";
-  }
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) {
-    return String(value);
-  }
-  return `${formatNumber(numeric)}%`;
 }
 
 function metricValue(metric: DashboardSummaryResponse["metrics"][number]) {
@@ -94,26 +60,6 @@ function submetricLabel(submetric: NonNullable<DashboardMetric["submetrics"]>[nu
     return `${value} ${submetric.label}`;
   }
   return `${submetric.label}: ${value}`;
-}
-
-function toneColor(tone: string | undefined) {
-  if (tone === "positive") return "text-green-600 dark:text-green-400";
-  if (tone === "negative") return "text-red-500";
-  if (tone === "warning") return "text-amber-500";
-  return "text-foreground";
-}
-
-function pnlColor(value: number | null | undefined) {
-  if ((value ?? 0) > 0) return "text-green-600 dark:text-green-400";
-  if ((value ?? 0) < 0) return "text-red-500";
-  return "text-foreground";
-}
-
-function alertDotColor(level: string) {
-  if (level === "error") return "bg-red-500";
-  if (level === "warning") return "bg-amber-500";
-  if (level === "success") return "bg-green-500";
-  return "bg-blue-500";
 }
 
 function applyLiveTick(position: DashboardPosition, tick: LiveTick | undefined): DashboardPosition {
@@ -268,7 +214,7 @@ export function DashboardPage() {
   const positions = summaryState.data?.positions ?? [];
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {(metrics.length
           ? metrics
@@ -374,6 +320,6 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageLayout>
   );
 }

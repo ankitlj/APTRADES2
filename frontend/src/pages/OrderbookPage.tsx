@@ -9,10 +9,12 @@ import {
   type OrdersResponse,
 } from "@/lib/api";
 import { ErrorState } from "@/components/ErrorState";
-import { EmptyState } from "@/components/EmptyState";
-import { Badge } from "@/components/ui/badge";
+import { formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { BuySellBadge } from "@/components/ui/buy-sell-badge";
+import { DataTableShell } from "@/components/ui/data-table-shell";
+import { PageLayout } from "@/components/ui/page-layout";
+import { SymbolCell } from "@/components/ui/symbol-cell";
 import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
 
 type OrderbookState = {
@@ -48,13 +50,6 @@ function exportCsv(rows: OrderRecord[]) {
   anchor.download = "oriens-orderbook.csv";
   anchor.click();
   URL.revokeObjectURL(url);
-}
-
-function formatNumber(value: number | null | undefined, maximumFractionDigits = 2) {
-  if (value === null || value === undefined) {
-    return "n/a";
-  }
-  return new Intl.NumberFormat("en-IN", { maximumFractionDigits }).format(value);
 }
 
 export function OrderbookPage() {
@@ -121,7 +116,7 @@ export function OrderbookPage() {
   ];
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4">
+    <PageLayout>
       <PageHeader
         kicker="Broker orders"
         title="Orderbook"
@@ -174,70 +169,62 @@ export function OrderbookPage() {
       ) : null}
       {state.error ? <ErrorState title="Orders unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
-      <Card className="overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
-          <CardTitle className="text-sm">Orders</CardTitle>
-          <Badge variant="secondary">{orders.length}</Badge>
-        </CardHeader>
-        {state.loading ? (
-          <p className="px-4 py-10 text-center text-sm text-muted-foreground">Loading orderbook...</p>
-        ) : !orders.length && !state.error ? (
-          <EmptyState title="No orders" message="No orders returned for this filter window." />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Symbol</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
-                  <th className="px-4 py-3 text-right font-medium">Qty</th>
-                  <th className="px-4 py-3 text-right font-medium">Pending</th>
-                  <th className="px-4 py-3 text-right font-medium">Filled</th>
-                  <th className="px-4 py-3 text-right font-medium">Limit</th>
-                  <th className="px-4 py-3 text-right font-medium">Avg</th>
-                  <th className="px-4 py-3 font-medium">Type</th>
-                  <th className="px-4 py-3 font-medium">Created</th>
-                  <th className="px-4 py-3 font-medium">Control</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {orders.map((order) => (
-                  <tr key={`${order.order_id}-${order.symbol}`} className="hover:bg-muted/20">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold">{order.symbol}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {order.exchange_code} · {order.product_type}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.status}</td>
-                    <td className="px-4 py-3">
-                      <span className={order.action === "BUY" ? "badge-buy" : "badge-sell"}>{order.action}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.quantity, 0)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.pending_quantity, 0)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.filled_quantity, 0)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.limit_price)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.average_price)}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.order_type || order.validity || "n/a"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{order.created_at || "n/a"}</td>
-                    <td className="px-4 py-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void handleCancel(order)}
-                        disabled={!(order.status_normalized === "open" || order.status_normalized === "pending" || order.status_normalized === "ordered")}
-                      >
-                        Cancel
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-    </div>
+      <DataTableShell
+        title="Orders"
+        count={orders.length}
+        loading={state.loading}
+        error={state.error}
+        onRetry={() => void load()}
+        emptyMessage="No orders returned for this filter window."
+        emptyTitle="No orders"
+        minWidth="1000px"
+      >
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/30 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Symbol</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 font-medium">Action</th>
+              <th className="px-4 py-3 text-right font-medium">Qty</th>
+              <th className="px-4 py-3 text-right font-medium">Pending</th>
+              <th className="px-4 py-3 text-right font-medium">Filled</th>
+              <th className="px-4 py-3 text-right font-medium">Limit</th>
+              <th className="px-4 py-3 text-right font-medium">Avg</th>
+              <th className="px-4 py-3 font-medium">Type</th>
+              <th className="px-4 py-3 font-medium">Created</th>
+              <th className="px-4 py-3 font-medium">Control</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {orders.map((order) => (
+              <tr key={`${order.order_id}-${order.symbol}`} className="hover:bg-muted/20">
+                <SymbolCell symbol={order.symbol} exchange={order.exchange_code} product={order.product_type} />
+                <td className="px-4 py-3 text-muted-foreground">{order.status}</td>
+                <td className="px-4 py-3">
+                  <BuySellBadge action={order.action} />
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.quantity, 0)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.pending_quantity, 0)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.filled_quantity, 0)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.limit_price)}</td>
+                <td className="px-4 py-3 text-right tabular-nums">{formatNumber(order.average_price)}</td>
+                <td className="px-4 py-3 text-muted-foreground">{order.order_type || order.validity || "n/a"}</td>
+                <td className="px-4 py-3 text-muted-foreground">{order.created_at || "n/a"}</td>
+                <td className="px-4 py-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleCancel(order)}
+                    disabled={!(order.status_normalized === "open" || order.status_normalized === "pending" || order.status_normalized === "ordered")}
+                  >
+                    Cancel
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </DataTableShell>
+    </PageLayout>
   );
 }
