@@ -2196,3 +2196,41 @@ The existing WebSocket infrastructure (`MarketDataWorker` + `useLiveSubscribe`) 
 - No websocket or SymbolResolver changes
 - Polling stops on selection change via React effect cleanup
 - Stale in-flight requests aborted via AbortController signal check
+
+### 2026-06-19 - Part 5: BUY/SELL Button Safety — Confirmation Modal
+
+#### Goal
+Add a safety confirmation modal before executing BUY or SELL. Ensures the user sees full contract details, current prices, and quantity before confirming a trade.
+
+#### Changes
+
+**`frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`:**
+- Added `confirmAction` state (`"BUY" | "SELL" | null`) and `confirmQty` state (default 1)
+- Added `openConfirm(action)` and `closeConfirm()` callbacks
+- BUY/SELL buttons now call `openConfirm` instead of being inert
+- Added an inline modal dialog (`role="dialog"`, `aria-modal="true"`, `aria-labelledby`):
+  - **Overlay**: fixed inset, semi-transparent black backdrop, z-50
+  - **Contract details card**: underlying, expiry, strike, right
+  - **Current prices**: LTP, Bid / Ask, Spread (calculated)
+  - **Quantity input**: number field (min 1, max 9999), auto-focused
+  - **Title color**: green for BUY, red for SELL
+  - **[Cancel]**: outline button, closes modal
+  - **[BUY/SELL]**: green (BUY) or red (SELL) button shows action + qty (e.g., "BUY 1")
+  - **Keyboard**: Escape key closes modal
+  - **Backdrop click**: closes modal
+  - **Focus**: quantity input auto-focused on open
+- Added `Input` import from shadcn UI
+
+#### Safety features
+1. **Double confirmation**: user must click the trade button, review the modal, then click confirm
+2. **Quantity clamped**: min 1, max 9999, input resets to 1 on contract change
+3. **Spread shown**: user can see the bid-ask spread before confirming
+4. **Visual distinction**: BUY modal has green title/button, SELL has red
+5. **Disabled buttons**: BUY/SELL still disabled until valid backend data is loaded
+
+#### Verification
+- `npm run build` → 1859 modules, clean (498.79 KB JS, 58.29 KB CSS)
+- No backend changes
+- Modal keyboard-accessible: Escape to close, Tab through fields, Enter on focused button
+- Modal closes on backdrop click
+- Quantity resets to 1 on contract change

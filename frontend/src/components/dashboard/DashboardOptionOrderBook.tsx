@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { getDashboardOptionOrderbook, getOptionChain, getOptionExpiries } from "@/lib/api";
 import type { OptionOrderbookResponse } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
@@ -31,6 +32,10 @@ export function DashboardOptionOrderBook() {
   const [expiries, setExpiries] = useState<FetchState<string[]>>({ status: "idle" });
   const [strikes, setStrikes] = useState<FetchState<StrikeOption[]>>({ status: "idle" });
   const [orderbook, setOrderbook] = useState<FetchState<OptionOrderbookResponse>>({ status: "idle" });
+  const [confirmAction, setConfirmAction] = useState<"BUY" | "SELL" | null>(null);
+  const [confirmQty, setConfirmQty] = useState(1);
+
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const hasValidDataRef = useRef(false);
@@ -74,6 +79,16 @@ export function DashboardOptionOrderBook() {
     setSelectedStrike({ strike: Number(strikeStr), right: right as Right, label: val });
     setOrderbook({ status: "loading" });
     hasValidDataRef.current = false;
+    setConfirmQty(1);
+  }, []);
+
+  const openConfirm = useCallback((action: "BUY" | "SELL") => {
+    setConfirmAction(action);
+    setConfirmQty(1);
+  }, []);
+
+  const closeConfirm = useCallback(() => {
+    setConfirmAction(null);
   }, []);
 
   useEffect(() => {
@@ -207,6 +222,7 @@ export function DashboardOptionOrderBook() {
   };
 
   return (
+    <>
     <Card className="overflow-hidden">
       <CardHeader className="min-h-14 gap-3 border-b px-4 py-3 md:flex-row md:items-center md:justify-between">
         <CardTitle className="text-sm">Order Book</CardTitle>
@@ -441,6 +457,7 @@ export function DashboardOptionOrderBook() {
             disabled={!hasSelection || orderbook.status !== "ok" || orderbookData?.status !== "ok"}
             className="flex-1 bg-green-600 text-white hover:bg-green-700 disabled:opacity-30"
             aria-label="Buy selected option"
+            onClick={() => openConfirm("BUY")}
           >
             BUY
           </Button>
@@ -449,11 +466,106 @@ export function DashboardOptionOrderBook() {
             disabled={!hasSelection || orderbook.status !== "ok" || orderbookData?.status !== "ok"}
             className="flex-1 disabled:opacity-30"
             aria-label="Sell selected option"
+            onClick={() => openConfirm("SELL")}
           >
             SELL
           </Button>
         </div>
       </CardContent>
     </Card>
+
+    {confirmAction && orderbookData && (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        onKeyDown={(e) => {
+          if (e.key === "Escape") closeConfirm();
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeConfirm();
+        }}
+      >
+        <div className="w-full max-w-sm rounded-lg border bg-background p-5 shadow-lg">
+          <h3
+            id="confirm-title"
+            className={`text-sm font-semibold ${
+              confirmAction === "BUY" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            }`}
+          >
+            Confirm {confirmAction}
+          </h3>
+
+          <div className="mt-3 space-y-2 text-xs">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Contract</span>
+              <span className="font-medium text-foreground">
+                {underlying} {expiry.slice(0, 10)} {formatNumber(selectedStrike!.strike, 0)}{" "}
+                {selectedStrike!.right === "call" ? "CE" : "PE"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">LTP</span>
+              <span className="font-medium tabular-nums text-foreground">
+                {orderbookData.ltp != null ? formatNumber(orderbookData.ltp) : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Bid / Ask</span>
+              <span className="font-medium tabular-nums text-foreground">
+                {orderbookData.bid_price != null ? formatNumber(orderbookData.bid_price) : "—"} /{" "}
+                {orderbookData.ask_price != null ? formatNumber(orderbookData.ask_price) : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Spread</span>
+              <span className="font-medium tabular-nums text-foreground">
+                {orderbookData.bid_price != null && orderbookData.ask_price != null
+                  ? formatNumber(orderbookData.ask_price - orderbookData.bid_price)
+                  : "—"}
+              </span>
+            </div>
+
+            <div className="pt-1">
+              <label htmlFor="confirm-qty" className="mb-1 block text-[10px] font-medium text-muted-foreground">
+                Quantity (lots)
+              </label>
+              <Input
+                id="confirm-qty"
+                type="number"
+                min={1}
+                max={9999}
+                value={confirmQty}
+                onChange={(e) => setConfirmQty(Math.max(1, Math.min(9999, Number(e.target.value) || 1)))}
+                className="h-8 text-xs tabular-nums"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={closeConfirm} ref={cancelRef}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className={`flex-1 text-white ${
+                confirmAction === "BUY"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-red-600 hover:bg-red-700"
+              }`}
+              onClick={() => {
+                closeConfirm();
+              }}
+              aria-label={`Confirm ${confirmAction}`}
+            >
+              {confirmAction} {confirmQty}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

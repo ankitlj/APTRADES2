@@ -902,3 +902,14 @@ From this point onward, the project is renamed ORIENS.
 - Chose polling over WebSocket: option contracts share `display_symbol="NIFTY"` which would cause tick collisions in the existing `ticks` map. Avoiding realtime infrastructure changes.
 - Files changed: `DashboardOptionOrderBook.tsx` (frontend only).
 - Verification: `npm run build` -> 1859 modules; backend unchanged.
+
+## 2026-06-19 - Part 5: BUY/SELL Button Safety — Confirmation Modal
+
+- Added inline confirmation modal to `DashboardOptionOrderBook.tsx` with `role="dialog"`, `aria-modal="true"`, `aria-labelledby`.
+- BUY/SELL buttons now open the modal instead of being inert.
+- Modal shows: contract details, LTP, Bid/Ask, spread, quantity input (1-9999).
+- Green title/button for BUY, red for SELL.
+- Escape key and backdrop click to close.
+- Quantity auto-focuses on open, resets to 1 on contract change.
+- Files changed: `DashboardOptionOrderBook.tsx` (frontend only).
+- Verification: `npm run build` -> 1859 modules; backend unchanged.
