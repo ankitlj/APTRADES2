@@ -877,3 +877,17 @@ From this point onward, the project is renamed ORIENS.
 - 9 new contract tests in `test_dashboard_contract.py`: valid request, missing params, invalid right, unsupported underlying, empty response, missing fields, zero qty.
 - Backend only (frontend unchanged from Part 1).
 - Verification: `python -m pytest` -> 135/135 passed; `npm run build` -> 1859 modules.
+
+## 2026-06-19 - Part 3: Wire Frontend to Real Backend Data
+
+- Added `OptionOrderbookLevel`, `OptionOrderbookInstrument`, `OptionOrderbookResponse` interfaces and `getDashboardOptionOrderbook()` API function to `api.ts`.
+- Rewired `DashboardOptionOrderBook.tsx` with 3 cascading effects:
+  - Underlying → fetch expiries via `getOptionExpiries()`
+  - Expiry → fetch option chain via `getOptionChain()` → extract CE/PE strikes
+  - Strike+right → fetch orderbook via `getDashboardOptionOrderbook()` → display real LTP/bid/ask/depth
+- Added `FetchState<T>` discriminated union for loading/error/ok/idle states.
+- Added `AbortController` per request chain to cancel stale in-flight requests.
+- Real status badge (Loading/Error/Data loaded/No data), error banners, real data in table and depth card.
+- BUY/SELL buttons disabled until valid data loaded.
+- Files changed: `api.ts`, `DashboardOptionOrderBook.tsx` (frontend only).
+- Verification: `npm run build` -> 1859 modules; backend unchanged.

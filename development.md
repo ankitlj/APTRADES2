@@ -2129,3 +2129,35 @@ GET /api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&strike=23
 - No backend latency concern: single Breeze `/optionchain` call with specific strike, not full chain
 - `get_option_chain_quotes` uses interactive timeout (10s, 2 attempts)
 - No storage, no Postgres writes, no market_candles, no websocket changes
+
+### 2026-06-19 - Part 3: Wire Frontend to Real Backend Data
+
+#### Goal
+Connect the shell component from Part 1 to the real backend endpoint from Part 2. Users can now select an underlying/expiry/strike and see live Breeze bid/ask/ltp data.
+
+#### Changes
+
+**`frontend/src/lib/api.ts`:**
+- Added interfaces: `OptionOrderbookLevel`, `OptionOrderbookInstrument`, `OptionOrderbookResponse`
+- Added `getDashboardOptionOrderbook(params)` function — calls `GET /api/dashboard/option-orderbook` with `underlying`, `expiry`, `strike`, `right` params
+
+**`frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`:**
+- Full data wiring with 3 cascading `useEffect` hooks:
+  1. `underlying` changes → `getOptionExpiries()` → populate expiry `<select>`
+  2. `expiry` changes → `getOptionChain()` → extract CE/PE strikes → populate strike `<select>`
+  3. `strike+right` selected → `getDashboardOptionOrderbook()` → display real data
+- Added `FetchState<T>` discriminated union type for loading/error/ok/idle states
+- Uses `AbortController` per request chain to cancel stale in-flight requests when selector changes
+- Status badge: "Awaiting selection" / "Loading..." (amber) / "Error" (red) / "Data loaded" (green) / "No data" (red)
+- Error display: inline red banner for fetch failures and backend-level errors
+- Summary strip: shows real LTP from response with "..." during load, "N/A" if null
+- Orderbook table: renders real `levels[]` rows (bid_qty/bid_price/ask_price/ask_qty) with "—" fallback for missing fields
+- Market depth card: real `buy_percent`/`sell_percent` bar, real `total_buy_qty`/`total_sell_qty`
+- BUY/SELL buttons disabled until valid data loaded (not just selection made)
+- All existing states preserved: empty (no selection), loading (skeleton), error (banner), partial (underlying selected, awaiting expiry/strike)
+
+#### Verification
+- `npm run build` → 1859 modules, clean (495.55 KB JS, 57.57 KB CSS)
+- No backend changes — all tests from Part 2 still pass
+- Data contract: frontend `OptionOrderbookResponse` matches backend shape from `dashboard_service.py:_get_option_orderbook()`
+- No websocket changes (deferred to Part 4)

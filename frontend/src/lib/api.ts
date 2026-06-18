@@ -848,6 +848,63 @@ export interface MarketDataSnapshotResponse {
   ticks: MarketDataTick[];
 }
 
+export interface OptionOrderbookLevel {
+  bid_qty?: number;
+  bid_price?: number;
+  ask_price?: number;
+  ask_qty?: number;
+}
+
+export interface OptionOrderbookInstrument {
+  display_symbol: string;
+  broker_symbol: string;
+  stock_code: string;
+  exchange_code: string;
+  product_type: string;
+  token: string | null;
+  stock_token: string | null;
+}
+
+export interface OptionOrderbookResponse {
+  status: string;
+  underlying: string;
+  exchange: string;
+  expiry: string;
+  strike: number;
+  right: string;
+  instrument: OptionOrderbookInstrument;
+  ltp: number | null;
+  previous_close: number | null;
+  bid_price: number | null;
+  bid_qty: number | null;
+  ask_price: number | null;
+  ask_qty: number | null;
+  levels: OptionOrderbookLevel[];
+  total_buy_qty: number;
+  total_sell_qty: number;
+  buy_percent: number;
+  sell_percent: number;
+  spot_price: number | null;
+  underlying_ltp: number | null;
+  timestamp: string;
+  error?: string;
+}
+
+export function getDashboardOptionOrderbook(params: {
+  underlying: string;
+  expiry: string;
+  strike: number | string;
+  right: string;
+}) {
+  const search = new URLSearchParams({
+    underlying: params.underlying,
+    expiry: params.expiry,
+    strike: String(params.strike),
+    right: params.right,
+  });
+  return requestJson<OptionOrderbookResponse>(`/api/dashboard/option-orderbook?${search.toString()}`);
+}
+
 export function getMarketDataStatus() {
   return requestJson<MarketDataStatusResponse>("/api/market-data/status");
 }
