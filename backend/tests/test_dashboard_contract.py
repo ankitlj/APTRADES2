@@ -530,3 +530,172 @@ def test_dashboard_summary_fallback_is_symbol_specific(tmp_path):
     # Cleanup
     with _last_good_lock:
         _last_good_quotes.pop("NIFTY", None)
+
+def _option_chain_response(instrument):
+    if instrument.stock_code != "NIFTY":
+        return []
+    return [
+        {
+            "ltp": "152.35",
+            "best_bid_price": "151.80",
+            "best_offer_price": "152.90",
+            "best_bid_qty": "225",
+            "best_offer_qty": "175",
+            "open_interest": "1245000",
+            "total_quantity_traded": "8500",
+            "previous_close": "148.20",
+            "spot_price": "23420.00",
+            "strike_price": "23500",
+            "expiry_date": "2026-06-30T06:00:00.000Z",
+        }
+    ]
+
+
+def test_option_orderbook_valid_request_returns_expected_keys(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'option_orderbook.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_option_chain_quotes",
+        side_effect=_option_chain_response,
+    ):
+        response = client.get(
+            "/api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&strike=23500&right=call"
+        )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["underlying"] == "NIFTY"
+    assert payload["exchange"] == "NFO"
+    assert payload["expiry"] == "2026-06-30"
+    assert payload["strike"] == 23500.0
+    assert payload["right"] == "call"
+    assert payload["ltp"] == 152.35
+    assert payload["bid_price"] == 151.80
+    assert payload["ask_price"] == 152.90
+    assert payload["bid_qty"] == 225.0
+    assert payload["ask_qty"] == 175.0
+    assert payload["previous_close"] == 148.20
+    assert payload["spot_price"] == 23420.0
+    assert len(payload["levels"]) == 1
+    assert payload["levels"][0]["bid_price"] == 151.80
+    assert payload["total_buy_qty"] == 225.0
+    assert payload["total_sell_qty"] == 175.0
+    assert payload["buy_percent"] == 56.2
+    assert payload["sell_percent"] == 43.8
+    assert payload["timestamp"] is not None
+    assert payload["instrument"]["exchange_code"] == "NFO"
+
+
+def test_option_orderbook_missing_underlying_returns_400(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'opt_ob_missing.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/option-orderbook?expiry=2026-06-30&strike=23500&right=call")
+    assert response.status_code == 400
+    assert "underlying" in response.get_json()["error"].lower()
+
+
+def test_option_orderbook_missing_expiry_returns_400(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'opt_ob_missing_exp.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/option-orderbook?underlying=NIFTY&strike=23500&right=call")
+    assert response.status_code == 400
+    assert "expiry" in response.get_json()["error"].lower()
+
+
+def test_option_orderbook_missing_strike_returns_400(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'opt_ob_missing_strike.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&right=call")
+    assert response.status_code == 400
+    assert "strike" in response.get_json()["error"].lower()
+
+
+def test_option_orderbook_invalid_right_returns_400(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'opt_ob_bad_right.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&strike=23500&right=straddle")
+    assert response.status_code == 400
+    assert "right" in response.get_json()["error"].lower()
+
+
+def test_option_orderbook_unsupported_underlying_returns_400(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'opt_ob_bad_ul.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/option-orderbook?underlying=SENSEX&expiry=2026-06-30&strike=50000&right=call")
+    assert response.status_code == 400
+    assert "SENSEX" in response.get_json()["error"]
+
+
+def test_option_orderbook_empty_breeze_response_returns_safe_error(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'opt_ob_empty.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_option_chain_quotes", return_value=[],
+    ):
+        response = client.get("/api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&strike=23500&right=call")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "error"
+    assert "no data" in payload["error"].lower()
+    assert payload["ltp"] is None
+    assert payload["levels"] == []
+
+
+def test_option_orderbook_missing_bid_ask_fields_does_not_crash(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'opt_ob_partial.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_option_chain_quotes",
+        return_value=[{"ltp": "100.00", "strike_price": "23500"}],
+    ):
+        response = client.get("/api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&strike=23500&right=call")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["ltp"] == 100.0
+    assert payload["bid_price"] is None
+    assert payload["ask_price"] is None
+    assert payload["bid_qty"] is None
+    assert payload["ask_qty"] is None
+    assert payload["levels"] == []
+    assert payload["total_buy_qty"] == 0.0
+    assert payload["total_sell_qty"] == 0.0
+    assert payload["buy_percent"] == 50.0
+    assert payload["sell_percent"] == 50.0
+
+
+def test_option_orderbook_zero_totals_handles_percent_safely(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'opt_ob_zero.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_option_chain_quotes",
+        return_value=[{
+            "ltp": "100.00",
+            "best_bid_price": "99.50",
+            "best_offer_price": "100.50",
+            "best_bid_qty": "0",
+            "best_offer_qty": "0",
+        }],
+    ):
+        response = client.get("/api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&strike=23500&right=call")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["bid_qty"] == 0.0
+    assert payload["ask_qty"] == 0.0
+    assert payload["buy_percent"] == 50.0
+    assert payload["sell_percent"] == 50.0

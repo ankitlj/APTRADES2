@@ -8,11 +8,11 @@ from typing import Any
 
 from flask import current_app
 
-from .breeze_gateway import BreezeGateway, BreezeGatewayError
+from .breeze_gateway import BreezeGateway, BreezeGatewayError, BreezeInstrument
 from .master_contract_service import MasterContractService
 from .positions_service import PositionsService, PositionsServiceError
 from .quote_service import QuoteRequest, QuoteService, QuoteServiceError
-from .symbol_resolver import ResolvedInstrument
+from .symbol_resolver import ResolvedInstrument, SymbolResolver
 
 _CHART_CACHE_TTL = 300  # 5 minutes — daily candles change slowly
 _CHART_CACHE_KEY_PREFIX = "_DASHBOARD_CHART_CACHE_"
@@ -222,6 +222,172 @@ class DashboardService:
             with _chart_cache_lock:
                 cache_store[cache_key] = (time.monotonic(), result)
         return result
+
+    _OPTION_ORDERBOOK_UNDERLYINGS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"}
+
+    def get_option_orderbook(
+        self,
+        underlying: str,
+        exchange: str,
+        expiry: str,
+        strike: str,
+        right: str,
+    ) -> dict[str, Any]:
+        normalized_underlying = underlying.strip().upper()
+        normalized_exchange = exchange.strip().upper()
+        normalized_expiry = expiry.strip()
+        normalized_strike = strike.strip()
+        normalized_right = right.strip().lower()
+
+        if not normalized_underlying or normalized_underlying not in self._OPTION_ORDERBOOK_UNDERLYINGS:
+            raise DashboardServiceError(
+                f"Unsupported underlying '{underlying}'. Supported: {', '.join(sorted(self._OPTION_ORDERBOOK_UNDERLYINGS))}."
+            )
+        if not normalized_expiry:
+            raise DashboardServiceError("expiry is required (ISO date string).")
+        if not normalized_strike:
+            raise DashboardServiceError("strike is required.")
+        if normalized_right not in ("call", "put"):
+            raise DashboardServiceError("right must be 'call' or 'put'.")
+
+        try:
+            resolver = SymbolResolver(self.dependencies.database_url)
+            cash_resolved = resolver.resolve(normalized_underlying, "NSE", product_type="cash")
+            broker_symbol = cash_resolved.broker_symbol
+        except Exception as error:
+            raise DashboardServiceError(f"Failed to resolve underlying '{normalized_underlying}': {error}") from error
+
+        expiry_value = f"{normalized_expiry}T06:00:00.000Z"
+        instrument = BreezeInstrument(
+            display_symbol=broker_symbol,
+            stock_code=broker_symbol,
+            exchange_code=normalized_exchange,
+            product_type="options",
+            right=normalized_right,
+            strike_price=normalized_strike,
+            expiry_date=expiry_value,
+        )
+
+        try:
+            rows = self.gateway.get_option_chain_quotes(instrument)
+        except BreezeGatewayError as error:
+            raise DashboardServiceError(f"Breeze option chain request failed: {error}") from error
+
+        if not isinstance(rows, list) or len(rows) == 0:
+            return self._empty_option_orderbook(
+                underlying=normalized_underlying,
+                exchange=normalized_exchange,
+                expiry=normalized_expiry,
+                strike=normalized_strike,
+                right=normalized_right,
+                broker_symbol=broker_symbol,
+                error="Breeze returned no data for this option contract.",
+            )
+
+        row = rows[0] if isinstance(rows[0], dict) else {}
+        ltp = self._to_float(row.get("ltp"))
+        bid_price = self._to_float(row.get("best_bid_price") or row.get("bid_price"))
+        ask_price = self._to_float(row.get("best_offer_price") or row.get("ask_price"))
+        bid_qty = self._to_float(row.get("best_bid_qty") or row.get("bid_qty"))
+        ask_qty = self._to_float(row.get("best_offer_qty") or row.get("ask_qty") or row.get("ask_quantity"))
+        previous_close = self._to_float(row.get("previous_close") or row.get("close"))
+        oi = self._to_float(row.get("open_interest") or row.get("oi") or row.get("openinterest"))
+        volume = self._to_float(
+            row.get("total_quantity_traded") or row.get("volume") or row.get("trade_volume")
+        )
+        spot_price = self._to_float(row.get("spot_price"))
+
+        total_buy = bid_qty if bid_qty is not None else 0.0
+        total_sell = ask_qty if ask_qty is not None else 0.0
+        total = total_buy + total_sell
+        buy_percent = round((total_buy / total) * 100, 1) if total > 0 else 50.0
+        sell_percent = round((total_sell / total) * 100, 1) if total > 0 else 50.0
+
+        level = {}
+        if bid_qty is not None:
+            level["bid_qty"] = bid_qty
+        if bid_price is not None:
+            level["bid_price"] = bid_price
+        if ask_price is not None:
+            level["ask_price"] = ask_price
+        if ask_qty is not None:
+            level["ask_qty"] = ask_qty
+
+        return {
+            "status": "ok",
+            "underlying": normalized_underlying,
+            "exchange": normalized_exchange,
+            "expiry": normalized_expiry,
+            "strike": self._to_float(normalized_strike) or normalized_strike,
+            "right": normalized_right,
+            "instrument": {
+                "display_symbol": broker_symbol,
+                "broker_symbol": broker_symbol,
+                "stock_code": broker_symbol,
+                "exchange_code": normalized_exchange,
+                "product_type": "options",
+                "token": None,
+                "stock_token": None,
+            },
+            "ltp": ltp,
+            "previous_close": previous_close,
+            "bid_price": bid_price,
+            "bid_qty": bid_qty,
+            "ask_price": ask_price,
+            "ask_qty": ask_qty,
+            "levels": [level] if level else [],
+            "total_buy_qty": total_buy,
+            "total_sell_qty": total_sell,
+            "buy_percent": buy_percent,
+            "sell_percent": sell_percent,
+            "spot_price": spot_price,
+            "underlying_ltp": spot_price,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    @staticmethod
+    def _empty_option_orderbook(
+        *,
+        underlying: str,
+        exchange: str,
+        expiry: str,
+        strike: str,
+        right: str,
+        broker_symbol: str,
+        error: str,
+    ) -> dict[str, Any]:
+        return {
+            "status": "error",
+            "underlying": underlying,
+            "exchange": exchange,
+            "expiry": expiry,
+            "strike": strike,
+            "right": right,
+            "instrument": {
+                "display_symbol": broker_symbol,
+                "broker_symbol": broker_symbol,
+                "stock_code": broker_symbol,
+                "exchange_code": exchange,
+                "product_type": "options",
+                "token": None,
+                "stock_token": None,
+            },
+            "ltp": None,
+            "previous_close": None,
+            "bid_price": None,
+            "bid_qty": None,
+            "ask_price": None,
+            "ask_qty": None,
+            "levels": [],
+            "total_buy_qty": 0,
+            "total_sell_qty": 0,
+            "buy_percent": 50.0,
+            "sell_percent": 50.0,
+            "spot_price": None,
+            "underlying_ltp": None,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "error": error,
+        }
 
     def _resolve_chart_instrument(self, symbol: str) -> ResolvedInstrument:
         return self.quote_service.symbol_resolver.resolve(symbol, "NSE", product_type="cash")

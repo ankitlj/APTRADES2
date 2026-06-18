@@ -47,3 +47,27 @@ def dashboard_chart() -> tuple[object, int]:
     except DashboardServiceError as error:
         return jsonify({"status": "error", "error": str(error)}), 400
     return jsonify(payload), 200
+
+
+@dashboard_bp.get("/dashboard/option-orderbook")
+def dashboard_option_orderbook() -> tuple[object, int]:
+    underlying = str(request.args.get("underlying", "")).strip()
+    exchange = str(request.args.get("exchange", "NFO")).strip() or "NFO"
+    expiry = str(request.args.get("expiry", "")).strip()
+    strike = str(request.args.get("strike", "")).strip()
+    right = str(request.args.get("right", "")).strip().lower()
+
+    if not underlying:
+        return jsonify({"status": "error", "error": "underlying is required."}), 400
+    if not expiry:
+        return jsonify({"status": "error", "error": "expiry is required (ISO date string)."}), 400
+    if not strike:
+        return jsonify({"status": "error", "error": "strike is required."}), 400
+    if not right or right not in ("call", "put"):
+        return jsonify({"status": "error", "error": "right must be 'call' or 'put'."}), 400
+
+    try:
+        payload = _dashboard_service().get_option_orderbook(underlying, exchange, expiry, strike, right)
+    except DashboardServiceError as error:
+        return jsonify({"status": "error", "error": str(error)}), 400
+    return jsonify(payload), 200

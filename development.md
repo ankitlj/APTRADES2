@@ -2066,3 +2066,66 @@ Unplug chart from `/dashboard` and replace the same grid area with a new live op
 - Chart API route `GET /api/dashboard/chart` confirmed intact in `backend/app/api/dashboard.py`
 - No console errors expected (all JSX + native `<select>` elements)
 - Dark/light theme preserved
+
+### 2026-06-19 - Part 2: Dashboard Option Orderbook Backend API
+
+#### Goal
+Create `GET /api/dashboard/option-orderbook` — lightweight backend endpoint returning single-option bid/ask/ltp/depth data using Breeze's `/optionchain` endpoint with a specific strike price.
+
+#### Changes
+
+**`backend/app/services/dashboard_service.py`:**
+- Added `BreezeInstrument`, `SymbolResolver` to imports
+- Added `_OPTION_ORDERBOOK_UNDERLYINGS = {"NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"}`
+- Added `get_option_orderbook(self, underlying, exchange, expiry, strike, right) -> dict`:
+  - Validates inputs (underlying in allowed set, expiry not empty, strike not empty, right in call/put)
+  - Resolves underlying via `SymbolResolver` (NSE cash → broker_symbol)
+  - Builds `BreezeInstrument` with specific `strike_price` and `right`
+  - Calls `self.gateway.get_option_chain_quotes(instrument)` — single-strike Breeze call (fast, one row)
+  - Extracts: `ltp`, `bid_price` (from `best_bid_price`/`bid_price`), `ask_price`, `bid_qty`, `ask_qty`, `previous_close`, `oi`, `volume`, `spot_price`
+  - Calculates `total_buy_qty`, `total_sell_qty`, `buy_percent`, `sell_percent` from bid/ask qty
+  - Safe fallback: missing bid/ask fields → `None`; zero totals → 50/50 split
+  - Returns structured response with `levels[]` array (one level for top-of-book)
+- Added `_empty_option_orderbook()` static method for graceful Breeze-empty-response handling
+
+**`backend/app/api/dashboard.py`:**
+- Added `GET /dashboard/option-orderbook` route with input validation for required params (underlying, expiry, strike, right)
+- Catches `DashboardServiceError` → `400` with error message
+- Delegates to `_dashboard_service().get_option_orderbook(...)`
+
+**`backend/tests/test_dashboard_contract.py`:**
+- 9 new tests (135 total):
+  - Valid request returns all expected keys (ltp, bid, ask, qty, percentages, levels)
+  - Missing underlying → 400
+  - Missing expiry → 400
+  - Missing strike → 400
+  - Invalid right → 400
+  - Unsupported underlying (SENSEX) → 400
+  - Empty Breeze response → safe error (status "error", ltp null, not 500)
+  - Missing bid/ask fields → does not crash (nulls, empty levels, 50/50 split)
+  - Zero bid/ask quantities → safe 50/50 percent split
+
+#### Data contract
+```
+GET /api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&strike=23500&right=call
+→ {
+  "status": "ok",
+  "underlying": "NIFTY", "exchange": "NFO", "expiry": "2026-06-30",
+  "strike": 23500.0, "right": "call",
+  "instrument": { "display_symbol": "...", "broker_symbol": "...", "exchange_code": "NFO", ... },
+  "ltp": 152.35, "previous_close": 148.20, "spot_price": 23420.0,
+  "bid_price": 151.80, "bid_qty": 225.0,
+  "ask_price": 152.90, "ask_qty": 175.0,
+  "levels": [{"bid_qty": 225.0, "bid_price": 151.80, "ask_price": 152.90, "ask_qty": 175.0}],
+  "total_buy_qty": 225.0, "total_sell_qty": 175.0,
+  "buy_percent": 56.2, "sell_percent": 43.8,
+  "timestamp": "..."
+}
+```
+
+#### Verification
+- `python -m pytest` → 135/135 passed (9 new option orderbook tests)
+- `npm run build` → 1859 modules, clean (frontend unchanged from Part 1)
+- No backend latency concern: single Breeze `/optionchain` call with specific strike, not full chain
+- `get_option_chain_quotes` uses interactive timeout (10s, 2 attempts)
+- No storage, no Postgres writes, no market_candles, no websocket changes

@@ -869,3 +869,11 @@ From this point onward, the project is renamed ORIENS.
   - BUY/SELL buttons (disabled until valid selection)
 - Files changed: 1 new + 1 modified (frontend only).
 - Verification: `npm run build` -> 1859 modules; `python -m pytest` -> 126 passed.
+
+## 2026-06-19 - Part 2: Dashboard Option Orderbook Backend API
+
+- Added `GET /api/dashboard/option-orderbook` endpoint in `dashboard.py`.
+- Added `get_option_orderbook()` in `dashboard_service.py` — validates inputs, calls Breeze `/optionchain` with specific strike, returns structured bid/ask/ltp/depth response.
+- 9 new contract tests in `test_dashboard_contract.py`: valid request, missing params, invalid right, unsupported underlying, empty response, missing fields, zero qty.
+- Backend only (frontend unchanged from Part 1).
+- Verification: `python -m pytest` -> 135/135 passed; `npm run build` -> 1859 modules.
