@@ -3,6 +3,16 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
+## 2026-06-18 - Step 3: Dashboard chart hover fix
+
+- Tooltip `left` was hard-clamped to `Math.min(mousePos.x, 280)`, making the right half of the chart feel dead (tooltip stuck at 280px).
+- Vertical clamp was also tight (max 190px), restricting hover zone.
+- Fix: replaced hardclamps with `mousePos.containerW` and `mousePos.containerH` dynamic bounds. Tooltip now follows cursor across the full chart width, staying 94px from edges (half estimated tooltip width + padding).
+- `MousePosition` interface added with `containerW`/`containerH` captured from `getBoundingClientRect`.
+- `tooltipRef` added for future measurement.
+- Frontend-only change: `DashboardMarketChart.tsx`. No backend changes.
+- Verification: `npm run build` clean, 1859 modules, bundle +0.08 kB.
+
 ## 2026-06-18 - Step 2b: Remove SENSEX + add ticker fallback cache
 
 - Root cause:

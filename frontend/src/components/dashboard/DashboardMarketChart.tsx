@@ -16,6 +16,13 @@ interface Coordinate {
   y: number;
 }
 
+interface MousePosition {
+  x: number;
+  y: number;
+  containerW: number;
+  containerH: number;
+}
+
 const SUGGESTED_SYMBOLS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
 
 function formatTimeLabel(time: string | null, interval: string): string {
@@ -81,8 +88,9 @@ export function DashboardMarketChart() {
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<DashboardChartResponse | null>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [mousePos, setMousePos] = useState<MousePosition | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
 
   const chartData: ChartPoint[] = useMemo(
     () =>
@@ -152,11 +160,11 @@ export function DashboardMarketChart() {
       const rect = svg.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
-      setMousePos({ x: mouseX, y: mouseY });
       const viewBoxX = (mouseX / rect.width) * 900;
       const xStep = chartData.length > 1 ? 900 / (chartData.length - 1) : 900;
       const index = Math.round(viewBoxX / xStep);
       setHoverIndex(Math.max(0, Math.min(chartData.length - 1, index)));
+      setMousePos({ x: mouseX, y: mouseY, containerW: rect.width, containerH: rect.height });
     },
     [chartData]
   );
@@ -293,10 +301,11 @@ export function DashboardMarketChart() {
 
         {hoverIndex !== null && mousePos && chartData[hoverIndex] && (
           <div
+            ref={tooltipRef}
             className="pointer-events-none absolute z-10 rounded-md border bg-card px-2 py-1.5 text-xs shadow-lg tabular-nums"
             style={{
-              left: Math.max(10, Math.min(mousePos.x, 280)),
-              top: Math.max(5, Math.min(mousePos.y - 48, 190)),
+              left: Math.max(94, Math.min(mousePos.x, mousePos.containerW - 94)),
+              top: Math.max(8, Math.min(mousePos.y - 48, mousePos.containerH - 68)),
               transform: "translateX(-50%)",
             }}
           >

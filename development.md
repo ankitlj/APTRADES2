@@ -1,11 +1,31 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Step 2b — Remove SENSEX + add ticker fallback cache
-- Last completed phase: Step 2b — Complete fix pass
-- Planned next: Websocket zero-tick investigation (if needed)
+- Current phase: Step 3 — Dashboard chart hover fix
+- Last completed phase: Step 3 — Fix pass complete
+- Planned next: Step 4 — Dashboard layout swap
 
-### 2026-06-18 - Step 2b: Remove SENSEX + add ticker fallback cache
+### 2026-06-18 - Step 3: Dashboard chart hover fix
+
+#### Root cause
+- Tooltip `left` was hard-clamped to `Math.min(mousePos.x, 280)`, which capped the tooltip at 280px from the container's left edge. On a ~700px-wide card, the entire right half (420px+) had the tooltip stuck at 280px, making it feel disconnected from the cursor.
+- No container-width-aware positioning — hardcoded pixel bounds that didn't scale with actual card width.
+- Tooltip vertical positioning was also hardcoded with small bounds (max 190px), restricting the hover zone unnecessarily.
+
+#### Fix (frontend-only)
+- `DashboardMarketChart.tsx`:
+  - Added `MousePosition` interface with `containerW` and `containerH` fields (captured from `getBoundingClientRect` on each mouse move).
+  - Replaced hard 280px clamp with `Math.max(94, Math.min(mousePos.x, mousePos.containerW - 94))` — dynamically stays within the actual container width with a 94px margin (half estimated tooltip width + padding).
+  - Replaced hard 190px vertical clamp with `Math.max(8, Math.min(mousePos.y - 48, mousePos.containerH - 68))` — dynamically stays within container height.
+  - Added `tooltipRef` for future measurement if needed.
+  - Not changed: data interval (still 30 days daily), hover index math (still nearest-point), x-axis labels, card overflow (still `overflow-hidden` since tooltip now respects container bounds).
+
+#### Verification
+- `npm run build` → 1859 modules, 489.72 kB JS (negligible +0.08 kB from extra ref + interface).
+- Tooltip now follows cursor across the full chart width (not stuck at 280px).
+- No backend changes — latency unchanged.
+- No console errors expected (all changes are pure style/position logic).
+- Dark theme preserved (no visual style changes, only positioning).
 
 #### Root cause
 - SENSEX (BSE/cash): Breeze quote API returns ltp=0 for BSESEN/BSE — not a usable source.
