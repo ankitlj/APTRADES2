@@ -22,7 +22,7 @@ from .api.positions import positions_bp
 from .api.quotes import quotes_bp
 from .api.strategy import strategy_bp
 from .config import load_config
-from .db import ensure_tables
+from .db import create_session_factory, ensure_tables
 from .errors import register_error_handlers
 from .rate_limit import init_rate_limiting
 from .realtime import init_realtime
@@ -50,6 +50,24 @@ def _register_cli(app: Flask) -> None:
         print(json.dumps(payload, indent=2))
 
     app.cli.add_command(master_contract_cli)
+
+    market_data_cli = AppGroup("market-data")
+
+    @market_data_cli.command("cleanup-candles")
+    def cleanup_market_candles_command() -> None:
+        database_url = app.config.get("DATABASE_URL")
+        if not database_url:
+            print("No DATABASE_URL configured — nothing to clean.")
+            return
+        from .models import MarketCandle
+        ensure_tables(database_url)
+        session_factory = create_session_factory(database_url)
+        with session_factory() as session:
+            rows = session.query(MarketCandle).delete()
+            session.commit()
+            print(f"Deleted {rows} rows from market_candles.")
+
+    app.cli.add_command(market_data_cli)
 
 
 def create_app() -> Flask:
