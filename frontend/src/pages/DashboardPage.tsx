@@ -15,7 +15,7 @@ import {
 } from "@/lib/api";
 import { useLiveMarketData, useLiveSubscribe } from "@/hooks/useLiveMarketData";
 import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
-import { DashboardMarketChart } from "@/components/dashboard/DashboardMarketChart";
+import { DashboardOptionOrderBook } from "@/components/dashboard/DashboardOptionOrderBook";
 import { formatNumber, formatCurrency, formatPercent, pnlColor, toneColor, alertDotColor } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -280,7 +280,7 @@ export function DashboardPage() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2.2fr)_minmax(280px,0.8fr)]">
-        <DashboardMarketChart />
+        <DashboardOptionOrderBook />
 
         <Card>
           <CardHeader className="flex-row items-center justify-between border-b px-4 py-3">

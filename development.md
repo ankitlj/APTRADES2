@@ -1881,3 +1881,188 @@ Step 2: Add constants + `useSvgPoint` helper. Step 3: Replace mouse mapping with
 - `python -m pytest` -> 126/126 passed (no backend changes)
 - No console errors expected (all changes are pure positioning/mapping logic)
 - Dark/light theme preserved (no visual style changes, only coordinate math)
+
+### 2026-06-19 - Part 0: Dashboard Option Orderbook — Diagnosis
+
+#### What existing backend endpoints provide option chain/orderbook depth
+| Endpoint | Provides | Latency |
+|---|---|---|
+| `GET /api/options/expiries?underlying=NIFTY` | Expiry dates for an underlying | Fast (DB query) |
+| `GET /api/option-chain?underlying=NIFTY&expiry=...&strike_count=12` | Full option chain: all strikes with bid/ask/ltp/oi/volume for CALL and PUT | ~3-4s (2 Breeze calls) |
+| `GET /api/quotes?symbol=...&exchange=...` | Single instrument quote | ~1-3s |
+| `POST /api/quotes/batch` | Batch quotes (parallel) | ~2-4s |
+
+No existing endpoint returns 5-level market depth. Breeze does not provide a market depth API for options — only top-of-book (single best bid/ask) via the `/optionchain` endpoint fields `best_bid_price`, `best_offer_price`, `bid_qty`, `ask_qty`.
+
+#### Does Breeze payload have enough fields for a bid/ask table?
+Breeze `/optionchain` response fields per leg:
+- `ltp / last_price / last / close` — last traded price
+- `best_bid_price / bid_price / bid` — top bid price
+- `best_offer_price / ask_price / ask` — top ask price
+- `open_interest / oi` — open interest
+- `volume / total_quantity / vol_today` — traded volume
+
+Breeze does NOT provide:
+- 5-level bid/ask depth (bid2-bid5, ask2-ask5)
+- Aggregate total buy/sell quantities at the instrument level
+- Cumulative depth percentages
+
+The `bid_qty` and `ask_qty` fields may or may not be present in the Breeze response. The existing `_normalize_leg()` in `option_chain_service.py` does not extract them. We can add extraction in the new endpoint.
+
+**Verdict**: Top-of-book only. One bid/ask row per option contract. If Breeze returns `bid_qty`/`ask_qty`, we show them. If not, we show qty as "—".
+
+#### Do we need a new backend endpoint?
+**Yes.** `GET /api/dashboard/option-orderbook` with query params:
+- `underlying` (required) — NIFTY, BANKNIFTY, FINNIFTY, NIFTYMID50
+- `expiry` (required) — ISO date string
+- `strike` (required) — strike price as number/string
+- `right` (required) — "call" or "put"
+
+Rationale:
+- The existing option-chain endpoint returns ALL strikes (30+ rows), which is wasteful for a single-strike orderbook view
+- A dedicated endpoint can make ONE Breeze call (either `/quotes` or `/optionchain` filtered) instead of two
+- Can return a simpler, faster response focused on bid/ask/ltp/depth
+- Follows the same pattern as other single-purpose endpoints (`/dashboard/chart`, `/dashboard/summary`)
+
+Implementation plan:
+- Use `BreezeGateway.get_quote()` internally (single quote call, not full chain)
+- Or use `BreezeGateway.get_option_chain_quotes()` with specific strike (faster than fetching all strikes)
+- Extract bid_price, ask_price, ltp, bid_qty, ask_qty, volume, oi
+- Calculate buy/sell percentages from bid/ask quantities
+- Return standardized response
+
+#### Proposed component architecture
+```
+DashboardOptionOrderBook
+├── Header: "Order Book" title
+├── Selector row
+│   ├── Underlying <select>: NIFTY, BANKNIFTY, FINNIFTY, NIFTYMID50
+│   ├── Expiry <select>: loaded from GET /api/options/expiries
+│   └── Strike + Right <select>: loaded from GET /api/option-chain?strike_count=0 (full chain) or separate per-right endpoint
+├── Selected instrument summary card
+│   └── Symbol | Strike | Right | LTP | Connection badge
+├── Orderbook table (1 row if top-of-book only)
+│   ├── Qty | Bid | Ask | Qty
+│   └── Fallback: "Market depth limited to top-of-book by Breeze"
+├── Market depth card
+│   ├── Buy % / Sell % (calculated from bid/ask qty)
+│   ├── Total buy qty / Total sell qty
+│   └── Green/red progress bar
+└── Action buttons
+    ├── BUY button (disabled until valid contract)
+    └── SELL button (disabled until valid contract)
+```
+
+State coverage:
+- Loading: selectors disabled, skeleton placeholders
+- Empty: no expiries / no strikes / no option data available
+- Error: Breeze error message displayed
+- Disconnected: stale badge on live data
+- Valid: full interactive orderbook
+
+#### Files that will be changed
+
+**Part 1 (Frontend Shell):**
+| File | Change |
+|---|---|
+| `frontend/src/pages/DashboardPage.tsx` | Replace `<DashboardMarketChart />` with `<DashboardOptionOrderBook />`, add import |
+| `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` | **New** — full component with state, selectors, table, depth card, buttons |
+| `frontend/src/lib/format.ts` | Possibly add helper for buy/sell percentage formatting |
+| `development.md` | Update |
+| `REBUILD.md` | Update |
+
+**Part 2 (Backend Endpoint):**
+| File | Change |
+|---|---|
+| `backend/app/api/dashboard.py` | Add `GET /option-orderbook` route |
+| `backend/app/services/dashboard_service.py` | Add `get_option_orderbook()` method |
+| `backend/app/services/breeze_gateway.py` | Possibly add helper for single-option quote parsing |
+| `backend/tests/test_dashboard_contract.py` | Add contract tests for new endpoint |
+| `development.md` | Update |
+| `REBUILD.md` | Update |
+
+**Part 3 (Frontend Data Wiring):**
+| File | Change |
+|---|---|
+| `frontend/src/lib/api.ts` | Add `getDashboardOptionOrderbook()` + TypeScript interfaces |
+| `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` | Wire selectors and data fetching |
+| `development.md` | Update |
+| `REBUILD.md` | Update |
+
+**Part 4 (WebSocket Live):**
+| File | Change |
+|---|---|
+| `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` | Add `useLiveSubscribe` for selected option |
+| `backend/app/realtime.py` | Possibly extend `resolve_subscription_items` for options |
+| `backend/app/services/symbol_resolver.py` | Possibly add option contract resolution path |
+| `development.md` | Update |
+| `REBUILD.md` | Update |
+
+**Part 5 (Buy/Sell Buttons):**
+| File | Change |
+|---|---|
+| `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` | Add confirmation modal / disabled state |
+| `development.md` | Update |
+| `REBUILD.md` | Update |
+
+**Part 6 (Latency Test):**
+| File | Change |
+|---|---|
+| `development.md` | Record latency results |
+
+#### Risks
+1. **5-level market depth unavailable**: Breeze does not provide multi-level depth for options. The orderbook table will show one bid/ask row with a note. Not ideal but truthful.
+2. **bid_qty / ask_qty may be absent**: Breeze may not return quantities with bid/ask. We show "—" and use 0 for percentage calculations (safe fallback).
+3. **Total buy/sell**: Breeze does not provide aggregate totals. We must either calculate from top-of-book (single level = total) or omit. Single-level totals are misleading — we should clearly label "Top of book" or omit.
+4. **Option subscription via websocket**: `useLiveSubscribe` requires symbol resolution for options. We need to verify `SymbolResolver.resolve()` can handle option contracts with product_type="options", right, strike, expiry_date. This may not work in the current implementation.
+5. **Breeze quote latency for options**: Individual option quotes via Breeze REST can be slow. The option orderbook endpoint must use short timeouts (established pattern: 10s timeout, 2 attempts) and have a cache strategy.
+6. **Underlying symbol mismatch**: The frontend uses NSE cash symbols (NIFTY, BANKNIFTY) but options trade on NFO. The resolver must correctly map to NFO option symbols.
+7. **Dashboard layout unchanged**: The chart currently occupies `[minmax(0,2.2fr)_minmax(280px,0.8fr)]` grid. The new component must fit this exact space without overflow.
+8. **Existing chart not deleted**: `DashboardMarketChart.tsx` remains importable and usable. Only `DashboardPage.tsx` rendering is changed.
+
+#### Proceed to Part 1?
+Part 0 diagnosis complete. Ready for user approval to start Part 1 (Frontend Shell).
+
+### 2026-06-19 - Part 1: Dashboard Option Orderbook Frontend Shell
+
+#### Goal
+Unplug chart from `/dashboard` and replace the same grid area with a new live option orderbook shell component. No real data wiring — pure layout shell.
+
+#### Changes
+
+**New file:** `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
+- Full card component wrapping in `<Card className="overflow-hidden">` matching chart panel style
+- **Header**: "Order Book" title with "Awaiting selection" badge
+- **Selector row** (3-column grid):
+  - Underlying `<select>`: NIFTY, BANKNIFTY, FINNIFTY, NIFTYMID50
+  - Expiry `<select>`: disabled until underlying selected
+  - Strike+Right `<select>`: disabled until expiry selected
+- **Selected instrument summary**: Shows symbol, expiry, strike, right, LTP placeholder (`Awaiting data`)
+- **Orderbook table**: Qty | Bid | Ask | Qty columns with green bid / red ask styling. Single row placeholder when selected. Empty state: "No option selected". Note: "Full market depth is unavailable from Breeze."
+- **Market depth card**: Buy/Sell percentage bar (0% when no data), total buy/sell qty as "—"
+- **BUY/SELL buttons**: Green BUY, red SELL using Button component. Both disabled until valid selection.
+- All selectors use native `<select>` styled to match ORIENS (border, background, focus ring, disabled state)
+- Accessible labels (`aria-label`, `<label htmlFor>`)
+- Keyboard usable (native `<select>` is keyboard-accessible by default)
+- Responsive: selectors stack on mobile (`grid-cols-1 sm:grid-cols-3`)
+- States covered: empty (no selection), loading (selectors disabled), partial (underlying selected, awaiting expiry/strike)
+
+**Modified file:** `frontend/src/pages/DashboardPage.tsx`
+- Replaced `DashboardMarketChart` import with `DashboardOptionOrderBook` import
+- Replaced `<DashboardMarketChart />` render with `<DashboardOptionOrderBook />`
+- Grid layout unchanged: `[minmax(0,2.2fr)_minmax(280px,0.8fr)]`
+- Alerts panel untouched
+
+**Not changed:**
+- `DashboardMarketChart.tsx` — preserved in full, importable, API routes intact
+- Backend — no changes
+- Other frontend files/pages/components
+- Sidebar, footer, ticker, theme
+
+#### Verification
+- `npm run build` -> 1859 modules, clean build (490.98 KB JS, 55.68 KB CSS)
+- `python -m pytest` -> 126/126 passed (no backend changes)
+- Chart file `DashboardMarketChart.tsx` confirmed still exists
+- Chart API route `GET /api/dashboard/chart` confirmed intact in `backend/app/api/dashboard.py`
+- No console errors expected (all JSX + native `<select>` elements)
+- Dark/light theme preserved

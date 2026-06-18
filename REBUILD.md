@@ -855,3 +855,17 @@ From this point onward, the project is renamed ORIENS.
 - Top-header avatar menu still lists the 5 tools.
 - Files changed: `frontend/src/components/layout/Navbar.tsx`
 - Verification: `python -m pytest` -> 124 passed; `npm.cmd run build` -> 1853 modules.
+
+## 2026-06-19 - Part 1: Dashboard Option Orderbook Shell
+
+- Created `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` — new card component replacing chart in dashboard grid.
+- Unplugged chart from `DashboardPage.tsx`: replaced `<DashboardMarketChart />` with `<DashboardOptionOrderBook />`.
+- Chart file `DashboardMarketChart.tsx` preserved (not deleted), chart API route preserved.
+- Component features (shell only, no real data):
+  - Underlying / Expiry / Strike selectors with cascading enable/disable
+  - Selected instrument summary strip
+  - Orderbook table (bid/ask top-of-book only, Breeze limitation noted)
+  - Market depth card with buy/sell percentage bar
+  - BUY/SELL buttons (disabled until valid selection)
+- Files changed: 1 new + 1 modified (frontend only).
+- Verification: `npm run build` -> 1859 modules; `python -m pytest` -> 126 passed.
