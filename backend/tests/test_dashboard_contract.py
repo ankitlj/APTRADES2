@@ -319,8 +319,8 @@ def test_dashboard_alerts_pending_when_no_cached_positions(tmp_path):
         "app.services.breeze_gateway.BreezeGateway.is_configured",
         return_value=True,
     ), patch(
-        "app.services.breeze_gateway.BreezeGateway.auth_diagnostic",
-        return_value={"status": "ok", "user_id": "AJ510524", "configured": True, "session_token_received": True},
+        "app.services.breeze_gateway.BreezeGateway.get_portfolio_positions",
+        side_effect=BreezeGatewayError("No Positions available."),
     ):
         response = client.get("/api/dashboard/alerts")
 
@@ -332,3 +332,201 @@ def test_dashboard_alerts_pending_when_no_cached_positions(tmp_path):
     assert any(alert["title"] == "Master contract loaded" for alert in payload["alerts"])
     # Verify no fresh broker call was made — positions endpoint should never be called
     assert all("positions" not in alert["title"].lower() or alert["title"] == "Positions snapshot pending" for alert in payload["alerts"])
+
+
+def test_dashboard_summary_ticker_has_exactly_4_symbols(tmp_path):
+    """After SENSEX removal, the top ticker must contain exactly 4 items and
+    never include SENSEX."""
+    import app.services.dashboard_service as svc
+    assert len(svc._TICKER_SYMBOLS) == 4
+    keys = [item["symbol"] for item in svc._TICKER_SYMBOLS]
+    assert "SENSEX" not in keys
+    assert "NIFTY" in keys
+    assert "BANKNIFTY" in keys
+    assert "NIFTYMID50" in keys
+    assert "FINNIFTY" in keys
+
+
+def test_dashboard_summary_fallback_uses_cached_value_when_breeze_fails(tmp_path):
+    """When Breeze returns a null LTP for a symbol that previously had a valid
+    value, the dashboard should return the cached value within TTL."""
+    import time
+    from app.services.dashboard_service import _last_good_quotes, _last_good_lock
+
+    # Prime the cache with a good value for NIFTY
+    with _last_good_lock:
+        _last_good_quotes["NIFTY"] = {
+            "ltp": 24168.0,
+            "change_percent": 0.34,
+            "ts": time.monotonic(),
+        }
+
+    database_url = f"sqlite:///{tmp_path / 'dashboard_fallback.sqlite'}"
+    _seed_dashboard_data(database_url)
+
+    # Mock Breeze to return a failed quote for NIFTY but success for others
+    call_count = [0]
+    def _mock_quote(instrument):
+        call_count[0] += 1
+        if instrument.stock_code == "NIFTY":
+            # Simulate Breeze returning null ltp
+            return [{"ltp": None, "previous_close": 24150.0}]
+        return _quote_response(instrument)
+
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote",
+        side_effect=_mock_quote,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_portfolio_positions",
+        return_value=[],
+    ):
+        response = client.get("/api/dashboard/summary")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    ticker = {item["symbol"]: item for item in payload["ticker"]}
+    # NIFTY should use cached value (24168.0) instead of null
+    assert ticker["NIFTY"]["ltp"] == 24168.0
+    assert ticker["NIFTY"]["change_percent"] == 0.34
+
+    # Cleanup
+    with _last_good_lock:
+        _last_good_quotes.pop("NIFTY", None)
+
+
+def test_dashboard_summary_updates_cache_on_valid_quote(tmp_path):
+    """When Breeze returns a valid LTP, the cache must be updated with the new
+    value."""
+    import time as time_module
+    from app.services.dashboard_service import _last_good_quotes, _last_good_lock
+
+    # Clear any leftover
+    with _last_good_lock:
+        _last_good_quotes.clear()
+
+    database_url = f"sqlite:///{tmp_path / 'dashboard_cache_update.sqlite'}"
+    _seed_dashboard_data(database_url)
+
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote",
+        side_effect=_quote_response,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_portfolio_positions",
+        return_value=[],
+    ):
+        response = client.get("/api/dashboard/summary")
+
+    assert response.status_code == 200
+    # NIFTY should have been cached
+    with _last_good_lock:
+        cached = _last_good_quotes.get("NIFTY")
+    assert cached is not None
+    assert cached["ltp"] == 23440.0  # from test fixture _quote_response
+    # Ensure timestamp is recent
+    assert (time_module.monotonic() - cached["ts"]) < 5
+
+    # Cleanup
+    with _last_good_lock:
+        _last_good_quotes.clear()
+
+
+def test_dashboard_summary_stale_cache_returns_null(tmp_path):
+    """When the cached value is older than FALLBACK_TTL, the dashboard should
+    return null/Unavailable instead of the stale cache."""
+    import time
+    from app.services.dashboard_service import _last_good_quotes, _last_good_lock, _FALLBACK_TTL
+
+    # Prime the cache with a very old value
+    with _last_good_lock:
+        _last_good_quotes["NIFTY"] = {
+            "ltp": 10000.0,
+            "change_percent": 0.0,
+            "ts": time.monotonic() - _FALLBACK_TTL - 10,
+        }
+
+    database_url = f"sqlite:///{tmp_path / 'dashboard_stale.sqlite'}"
+    _seed_dashboard_data(database_url)
+
+    # NIFTY resolution fails because we have no instrument matching NIFTYMID50...
+    # actually, NIFTY is in the seed data, so it resolves fine. Let's make Breeze
+    # return null for it.
+    def _stale_quote(instrument):
+        if instrument.stock_code == "NIFTY":
+            return [{"ltp": None, "previous_close": None}]
+        return _quote_response(instrument)
+
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote",
+        side_effect=_stale_quote,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_portfolio_positions",
+        return_value=[],
+    ):
+        response = client.get("/api/dashboard/summary")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    ticker = {item["symbol"]: item for item in payload["ticker"]}
+    # NIFTY should show null because cache is stale and Breeze returned null
+    assert ticker["NIFTY"]["ltp"] is None
+
+    # Cleanup
+    with _last_good_lock:
+        _last_good_quotes.clear()
+
+
+def test_dashboard_summary_fallback_is_symbol_specific(tmp_path):
+    """One symbol's failed quote should not affect another symbol's cached
+    value."""
+    import time
+    from app.services.dashboard_service import _last_good_quotes, _last_good_lock
+
+    # Prime cache for NIFTY only
+    with _last_good_lock:
+        _last_good_quotes["NIFTY"] = {
+            "ltp": 24168.0,
+            "change_percent": 0.34,
+            "ts": time.monotonic(),
+        }
+
+    database_url = f"sqlite:///{tmp_path / 'dashboard_isolation.sqlite'}"
+    _seed_dashboard_data(database_url)
+
+    # Breeze returns null for NIFTY but good data for CNXBAN
+    def _iso_quote(instrument):
+        if instrument.stock_code == "NIFTY":
+            return [{"ltp": None, "previous_close": 24150.0}]
+        return _quote_response(instrument)
+
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote",
+        side_effect=_iso_quote,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_portfolio_positions",
+        return_value=[],
+    ):
+        response = client.get("/api/dashboard/summary")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    ticker = {item["symbol"]: item for item in payload["ticker"]}
+    # NIFTY uses fallback
+    assert ticker["NIFTY"]["ltp"] == 24168.0
+    # BANKNIFTY gets live data (from _quote_response mock)
+    assert ticker.get("BANKNIFTY") is not None
+
+    # Cleanup
+    with _last_good_lock:
+        _last_good_quotes.pop("NIFTY", None)

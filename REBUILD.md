@@ -3,11 +3,21 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
-## 2026-06-18 - Step 2a: Full symbol chain fix (MIDCAP50)
+## 2026-06-18 - Step 2b: Remove SENSEX + add ticker fallback cache
 
-- Root cause: MIDCAP50 request symbol "MIDCAP50" does not match any broker_symbol (NIFMID), display_symbol (NIFTYMID50), contract_code, or alias in the DB.
-  - SENSEX resolves correctly (display_symbol "SENSEX" matches), ltp=0 is Breeze data issue.
-  - FINNIFTY resolves correctly (display_symbol "FINNIFTY" matches) from code analysis.
+- Root cause:
+  - SENSEX (BSE/cash): Breeze quote API returns ltp=0 for BSESEN/BSE — not a usable live source.
+  - NIFTY/BANKNIFTY/MIDCAP50/FINNIFTY: Breeze intermittently returns null/error. No fallback existed, so a single bad refresh blanked the ticker to "Unavailable".
+  - BANKNIFTY WS display_symbol ("BANK NIFTY") vs REST key ("BANKNIFTY") misaligned: `ticks["BANKNIFTY"]` would never match WS `{"symbol": "BANK NIFTY"}`.
+- Part 1 fix (backend):
+  - `dashboard_service.py`: Removed SENSEX from `_TICKER_SYMBOLS` (now 4). Added `_FALLBACK_TTL=120s` module-level `_last_good_quotes` cache. Added `_is_valid_ticker_quote()` and `_apply_fallback()`.
+  - `realtime.py`: Removed SENSEX from `DEFAULT_WATCHLIST`. Added BANKNIFTY display_symbol normalisation ("BANK NIFTY" → "BANKNIFTY") in `resolve_subscription_items` so WS tick.symbol matches REST key.
+- Part 2 fix (frontend):
+  - `DashboardMarketChart.tsx`: Removed SENSEX from `SUGGESTED_SYMBOLS`, replaced with NIFTYMID50.
+- Symbol-key alignment now: all 4 symbols aligned (WS tick.symbol == REST key).
+- Verification: `python -m pytest` 129 passed (5 new tests); `npm.cmd run build` 1859 modules clean.
+- SENSEX removed from all dashboard-relevant paths (3 files).
+- Fallback TTL: 120 seconds. No latency impact.
 - Part 1 fix: Changed `_TICKER_SYMBOLS` in `dashboard_service.py`:
   - MIDCAP50: request symbol changed from "MIDCAP50" to "NIFTYMID50" (DB display_symbol)
   - Label stays "MIDCAP50" for display

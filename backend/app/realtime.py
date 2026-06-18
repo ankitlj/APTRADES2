@@ -17,11 +17,12 @@ from .services.symbol_resolver import SymbolResolver, SymbolResolverError
 socketio = SocketIO(async_mode="threading", cors_allowed_origins="*")
 
 # The default dashboard watchlist that every connected client gets streamed.
-# All 5 are cash/index symbols so the top ticker shows spot values, not futures.
+# All 4 are NSE cash/index symbols so the top ticker shows spot values, not futures.
+# SENSEX was removed because Breeze does not return usable live quotes for BSE cash
+# indices.
 DEFAULT_WATCHLIST: list[dict[str, str]] = [
     {"symbol": "NIFTY", "exchange": "NSE", "product_type": "cash"},
     {"symbol": "BANKNIFTY", "exchange": "NSE", "product_type": "cash"},
-    {"symbol": "SENSEX", "exchange": "BSE", "product_type": "cash"},
     {"symbol": "NIFTYMID50", "exchange": "NSE", "product_type": "cash"},
     {"symbol": "FINNIFTY", "exchange": "NSE", "product_type": "cash"},
 ]
@@ -91,9 +92,17 @@ def resolve_subscription_items(
             continue
         if not resolved.token:
             continue
+        display_symbol = resolved.display_symbol
+        # Normalise display_symbol for symbols where the DB alias/seed-row
+        # display_symbol has a space (e.g. "BANK NIFTY") but the REST ticker
+        # response key is the compact form ("BANKNIFTY"). The frontend merge
+        # key is ticks[item.symbol.toUpperCase()], so both paths must emit
+        # the same key.
+        if display_symbol == "BANK NIFTY":
+            display_symbol = "BANKNIFTY"
         resolved_items.append(
             {
-                "display_symbol": resolved.display_symbol,
+                "display_symbol": display_symbol,
                 "broker_symbol": resolved.broker_symbol,
                 "exchange_code": resolved.exchange_code,
                 "product_type": resolved.product_type,

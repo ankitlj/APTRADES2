@@ -23,16 +23,27 @@ class DashboardServiceError(Exception):
     pass
 
 
-# The 5 cash/index symbols shown in the ORIENS top ticker, with their REST
-# quote parameters and display labels. Live websocket ticks (from the default
-# watchlist in realtime.py) are overlaid on top of these snapshot values.
+# The 4 NSE cash/index symbols shown in the ORIENS top ticker, with their REST
+# quote parameters and display labels. SENSEX was removed because Breeze does not
+# return usable live quotes for BSE cash indices. Live websocket ticks (from the
+# default watchlist in realtime.py) are overlaid on top of these snapshot values.
 _TICKER_SYMBOLS: list[dict[str, str | None]] = [
     {"symbol": "NIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "NIFTY 50"},
     {"symbol": "BANKNIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "BANKNIFTY"},
-    {"symbol": "SENSEX", "exchange_code": "BSE", "product_type": "cash", "label": "SENSEX 30"},
     {"symbol": "NIFTYMID50", "exchange_code": "NSE", "product_type": "cash", "label": "MIDCAP50"},
     {"symbol": "FINNIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "FINNIFTY"},
 ]
+
+# Fallback TTL for last-known-good ticker quotes (seconds). When Breeze returns
+# a null or invalid quote for a ticker symbol, the dashboard will reuse the most
+# recent valid quote for up to this duration instead of showing Unavailable.
+_FALLBACK_TTL = 120
+
+# Per-symbol cache of the last valid ticker quote. Keyed by _TICKER_SYMBOLS
+# symbol key (e.g. "NIFTY"). Each entry: {"ltp": float, "change_percent": float | None,
+# "ts": monotonic()}. Guarded by _last_good_lock.
+_last_good_quotes: dict[str, dict[str, Any]] = {}
+_last_good_lock = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -84,14 +95,18 @@ class DashboardService:
         totals = positions_payload["totals"]
         metrics = self._portfolio_metrics(totals)
 
+        ticker: list[dict[str, Any]] = []
+        for result, item in zip(quote_results, _TICKER_SYMBOLS):
+            symbol_key = str(item["symbol"])
+            ticker_item = self._ticker_item(result, str(item.get("label", result["symbol"])))
+            ticker_item = self._apply_fallback(ticker_item, symbol_key)
+            ticker.append(ticker_item)
+
         return {
             "status": "ok",
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "metrics": metrics,
-            "ticker": [
-                self._ticker_item(result, str(item.get("label", result["symbol"])))
-                for result, item in zip(quote_results, _TICKER_SYMBOLS)
-            ],
+            "ticker": ticker,
             "positions_status": positions_payload["status"],
             "positions_error": positions_payload.get("error"),
             "positions": positions_payload["positions"][:8],
@@ -352,3 +367,41 @@ class DashboardService:
             return float(str(value).replace(",", ""))
         except ValueError:
             return None
+
+    @staticmethod
+    def _is_valid_ticker_quote(result: dict[str, Any]) -> bool:
+        if result.get("status") != "ok":
+            return False
+        quote = result.get("quote")
+        if not isinstance(quote, dict):
+            return False
+        ltp = DashboardService._to_float(quote.get("ltp"))
+        if ltp is None or ltp <= 0:
+            return False
+        return True
+
+    def _apply_fallback(self, ticker_item: dict[str, Any], symbol_key: str) -> dict[str, Any]:
+        current_ltp = ticker_item.get("ltp")
+        if current_ltp is not None and current_ltp > 0:
+            with _last_good_lock:
+                _last_good_quotes[symbol_key] = {
+                    "ltp": current_ltp,
+                    "change_percent": ticker_item.get("change_percent"),
+                    "ts": time.monotonic(),
+                }
+            return ticker_item
+
+        with _last_good_lock:
+            cached = _last_good_quotes.get(symbol_key)
+
+        if cached is not None and (time.monotonic() - cached["ts"]) < _FALLBACK_TTL:
+            return {
+                "symbol": ticker_item["symbol"],
+                "label": ticker_item["label"],
+                "broker_symbol": ticker_item.get("broker_symbol"),
+                "ltp": cached["ltp"],
+                "change_percent": cached["change_percent"],
+                "status": ticker_item["status"],
+            }
+
+        return ticker_item

@@ -1,32 +1,47 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Step 2a — Fix SENSEX/MIDCAP50/FINNIFTY ticker resolution failures
-- Last completed phase: Step 2a — Backend symbol resolution fix (Part 1)
-- Planned next: Step 2a — Websocket watchlist fix (Part 2)
+- Current phase: Step 2b — Remove SENSEX + add ticker fallback cache
+- Last completed phase: Step 2b — Complete fix pass
+- Planned next: Websocket zero-tick investigation (if needed)
 
-### 2026-06-18 - Step 2a: Part 1+2 — Full symbol chain fix (MIDCAP50)
+### 2026-06-18 - Step 2b: Remove SENSEX + add ticker fallback cache
 
 #### Root cause
-- MIDCAP50 request symbol "MIDCAP50" does not match any broker_symbol (NIFMID), display_symbol (NIFTYMID50), contract_code, or alias in the DB.
-- SymbolResolver._resolve_cash_instrument fails → SymbolResolverError → status="error" → ltp=null → "Unavailable".
-- SENSEX resolves correctly (display_symbol="SENSEX" matches). ltp=0 is Breeze data behavior, not a symbol config bug.
-- FINNIFTY resolves correctly (display_symbol="FINNIFTY" matches).
+- SENSEX (BSE/cash): Breeze quote API returns ltp=0 for BSESEN/BSE — not a usable source.
+- NIFTY/BANKNIFTY/MIDCAP50/FINNIFTY sometimes show "Unavailable" when Breeze intermittently returns null/error for a valid symbol. The dashboard had no fallback, so a single bad Breeze response immediately blanked the ticker.
+- BANKNIFTY websocket display_symbol was "BANK NIFTY" (with space) but REST returned "BANKNIFTY", causing a merge key mismatch: `ticks["BANKNIFTY"]` would never match `{"symbol": "BANK NIFTY"}`.
 
-#### Part 1 fix (backend REST)
-- `dashboard_service.py`: Changed `_TICKER_SYMBOLS` entry: symbol `"MIDCAP50"` → `"NIFTYMID50"` (the DB display_symbol for NIFMID/NSE/cash). Label stays `"MIDCAP50"`.
+#### Part 1 fix (backend)
+- `dashboard_service.py`:
+  - Removed SENSEX from `_TICKER_SYMBOLS` (now 4 symbols: NIFTY, BANKNIFTY, NIFTYMID50, FINNIFTY)
+  - Added `_FALLBACK_TTL = 120` (2 minutes) for last-known-good quote cache
+  - Added `_last_good_quotes` module-level dict guarded by `_last_good_lock`
+  - Added `_is_valid_ticker_quote()` — rejects null, zero, non-numeric, error-status quotes
+  - Added `_apply_fallback()` — if current quote is invalid, uses cached value within TTL
+  - `get_summary()` now applies fallback per-symbol after building ticker
+- `realtime.py`:
+  - Removed SENSEX from `DEFAULT_WATCHLIST`
+  - Added display_symbol normalisation for BANKNIFTY: resolved "BANK NIFTY" → "BANKNIFTY" at subscription time, so WS emits `symbol="BANKNIFTY"` matching REST response key
 
-#### Part 2 fix (websocket + frontend merge alignment)
-- `realtime.py`: Changed `DEFAULT_WATCHLIST` entry: symbol `"MIDCAP50"` → `"NIFTYMID50"`.
+#### Part 2 fix (frontend)
+- `DashboardMarketChart.tsx`: Removed SENSEX from `SUGGESTED_SYMBOLS`, replaced with NIFTYMID50
 
 #### Symbol-key alignment after fix
 | Symbol | REST result.symbol | WS tick.symbol | Frontend key | Aligned? |
 |---|---|---|---|---|
 | NIFTY | NIFTY | NIFTY | ticks["NIFTY"] | yes |
-| BANKNIFTY | BANKNIFTY | BANK NIFTY | ticks["BANKNIFTY"] | no (pre-existing, live overlay degrades gracefully) |
-| SENSEX | SENSEX | SENSEX | ticks["SENSEX"] | yes |
+| BANKNIFTY | BANKNIFTY | BANKNIFTY | ticks["BANKNIFTY"] | yes (was misaligned: WS was "BANK NIFTY") |
 | MIDCAP50 | NIFTYMID50 | NIFTYMID50 | ticks["NIFTYMID50"] | yes |
 | FINNIFTY | FINNIFTY | FINNIFTY | ticks["FINNIFTY"] | yes |
+
+#### Verification
+- `python -m pytest` → 129 passed (5 new tests: symbol count valid, fallback uses cached, cache updates on valid, stale cache returns null, symbol-specific isolation)
+- `npm.cmd run build` → 1859 modules, build clean
+- `_is_valid_ticker_quote` correctly rejects null, zero, error-status, missing-quote
+- SENSEX removed from all dashboard-relevant paths (3 files)
+- Frontend merge remains: live WS tick > REST snapshot > cached fallback > unavailable
+- No latency regression (fallback is a dict lookup, no network calls)
 
 #### Files changed
 - `backend/app/services/dashboard_service.py`

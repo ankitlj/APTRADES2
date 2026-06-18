@@ -16,7 +16,7 @@ interface Coordinate {
   y: number;
 }
 
-const SUGGESTED_SYMBOLS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"];
+const SUGGESTED_SYMBOLS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
 
 function formatTimeLabel(time: string | null, interval: string): string {
   if (!time) return "";
