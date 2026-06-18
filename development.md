@@ -35,6 +35,9 @@
 #### Verification
 - `python -m pytest` → 124 passed.
 - `npm.cmd run build` → 1859 modules, clean.
+- Bundle size: 489.64 KB JS, 54.23 KB CSS — no material change from prior state.
+- Symbol-key alignment confirmed for all 5 ticker symbols (no merge-key mismatches for the bug-relevant symbols).
+- Dashboard latency: no code path changes that could introduce backend slowdown (one string literal changed in each of two config lists).
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
 - Phase 18 (Performance/Caching): intentionally deferred until Phase 24 fixes are complete
 - Phase 22 note: First pass was rejected (treated as code audit). Rerun followed playbook strictly: 31 API routes tested with real HTTP calls, 3 cold + 3 warm timing measurements, response shape verification for all routes, diagnosis endpoint deep dive. See PHASE22_FINDINGS.md for full evidence.

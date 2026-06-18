@@ -14,7 +14,7 @@ Target repo: `https://github.com/ankitlj/APTRADES2.git`
 - Part 2 fix: Changed `DEFAULT_WATCHLIST` in `realtime.py`:
   - MIDCAP50: symbol changed from "MIDCAP50" to "NIFTYMID50"
 - Symbol-key alignment verified: REST result.symbol = WS tick.symbol = "NIFTYMID50" for MIDCAP50
-- Verification: `python -m pytest` → 124 passed; `npm.cmd run build` → 1859 modules.
+- Verification: `python -m pytest` → 124 passed; `npm.cmd run build` → 1859 modules; bundle size unchanged.
 
 ## 2026-06-18 - Step 2: Top ticker fixes (cash/index symbols, 2dp, BANKNIFTY fix)
 
