@@ -3,15 +3,18 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
-## 2026-06-18 - Step 2a: Part 1 — Backend symbol resolution fix (MIDCAP50)
+## 2026-06-18 - Step 2a: Full symbol chain fix (MIDCAP50)
 
 - Root cause: MIDCAP50 request symbol "MIDCAP50" does not match any broker_symbol (NIFMID), display_symbol (NIFTYMID50), contract_code, or alias in the DB.
   - SENSEX resolves correctly (display_symbol "SENSEX" matches), ltp=0 is Breeze data issue.
   - FINNIFTY resolves correctly (display_symbol "FINNIFTY" matches) from code analysis.
-- Fix: Changed `_TICKER_SYMBOLS` in `dashboard_service.py`:
+- Part 1 fix: Changed `_TICKER_SYMBOLS` in `dashboard_service.py`:
   - MIDCAP50: request symbol changed from "MIDCAP50" to "NIFTYMID50" (DB display_symbol)
   - Label stays "MIDCAP50" for display
-- Verification: `python -m pytest` → 124 passed.
+- Part 2 fix: Changed `DEFAULT_WATCHLIST` in `realtime.py`:
+  - MIDCAP50: symbol changed from "MIDCAP50" to "NIFTYMID50"
+- Symbol-key alignment verified: REST result.symbol = WS tick.symbol = "NIFTYMID50" for MIDCAP50
+- Verification: `python -m pytest` → 124 passed; `npm.cmd run build` → 1859 modules.
 
 ## 2026-06-18 - Step 2: Top ticker fixes (cash/index symbols, 2dp, BANKNIFTY fix)
 

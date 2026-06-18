@@ -22,7 +22,7 @@ DEFAULT_WATCHLIST: list[dict[str, str]] = [
     {"symbol": "NIFTY", "exchange": "NSE", "product_type": "cash"},
     {"symbol": "BANKNIFTY", "exchange": "NSE", "product_type": "cash"},
     {"symbol": "SENSEX", "exchange": "BSE", "product_type": "cash"},
-    {"symbol": "MIDCAP50", "exchange": "NSE", "product_type": "cash"},
+    {"symbol": "NIFTYMID50", "exchange": "NSE", "product_type": "cash"},
     {"symbol": "FINNIFTY", "exchange": "NSE", "product_type": "cash"},
 ]
 

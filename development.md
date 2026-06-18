@@ -5,19 +5,36 @@
 - Last completed phase: Step 2a — Backend symbol resolution fix (Part 1)
 - Planned next: Step 2a — Websocket watchlist fix (Part 2)
 
-### 2026-06-18 - Step 2a: Part 1 — Backend symbol resolution fix
-- Root cause:
-  - MIDCAP50 request symbol "MIDCAP50" does not match any broker_symbol (NIFMID), display_symbol (NIFTYMID50), contract_code, or alias in the database.
-  - SymbolResolver._resolve_cash_instrument fails for MIDCAP50/NSE/cash → SymbolResolverError → status="error" → ltp=null → frontend shows "Unavailable".
-  - SENSEX resolves correctly (display_symbol="SENSEX" matches) but Breeze returns ltp=0 (Breeze data issue, not symbol config).
-  - FINNIFTY resolves correctly (display_symbol="FINNIFTY" matches) from code analysis.
-- Fix:
-  - Changed `_TICKER_SYMBOLS` in `dashboard_service.py`: MIDCAP50 symbol from "MIDCAP50" to "NIFTYMID50" (the actual DB display_symbol for NIFMID/NSE/cash).
-  - Display label stays "MIDCAP50" — the internal request symbol is separate from the user-facing label.
-  - No changes to SENSEX or FINNIFTY — their resolution already works.
-- Files changed: `backend/app/services/dashboard_service.py`
-- Verification: `python -m pytest` → 124 passed.
-- Remaining for Part 2: Update `DEFAULT_WATCHLIST` in `realtime.py` to match, and check frontend merge-key alignment.
+### 2026-06-18 - Step 2a: Part 1+2 — Full symbol chain fix (MIDCAP50)
+
+#### Root cause
+- MIDCAP50 request symbol "MIDCAP50" does not match any broker_symbol (NIFMID), display_symbol (NIFTYMID50), contract_code, or alias in the DB.
+- SymbolResolver._resolve_cash_instrument fails → SymbolResolverError → status="error" → ltp=null → "Unavailable".
+- SENSEX resolves correctly (display_symbol="SENSEX" matches). ltp=0 is Breeze data behavior, not a symbol config bug.
+- FINNIFTY resolves correctly (display_symbol="FINNIFTY" matches).
+
+#### Part 1 fix (backend REST)
+- `dashboard_service.py`: Changed `_TICKER_SYMBOLS` entry: symbol `"MIDCAP50"` → `"NIFTYMID50"` (the DB display_symbol for NIFMID/NSE/cash). Label stays `"MIDCAP50"`.
+
+#### Part 2 fix (websocket + frontend merge alignment)
+- `realtime.py`: Changed `DEFAULT_WATCHLIST` entry: symbol `"MIDCAP50"` → `"NIFTYMID50"`.
+
+#### Symbol-key alignment after fix
+| Symbol | REST result.symbol | WS tick.symbol | Frontend key | Aligned? |
+|---|---|---|---|---|
+| NIFTY | NIFTY | NIFTY | ticks["NIFTY"] | yes |
+| BANKNIFTY | BANKNIFTY | BANK NIFTY | ticks["BANKNIFTY"] | no (pre-existing, live overlay degrades gracefully) |
+| SENSEX | SENSEX | SENSEX | ticks["SENSEX"] | yes |
+| MIDCAP50 | NIFTYMID50 | NIFTYMID50 | ticks["NIFTYMID50"] | yes |
+| FINNIFTY | FINNIFTY | FINNIFTY | ticks["FINNIFTY"] | yes |
+
+#### Files changed
+- `backend/app/services/dashboard_service.py`
+- `backend/app/realtime.py`
+
+#### Verification
+- `python -m pytest` → 124 passed.
+- `npm.cmd run build` → 1859 modules, clean.
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
 - Phase 18 (Performance/Caching): intentionally deferred until Phase 24 fixes are complete
 - Phase 22 note: First pass was rejected (treated as code audit). Rerun followed playbook strictly: 31 API routes tested with real HTTP calls, 3 cold + 3 warm timing measurements, response shape verification for all routes, diagnosis endpoint deep dive. See PHASE22_FINDINGS.md for full evidence.
