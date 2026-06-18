@@ -1730,3 +1730,9 @@ From this point onward, the project is renamed ORIENS.
 - Adopted SymbolCell in 4 pages
 - Files changed: 16 modified + 7 new
 - Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1859 modules, clean
+
+### 2026-06-18 - Step 1: Move connection to bottom-left + market status to top-right
+- **TopHeader.tsx**: Removed websocket connection badge (live/connecting/degraded/offline) from top-right. Added time-based market status badge: checks Asia/Kolkata time, open 09:15-15:30 IST, updates every 30s via interval. Green dot + "Market Open" / Red dot + "Market Closed". Pure time-based, no websocket dependency.
+- **Navbar.tsx**: Replaced hardcoded "ICICI Direct" text in sidebar footer with connection status — green dot + "Connected" when live, amber dot + "Not Connected" otherwise. Removed unused `useLiveMarketData` import/usage from TopHeader.tsx.
+- Files changed: `TopHeader.tsx`, `Navbar.tsx` (frontend only)
+- Verification: `npm run build` -> 1859 modules, clean. No backend changes needed.

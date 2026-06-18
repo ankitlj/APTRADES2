@@ -54,16 +54,16 @@ export function Navbar() {
         <div
           className={cn(
             "flex min-h-5 items-center gap-2 text-xs",
-            online ? "text-green-600" : "text-muted-foreground"
+            online ? "text-green-600" : "text-amber-600"
           )}
         >
           <span
             className={cn(
               "h-2 w-2 rounded-full inline-block shrink-0",
-              online ? "bg-green-500" : "bg-red-500"
+              online ? "bg-green-500" : "bg-amber-500"
             )}
           />
-          ICICI Direct
+          {online ? "Connected" : "Not Connected"}
         </div>
       </div>
     </aside>

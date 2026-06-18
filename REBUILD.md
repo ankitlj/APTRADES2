@@ -3,6 +3,18 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
+## 2026-06-18 - Step 1: Connection badge move + market status
+
+- Moved websocket connection badge from top-right (TopHeader) to bottom-left sidebar footer (Navbar):
+  - Navbar now shows green dot + "Connected" when live, amber dot + "Not Connected" otherwise
+  - Replaced hardcoded "ICICI Direct" text
+- Added time-based market open/closed badge to top-right:
+  - Asia/Kolkata timezone, open 09:15-15:30 IST
+  - Green dot + "Market Open" / Red dot + "Market Closed"
+  - Updates every 30s via interval, no websocket dependency
+- Files: `TopHeader.tsx`, `Navbar.tsx` (frontend only)
+- Verification: `npm run build` -> 1859 modules, clean
+
 ## 2026-06-17 - Dashboard Card Submetric Rendering Fix
 
 - Tightened the ORIENS dashboard card submetric rendering to match the user's

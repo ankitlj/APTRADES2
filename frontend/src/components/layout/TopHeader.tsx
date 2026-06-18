@@ -1,4 +1,5 @@
 import { Moon, Palette, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { MarketTicker } from "@/components/dashboard/MarketTicker";
@@ -12,9 +13,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { utilityItems } from "@/config/navigation";
-import { useLiveMarketData } from "@/hooks/useLiveMarketData";
 import { useTheme, type ThemeColor } from "@/components/theme/ThemeProvider";
 import { cn } from "@/lib/utils";
+
+function isMarketOpen(): boolean {
+  try {
+    const now = new Date();
+    const indiaStr = now.toLocaleString("en-US", { timeZone: "Asia/Kolkata", hour12: false });
+    const timePart = indiaStr.split(", ")[1];
+    if (!timePart) return false;
+    const parts = timePart.split(":");
+    const hour = parseInt(parts[0], 10);
+    const minute = parseInt(parts[1], 10);
+    if (isNaN(hour) || isNaN(minute)) return false;
+    const totalMinutes = hour * 60 + minute;
+    return totalMinutes >= 555 && totalMinutes < 930;
+  } catch {
+    return false;
+  }
+}
 
 const ACCENTS: { value: ThemeColor; label: string }[] = [
   { value: "zinc", label: "Zinc" },
@@ -29,17 +46,16 @@ export function TopHeader() {
   const location = useLocation();
   const navigate = useNavigate();
   const { mode, toggleMode, color, setColor } = useTheme();
-  const { connectionState } = useLiveMarketData();
+  const [marketOpen, setMarketOpen] = useState(() => isMarketOpen());
+
+  useEffect(() => {
+    const tick = () => setMarketOpen(isMarketOpen());
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const isDashboard = location.pathname === "/" || location.pathname === "/dashboard";
-
-  const badgeMap: Record<string, { dotClass: string; textClass: string; label: string }> = {
-    live: { dotClass: "bg-green-500 animate-pulse", textClass: "text-green-600", label: "Connected" },
-    connecting: { dotClass: "bg-amber-500", textClass: "text-amber-600", label: "Reconnecting" },
-    degraded: { dotClass: "bg-amber-500", textClass: "text-amber-600", label: "Degraded" },
-    offline: { dotClass: "bg-red-500", textClass: "text-red-500", label: "Offline" },
-  };
-  const badge = badgeMap[connectionState] ?? badgeMap.offline;
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -51,11 +67,16 @@ export function TopHeader() {
             <span
               className={cn(
                 "h-2 w-2 rounded-full shrink-0",
-                badge.dotClass
+                marketOpen ? "bg-green-500" : "bg-red-500"
               )}
             />
-            <span className={cn("font-medium", badge.textClass)}>
-              {badge.label}
+            <span
+              className={cn(
+                "font-medium",
+                marketOpen ? "text-green-600" : "text-red-500"
+              )}
+            >
+              {marketOpen ? "Market Open" : "Market Closed"}
             </span>
           </div>
 
