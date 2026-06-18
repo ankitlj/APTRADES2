@@ -1731,7 +1731,21 @@ From this point onward, the project is renamed ORIENS.
 - Files changed: 16 modified + 7 new
 - Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1859 modules, clean
 
+### 2026-06-18 - Step 2: Top ticker fixes (cash/index symbols, 2dp, BANKNIFTY fix)
+- **Backend `dashboard_service.py`**: Changed summary ticker from NIFTY/BANKNIFTY futures to 5 cash/index symbols: NIFTY (NSE/cash), BANKNIFTY (NSE/cash), SENSEX (BSE/cash), MIDCAP50 (NSE/cash), FINNIFTY (NSE/cash). Removed "futures" suffix from `_ticker_item()`. Added `_TICKER_SYMBOLS` constant with proper display labels ("NIFTY 50", "BANKNIFTY", "SENSEX 30", "MIDCAP50", "FINNIFTY").
+- **Backend `realtime.py`**: Changed `DEFAULT_WATCHLIST` from 2 futures to the same 5 cash/index symbols so websocket subscriptions match the ticker.
+- **Frontend `MarketTicker.tsx`**: Fixed formatting to always show 2 decimal places (`minimumFractionDigits: 2, maximumFractionDigits: 2`).
+- **BANKNIFTY fix**: Token mismatch root cause (Step 0 finding) resolved by switching BANKNIFTY from NFO/futures to NSE/cash — both NIFTY and BANKNIFTY now use the same cash resolution path with consistent token handling.
+- Files changed: `dashboard_service.py`, `realtime.py` (backend); `MarketTicker.tsx` (frontend)
+- Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1859 modules, clean
+
 ### 2026-06-18 - Step 1: Move connection to bottom-left + market status to top-right
+- **Backend `dashboard_service.py`**: Changed summary ticker from NIFTY/BANKNIFTY futures to 5 cash/index symbols: NIFTY (NSE/cash), BANKNIFTY (NSE/cash), SENSEX (BSE/cash), MIDCAP50 (NSE/cash), FINNIFTY (NSE/cash). Removed "futures" suffix from `_ticker_item()`. Added `_TICKER_SYMBOLS` constant with proper display labels ("NIFTY 50", "BANKNIFTY", "SENSEX 30", "MIDCAP50", "FINNIFTY").
+- **Backend `realtime.py`**: Changed `DEFAULT_WATCHLIST` from 2 futures to the same 5 cash/index symbols so websocket subscriptions match the ticker.
+- **Frontend `MarketTicker.tsx`**: Fixed formatting to always show 2 decimal places (`minimumFractionDigits: 2, maximumFractionDigits: 2`).
+- **BANKNIFTY fix**: Token mismatch root cause (Step 0 finding) resolved by switching BANKNIFTY from NFO/futures to NSE/cash — both NIFTY and BANKNIFTY now use the same cash resolution path with consistent token handling.
+- Files changed: `dashboard_service.py`, `realtime.py` (backend); `MarketTicker.tsx` (frontend)
+- Verification: `python -m pytest` -> 124/124 passed; `npm.cmd run build` -> 1859 modules, clean
 - **TopHeader.tsx**: Removed websocket connection badge (live/connecting/degraded/offline) from top-right. Added time-based market status badge: checks Asia/Kolkata time, open 09:15-15:30 IST, updates every 30s via interval. Green dot + "Market Open" / Red dot + "Market Closed". Pure time-based, no websocket dependency.
 - **Navbar.tsx**: Replaced hardcoded "ICICI Direct" text in sidebar footer with connection status — green dot + "Connected" when live, amber dot + "Not Connected" otherwise. Removed unused `useLiveMarketData` import/usage from TopHeader.tsx.
 - Files changed: `TopHeader.tsx`, `Navbar.tsx` (frontend only)

@@ -3,6 +3,19 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
+## 2026-06-18 - Step 2: Top ticker fixes (cash/index symbols, 2dp, BANKNIFTY fix)
+
+- Changed summary ticker from 2 futures to 5 cash/index symbols:
+  NIFTY (NSE/cash), BANKNIFTY (NSE/cash), SENSEX (BSE/cash), MIDCAP50 (NSE/cash), FINNIFTY (NSE/cash)
+- Removed "futures" label suffix from ticker items
+- Added proper display labels: "NIFTY 50", "BANKNIFTY", "SENSEX 30", "MIDCAP50", "FINNIFTY"
+- Changed DEFAULT_WATCHLIST in realtime.py to match the 5 cash/index symbols
+- Fixed MarketTicker.tsx to always show 2 decimal places (minimumFractionDigits: 2)
+- BANKNIFTY fix: switched from NFO/futures to NSE/cash for consistent token resolution
+- Backend files: `dashboard_service.py`, `realtime.py`
+- Frontend file: `MarketTicker.tsx`
+- Verification: 124/124 backend tests pass, 1859 modules build clean
+
 ## 2026-06-18 - Step 1: Connection badge move + market status
 
 - Moved websocket connection badge from top-right (TopHeader) to bottom-left sidebar footer (Navbar):

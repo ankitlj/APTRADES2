@@ -60,7 +60,7 @@ export function MarketTicker() {
               <span className="text-muted-foreground">
                 {quote.ltp === null
                   ? "Unavailable"
-                  : quote.ltp.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                  : quote.ltp.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               {quote.changePercent !== null && (
                 <span

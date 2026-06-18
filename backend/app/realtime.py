@@ -17,9 +17,13 @@ from .services.symbol_resolver import SymbolResolver, SymbolResolverError
 socketio = SocketIO(async_mode="threading", cors_allowed_origins="*")
 
 # The default dashboard watchlist that every connected client gets streamed.
+# All 5 are cash/index symbols so the top ticker shows spot values, not futures.
 DEFAULT_WATCHLIST: list[dict[str, str]] = [
-    {"symbol": "NIFTY", "exchange": "NFO", "product_type": "futures"},
-    {"symbol": "BANKNIFTY", "exchange": "NFO", "product_type": "futures"},
+    {"symbol": "NIFTY", "exchange": "NSE", "product_type": "cash"},
+    {"symbol": "BANKNIFTY", "exchange": "NSE", "product_type": "cash"},
+    {"symbol": "SENSEX", "exchange": "BSE", "product_type": "cash"},
+    {"symbol": "MIDCAP50", "exchange": "NSE", "product_type": "cash"},
+    {"symbol": "FINNIFTY", "exchange": "NSE", "product_type": "cash"},
 ]
 
 _worker: MarketDataWorker | None = None

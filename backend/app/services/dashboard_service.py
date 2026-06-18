@@ -23,6 +23,18 @@ class DashboardServiceError(Exception):
     pass
 
 
+# The 5 cash/index symbols shown in the ORIENS top ticker, with their REST
+# quote parameters and display labels. Live websocket ticks (from the default
+# watchlist in realtime.py) are overlaid on top of these snapshot values.
+_TICKER_SYMBOLS: list[dict[str, str | None]] = [
+    {"symbol": "NIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "NIFTY 50"},
+    {"symbol": "BANKNIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "BANKNIFTY"},
+    {"symbol": "SENSEX", "exchange_code": "BSE", "product_type": "cash", "label": "SENSEX 30"},
+    {"symbol": "MIDCAP50", "exchange_code": "NSE", "product_type": "cash", "label": "MIDCAP50"},
+    {"symbol": "FINNIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "FINNIFTY"},
+]
+
+
 @dataclass(frozen=True)
 class DashboardDependencies:
     database_url: str | None
@@ -50,8 +62,12 @@ class DashboardService:
     def get_summary(self) -> dict[str, Any]:
         quote_results = self.quote_service.get_batch_quotes(
             [
-                QuoteRequest(symbol="NIFTY", exchange_code="NFO", product_type="futures"),
-                QuoteRequest(symbol="BANKNIFTY", exchange_code="NFO", product_type="futures"),
+                QuoteRequest(
+                    symbol=str(item["symbol"]),
+                    exchange_code=str(item["exchange_code"]),
+                    product_type=item.get("product_type") or None,
+                )
+                for item in _TICKER_SYMBOLS
             ]
         )["results"]
 
@@ -72,7 +88,10 @@ class DashboardService:
             "status": "ok",
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "metrics": metrics,
-            "ticker": [self._ticker_item(result) for result in quote_results],
+            "ticker": [
+                self._ticker_item(result, str(item.get("label", result["symbol"])))
+                for result, item in zip(quote_results, _TICKER_SYMBOLS)
+            ],
             "positions_status": positions_payload["status"],
             "positions_error": positions_payload.get("error"),
             "positions": positions_payload["positions"][:8],
@@ -285,7 +304,7 @@ class DashboardService:
         return "neutral"
 
     @staticmethod
-    def _ticker_item(result: dict[str, Any]) -> dict[str, Any]:
+    def _ticker_item(result: dict[str, Any], label: str) -> dict[str, Any]:
         resolved = result.get("resolved") or {}
         quote = result.get("quote") or {}
         ltp = DashboardService._to_float(quote.get("ltp"))
@@ -293,10 +312,9 @@ class DashboardService:
         change_percent = None
         if ltp is not None and previous_close not in (None, 0):
             change_percent = round(((ltp - previous_close) / previous_close) * 100, 2)
-        suffix = " futures" if resolved.get("product_type") == "futures" else ""
         return {
             "symbol": result["symbol"],
-            "label": result["symbol"] + suffix,
+            "label": label,
             "broker_symbol": resolved.get("broker_symbol"),
             "ltp": ltp,
             "change_percent": change_percent,
