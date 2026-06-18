@@ -224,8 +224,6 @@ class DashboardService:
         return result
 
     def _resolve_chart_instrument(self, symbol: str) -> ResolvedInstrument:
-        if symbol in {"NIFTY", "BANKNIFTY"}:
-            return self.quote_service.symbol_resolver.resolve(symbol, "NFO", product_type="futures")
         return self.quote_service.symbol_resolver.resolve(symbol, "NSE", product_type="cash")
 
     @staticmethod

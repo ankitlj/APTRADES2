@@ -253,9 +253,9 @@ def test_dashboard_chart_endpoint_returns_normalized_points(tmp_path):
 
     def _chart_response(instrument, **kwargs):
         assert instrument.stock_code == "NIFTY"
-        assert instrument.exchange_code == "NFO"
-        assert instrument.product_type == "futures"
-        assert instrument.expiry_date.endswith("T06:00:00.000Z")
+        assert instrument.exchange_code == "NSE"
+        assert instrument.product_type == "cash"
+        assert instrument.expiry_date == ""
         assert kwargs["interval"] == "day"
         return [
             {"datetime": "2026-06-05T00:00:00.000Z", "open": 23210.0, "high": 23490.0, "low": 23180.0, "close": 23420.0, "volume": 1200},
