@@ -1,9 +1,23 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Dashboard Latency Fix Pass (complete)
-- Last completed phase: Dashboard Latency Fix Pass
-- Planned next: End-to-end deployed verification
+- Current phase: Step 2a — Fix SENSEX/MIDCAP50/FINNIFTY ticker resolution failures
+- Last completed phase: Step 2a — Backend symbol resolution fix (Part 1)
+- Planned next: Step 2a — Websocket watchlist fix (Part 2)
+
+### 2026-06-18 - Step 2a: Part 1 — Backend symbol resolution fix
+- Root cause:
+  - MIDCAP50 request symbol "MIDCAP50" does not match any broker_symbol (NIFMID), display_symbol (NIFTYMID50), contract_code, or alias in the database.
+  - SymbolResolver._resolve_cash_instrument fails for MIDCAP50/NSE/cash → SymbolResolverError → status="error" → ltp=null → frontend shows "Unavailable".
+  - SENSEX resolves correctly (display_symbol="SENSEX" matches) but Breeze returns ltp=0 (Breeze data issue, not symbol config).
+  - FINNIFTY resolves correctly (display_symbol="FINNIFTY" matches) from code analysis.
+- Fix:
+  - Changed `_TICKER_SYMBOLS` in `dashboard_service.py`: MIDCAP50 symbol from "MIDCAP50" to "NIFTYMID50" (the actual DB display_symbol for NIFMID/NSE/cash).
+  - Display label stays "MIDCAP50" — the internal request symbol is separate from the user-facing label.
+  - No changes to SENSEX or FINNIFTY — their resolution already works.
+- Files changed: `backend/app/services/dashboard_service.py`
+- Verification: `python -m pytest` → 124 passed.
+- Remaining for Part 2: Update `DEFAULT_WATCHLIST` in `realtime.py` to match, and check frontend merge-key alignment.
 - Phase 12 (Option Greeks): intentionally skipped — deferred until a dedicated calculation phase is needed
 - Phase 18 (Performance/Caching): intentionally deferred until Phase 24 fixes are complete
 - Phase 22 note: First pass was rejected (treated as code audit). Rerun followed playbook strictly: 31 API routes tested with real HTTP calls, 3 cold + 3 warm timing measurements, response shape verification for all routes, diagnosis endpoint deep dive. See PHASE22_FINDINGS.md for full evidence.

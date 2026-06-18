@@ -3,18 +3,17 @@
 Date: 2026-06-07
 Target repo: `https://github.com/ankitlj/APTRADES2.git`
 
-## 2026-06-18 - Step 2: Top ticker fixes (cash/index symbols, 2dp, BANKNIFTY fix)
+## 2026-06-18 - Step 2a: Part 1 — Backend symbol resolution fix (MIDCAP50)
 
-- Changed summary ticker from 2 futures to 5 cash/index symbols:
-  NIFTY (NSE/cash), BANKNIFTY (NSE/cash), SENSEX (BSE/cash), MIDCAP50 (NSE/cash), FINNIFTY (NSE/cash)
-- Removed "futures" label suffix from ticker items
-- Added proper display labels: "NIFTY 50", "BANKNIFTY", "SENSEX 30", "MIDCAP50", "FINNIFTY"
-- Changed DEFAULT_WATCHLIST in realtime.py to match the 5 cash/index symbols
-- Fixed MarketTicker.tsx to always show 2 decimal places (minimumFractionDigits: 2)
-- BANKNIFTY fix: switched from NFO/futures to NSE/cash for consistent token resolution
-- Backend files: `dashboard_service.py`, `realtime.py`
-- Frontend file: `MarketTicker.tsx`
-- Verification: 124/124 backend tests pass, 1859 modules build clean
+- Root cause: MIDCAP50 request symbol "MIDCAP50" does not match any broker_symbol (NIFMID), display_symbol (NIFTYMID50), contract_code, or alias in the DB.
+  - SENSEX resolves correctly (display_symbol "SENSEX" matches), ltp=0 is Breeze data issue.
+  - FINNIFTY resolves correctly (display_symbol "FINNIFTY" matches) from code analysis.
+- Fix: Changed `_TICKER_SYMBOLS` in `dashboard_service.py`:
+  - MIDCAP50: request symbol changed from "MIDCAP50" to "NIFTYMID50" (DB display_symbol)
+  - Label stays "MIDCAP50" for display
+- Verification: `python -m pytest` → 124 passed.
+
+## 2026-06-18 - Step 2: Top ticker fixes (cash/index symbols, 2dp, BANKNIFTY fix)
 
 ## 2026-06-18 - Step 1: Connection badge move + market status
 

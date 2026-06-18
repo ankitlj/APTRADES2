@@ -30,7 +30,7 @@ _TICKER_SYMBOLS: list[dict[str, str | None]] = [
     {"symbol": "NIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "NIFTY 50"},
     {"symbol": "BANKNIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "BANKNIFTY"},
     {"symbol": "SENSEX", "exchange_code": "BSE", "product_type": "cash", "label": "SENSEX 30"},
-    {"symbol": "MIDCAP50", "exchange_code": "NSE", "product_type": "cash", "label": "MIDCAP50"},
+    {"symbol": "NIFTYMID50", "exchange_code": "NSE", "product_type": "cash", "label": "MIDCAP50"},
     {"symbol": "FINNIFTY", "exchange_code": "NSE", "product_type": "cash", "label": "FINNIFTY"},
 ]
 
