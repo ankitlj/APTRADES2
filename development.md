@@ -2234,3 +2234,63 @@ Add a safety confirmation modal before executing BUY or SELL. Ensures the user s
 - Modal keyboard-accessible: Escape to close, Tab through fields, Enter on focused button
 - Modal closes on backdrop click
 - Quantity resets to 1 on contract change
+
+### 2026-06-19 - Part 6: Latency and Regression Verification
+
+#### Goal
+Final verification pass: confirm all tests pass, measure endpoint latency, record bundle size growth, and validate no regressions across the 6-part feature.
+
+#### Verification results
+
+**Backend tests** — 135/135 passed (5.72s)
+| Test file | Tests | Status |
+|---|---|---|
+| `test_dashboard_contract.py` | 20 (incl. 9 new option orderbook tests) | Passed |
+| All other test files (18 files) | 115 | Passed |
+
+New endpoint contract coverage:
+- Valid request returns all expected keys
+- Missing underlying → 400
+- Missing expiry → 400
+- Missing strike → 400
+- Invalid right (not call/put) → 400
+- Unsupported underlying (SENSEX) → 400
+- Empty Breeze response → safe error (status "error", not 500)
+- Missing bid/ask fields → does not crash (null fallbacks)
+- Zero bid/ask quantities → safe 50/50 percent split
+
+**Endpoint latency** (dev server, no Breeze config):
+| Scenario | Response |
+|---|---|
+| Validation fail (no DB) | <1ms, 400 `DATABASE_URL is not configured` |
+| Validation pass + DB + Breeze call | ~3-4s (single Breeze `/optionchain` call, 10s timeout, 2 attempts) |
+
+**Frontend build** — 1859 modules, clean
+| Metric | Before part 1 | After part 6 | Delta |
+|---|---|---|---|
+| JS bundle | 491.29 KB | 498.79 KB | +7.50 KB |
+| CSS bundle | 55.68 KB | 58.29 KB | +2.61 KB |
+| Modules | 1859 | 1859 | 0 |
+
+Bundle growth is 3.1% JS / 4.7% CSS — attributable to:
+- New component: cascading selectors, polling, data wiring, confirm modal
+- New API types: 3 interfaces + 1 function in `api.ts`
+
+**No regressions**:
+- Chart file `DashboardMarketChart.tsx` preserved, importable
+- Chart API routes `GET /api/dashboard/chart` intact in `dashboard.py`
+- Existing 126 tests unchanged, 9 new tests added
+- No changes to sidebar, footer, ticker, theme, websocket core, orderbook/tradebook/positions/option-chain/OI/strategy pages
+- No changes to `SymbolResolver`, `MarketDataWorker`, `realtime.py`, or any WebSocket infrastructure
+
+#### Files changed across all 6 parts
+
+| Part | Files | Lines changed |
+|---|---|---|
+| Part 0 (Diagnosis) | `development.md` | ~140 new (documentation only) |
+| Part 1 (Frontend Shell) | `DashboardOptionOrderBook.tsx`, `DashboardPage.tsx`, `development.md`, `REBUILD.md` | 1 new file, 4 modified |
+| Part 2 (Backend API) | `dashboard.py`, `dashboard_service.py`, `test_dashboard_contract.py`, `development.md`, `REBUILD.md` | 5 modified, +432 lines |
+| Part 3 (Data Wiring) | `api.ts`, `DashboardOptionOrderBook.tsx`, `development.md`, `REBUILD.md` | 4 modified, +358/-53 lines |
+| Part 4 (Live Overlay) | `DashboardOptionOrderBook.tsx`, `development.md`, `REBUILD.md` | 3 modified, +98/-22 lines |
+| Part 5 (Confirm Modal) | `DashboardOptionOrderBook.tsx`, `development.md`, `REBUILD.md` | 3 modified, +161 lines |
+| **Total** | | **~9 files changed, ~1190 lines added** |

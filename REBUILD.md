@@ -913,3 +913,12 @@ From this point onward, the project is renamed ORIENS.
 - Quantity auto-focuses on open, resets to 1 on contract change.
 - Files changed: `DashboardOptionOrderBook.tsx` (frontend only).
 - Verification: `npm run build` -> 1859 modules; backend unchanged.
+
+## 2026-06-19 - Part 6: Latency and Regression Verification
+
+- 135/135 backend tests passed (5.72s), including 9 new option orderbook tests.
+- Frontend build clean: 498.79 KB JS, 58.29 KB CSS (+7.5 KB JS, +2.61 KB CSS from baseline).
+- Endpoint latency: <1ms validation path, ~3-4s with Breeze call (single `/optionchain` request, 10s timeout).
+- All 6 parts complete: shell -> API -> data wiring -> live overlay -> confirm modal -> verification.
+- No regressions in any existing functionality.
+- Total: ~1190 lines added across 9 files.
