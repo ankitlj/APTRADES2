@@ -7,6 +7,7 @@ import type { OptionOrderbookResponse } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
 
 const UNDERLYING_OPTIONS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
+const POLL_INTERVAL_MS = 2500;
 
 type Right = "call" | "put";
 
@@ -32,6 +33,7 @@ export function DashboardOptionOrderBook() {
   const [orderbook, setOrderbook] = useState<FetchState<OptionOrderbookResponse>>({ status: "idle" });
 
   const abortRef = useRef<AbortController | null>(null);
+  const hasValidDataRef = useRef(false);
 
   const cancelPending = useCallback(() => {
     if (abortRef.current) {
@@ -48,6 +50,7 @@ export function DashboardOptionOrderBook() {
     setExpiries(val ? { status: "loading" } : { status: "idle" });
     setStrikes({ status: "idle" });
     setOrderbook({ status: "idle" });
+    hasValidDataRef.current = false;
   }, []);
 
   const handleExpiryChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -56,6 +59,7 @@ export function DashboardOptionOrderBook() {
     setSelectedStrike(null);
     setStrikes(val ? { status: "loading" } : { status: "idle" });
     setOrderbook({ status: "idle" });
+    hasValidDataRef.current = false;
   }, []);
 
   const handleStrikeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -63,11 +67,13 @@ export function DashboardOptionOrderBook() {
     if (!val) {
       setSelectedStrike(null);
       setOrderbook({ status: "idle" });
+      hasValidDataRef.current = false;
       return;
     }
     const [strikeStr, right] = val.split("-");
     setSelectedStrike({ strike: Number(strikeStr), right: right as Right, label: val });
     setOrderbook({ status: "loading" });
+    hasValidDataRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -115,30 +121,49 @@ export function DashboardOptionOrderBook() {
   }, [underlying, expiry, cancelPending]);
 
   useEffect(() => {
-    if (!underlying || !expiry || !selectedStrike) return;
+    if (!underlying || !expiry || !selectedStrike) {
+      hasValidDataRef.current = false;
+      return;
+    }
+
     cancelPending();
     const signal = abortRef.current!.signal;
     setOrderbook({ status: "loading" });
-    getDashboardOptionOrderbook({
-      underlying,
-      expiry,
-      strike: selectedStrike.strike,
-      right: selectedStrike.right,
-    })
-      .then((res) => {
-        if (signal.aborted) return;
-        setOrderbook({ status: "ok", data: res });
+
+    const fetchData = () => {
+      getDashboardOptionOrderbook({
+        underlying,
+        expiry,
+        strike: selectedStrike.strike,
+        right: selectedStrike.right,
       })
-      .catch((err: Error) => {
-        if (signal.aborted) return;
-        setOrderbook({ status: "error", message: err.message });
-      });
+        .then((res) => {
+          if (signal.aborted) return;
+          hasValidDataRef.current = true;
+          setOrderbook({ status: "ok", data: res });
+        })
+        .catch((err: Error) => {
+          if (signal.aborted) return;
+          if (!hasValidDataRef.current) {
+            setOrderbook({ status: "error", message: err.message });
+          }
+        });
+    };
+
+    fetchData();
+
+    const intervalId = setInterval(fetchData, POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [underlying, expiry, selectedStrike, cancelPending]);
 
   const numberOfStrikes =
     strikes.status === "ok" ? strikes.data.length : 0;
   const orderbookData = orderbook.status === "ok" ? orderbook.data : null;
   const hasSelection = Boolean(underlying && expiry && selectedStrike);
+  const isLive = orderbook.status === "ok" && orderbook.data?.status === "ok";
 
   const statusBadge = () => {
     if (orderbook.status === "loading") {
@@ -157,15 +182,20 @@ export function DashboardOptionOrderBook() {
     }
     if (orderbook.status === "ok") {
       const isError = orderbook.data.status === "error";
+      if (isError) {
+        return (
+          <span className="inline-flex h-5 items-center rounded-full bg-red-100 px-2 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            No data
+          </span>
+        );
+      }
       return (
-        <span
-          className={`inline-flex h-5 items-center rounded-full px-2 text-[10px] font-medium ${
-            isError
-              ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-              : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-          }`}
-        >
-          {isError ? "No data" : "Data loaded"}
+        <span className="inline-flex h-5 items-center gap-1 rounded-full bg-green-100 px-2 text-[10px] font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75 dark:bg-green-500" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500" />
+          </span>
+          Live
         </span>
       );
     }

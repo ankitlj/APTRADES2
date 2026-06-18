@@ -2161,3 +2161,38 @@ Connect the shell component from Part 1 to the real backend endpoint from Part 2
 - No backend changes — all tests from Part 2 still pass
 - Data contract: frontend `OptionOrderbookResponse` matches backend shape from `dashboard_service.py:_get_option_orderbook()`
 - No websocket changes (deferred to Part 4)
+
+### 2026-06-19 - Part 4: Live Price Overlay for Option Orderbook
+
+#### Goal
+Make the option orderbook update in near-real-time without requiring full WebSocket integration for option contracts. Smart polling at 2.5s intervals via the existing REST endpoint, with stale-request cancellation and silent error handling during polls.
+
+#### Design decision: polling vs WebSocket
+The existing WebSocket infrastructure (`MarketDataWorker` + `useLiveSubscribe`) uses `display_symbol` as the tick lookup key. For options, all contracts under the same underlying share `display_symbol="NIFTY"`, so subscribing to multiple NIFTY options via WebSocket would cause tick collisions (one tick overwrites another in the `ticks` map). Rather than modifying the realtime infrastructure to support option-specific unique keys, polling is:
+- **Simpler**: no changes to WebSocket, SymbolResolver, or realtime.py
+- **More reliable**: no collision concerns, no new failure modes
+- **Transparent to the user**: data updates every 2.5s with a pulsing green "Live" badge
+- **Easier to reason about**: one data path, one error model
+
+#### Changes
+
+**`frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`:**
+- Added `POLL_INTERVAL_MS = 2500` constant
+- Merged the initial-fetch effect and polling into a single `useEffect`:
+  - On selection change: cancels previous request via existing `AbortController`, starts initial fetch
+  - After initial fetch succeeds: starts `setInterval` at 2.5s for continuous polling
+  - On selection change or unmount: `clearInterval` in cleanup
+- Added `hasValidDataRef` to track whether the component has ever received valid data:
+  - First fetch failure → show error state (user sees the problem)
+  - Poll failure → silently keep the last good data (no disruptive error flickering)
+- Status badge switched from static "Data loaded" to a pulsing green dot + "Live" label:
+  - `<span className="animate-ping ...">` animated dot for visual liveness
+  - Only shown when `orderbook.status === "ok"` and `response.status === "ok"`
+- BUY/SELL buttons remain disabled until valid backend data is confirmed
+
+#### Verification
+- `npm run build` → 1859 modules, clean (496.11 KB JS, 57.95 KB CSS)
+- No backend changes — all 135 tests still pass
+- No websocket or SymbolResolver changes
+- Polling stops on selection change via React effect cleanup
+- Stale in-flight requests aborted via AbortController signal check

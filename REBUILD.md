@@ -891,3 +891,14 @@ From this point onward, the project is renamed ORIENS.
 - BUY/SELL buttons disabled until valid data loaded.
 - Files changed: `api.ts`, `DashboardOptionOrderBook.tsx` (frontend only).
 - Verification: `npm run build` -> 1859 modules; backend unchanged.
+
+## 2026-06-19 - Part 4: Live Price Overlay for Option Orderbook
+
+- Added smart polling (2.5s interval) to `DashboardOptionOrderBook.tsx` for near-real-time price updates.
+- Polling merged into the existing data-fetch effect: initial fetch + `setInterval` for subsequent polls.
+- Added `hasValidDataRef` — poll failures keep last good data (no disruptive error flickering).
+- Status badge changed to pulsing green dot + "Live" when data is active.
+- AbortController cancels stale poll requests on selection change.
+- Chose polling over WebSocket: option contracts share `display_symbol="NIFTY"` which would cause tick collisions in the existing `ticks` map. Avoiding realtime infrastructure changes.
+- Files changed: `DashboardOptionOrderBook.tsx` (frontend only).
+- Verification: `npm run build` -> 1859 modules; backend unchanged.
