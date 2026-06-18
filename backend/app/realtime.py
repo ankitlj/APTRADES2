@@ -62,7 +62,6 @@ def init_realtime(app: Flask) -> MarketDataWorker:
         session_token=app.config.get("BREEZE_SESSION_TOKEN"),
         redis_url=redis_url,
         publish=socketio.emit,
-        database_url=app.config.get("DATABASE_URL"),
     )
     _worker = worker
     app.extensions["market_data_worker"] = worker
