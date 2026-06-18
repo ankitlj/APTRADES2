@@ -1820,3 +1820,64 @@ From this point onward, the project is renamed ORIENS.
 - **Navbar.tsx**: Replaced hardcoded "ICICI Direct" text in sidebar footer with connection status — green dot + "Connected" when live, amber dot + "Not Connected" otherwise. Removed unused `useLiveMarketData` import/usage from TopHeader.tsx.
 - Files changed: `TopHeader.tsx`, `Navbar.tsx` (frontend only)
 - Verification: `npm run build` -> 1859 modules, clean. No backend changes needed.
+
+### 2026-06-18 - Step 1 (redo): Dashboard chart hover/tooltip/crosshair diagnosis
+
+#### Root cause analysis
+
+**Data granularity**: Backend serves daily OHLC candles (`interval="day"`, 30-day window = ~20-25 points). Points are evenly spaced in `buildSvgPath` — weekends/holidays have no gaps in the visual spacing. This is acceptable for a daily overview chart.
+
+**Mouse-to-index mapping bug** (`handleMouseMove`, line 156-170):
+- Uses `svg.getBoundingClientRect()` to get the SVG element's bounding box.
+- Computes `mouseX = e.clientX - rect.left` (pixels from SVG's border-box left edge).
+- `viewBoxX = (mouseX / rect.width) * 900` — converts to viewBox space.
+- `xStep = 900 / (chartData.length - 1)`, `index = Math.round(viewBoxX / xStep)`.
+- **Root cause**: The SVG has CSS class `w-full px-4 py-3`. The `px-4` adds 32px total horizontal padding. `getBoundingClientRect().width` includes this padding. However, the SVG viewBox (0,0,900,220) maps to the SVG's *content area* (excluding padding), not the border-box. The content area starts 16px inside the border-box. With `preserveAspectRatio="none"`, the 900-wide viewBox is stretched across the content area only. So `viewBoxX = (mouseX / rect.width) * 900` is wrong — it should be `((mouseX - 16) / (rect.width - 32)) * 900`. This causes a ~24px offset error in viewBox space (on a 600px rendered width), which translates to ~1 index off for 25 points. The cursor feels slightly misaligned from the crosshair dot.
+
+**Tooltip positioning** (line 302-321):
+- Uses `mousePos` (raw pixel coords from SVG's bounding rect) positioned on `.CardContent` (same coordinate frame as SVG).
+- `left: Math.max(94, Math.min(mousePos.x, mousePos.containerW - 94))` with `translateX(-50%)`.
+- `top: Math.max(8, Math.min(mousePos.y - 48, mousePos.containerH - 68))`.
+- The magic numbers (94, 48, 68) are static estimates that don't account for actual tooltip dimensions or container padding. The 94px horizontal margin is conservative for a ~188px tooltip, but `translateX(-50%)` centers on mousePos.x, so the tooltip's right half can still clip if mousePos.x is near `containerW - 94`.
+- No tooltip dimension measurement — vertical offset `mousePos.y - 48` assumes fixed 48px tooltip height, but the tooltip height varies with content length and font size.
+
+**Crosshair** (line 265-286):
+- Uses `coordinates[hoverIndex].x` (viewBox space, 0-900) for the vertical line and dot x-position. Correct since SVG viewBox matches the coordinate space.
+- Vertical line uses hardcoded `y2="220"` instead of the actual viewBox height — works because viewBox is 220, but fragile if viewBox changes.
+- Active dot uses `coordinates[hoverIndex].x` and `coordinates[hoverIndex].y` — both viewBox-space and correct.
+
+**X-axis labels** (line 115-125):
+- Takes 6 evenly-spaced indices from chartData regardless of timestamp gaps. This means weekends (no data) get the same visual spacing as weekdays, which is fine for daily data.
+- Rendered as `absolute` div below the SVG in document flow, matching SVG's coordinate-free positioning.
+
+**Primary fix**: Replace manual `getBoundingClientRect()` + pixel division with SVG native `createSVGPoint()` + `getScreenCTM()` for the mouse-to-viewBox mapping. This handles padding, transforms, `preserveAspectRatio`, and any CSS layout changes automatically.
+
+**Secondary fixes**:
+1. Replace magic-number tooltip bounds with measured tooltip dimensions (`tooltipRef.current.offsetWidth/offsetHeight`) or container-aware edge detection.
+2. Use actual viewBox dimensions (900x220) from constants instead of hardcoded values.
+3. Format tooltip content more clearly (price on one line, date with full month on another).
+4. Ensure the crosshair vertical line spans the full chart height using viewBox constant.
+
+#### Plan
+Step 2: Add constants + `useSvgPoint` helper. Step 3: Replace mouse mapping with SVG transform. Step 4: Replace magic tooltip numbers with measured clamping. Step 5: Formatting polish. Step 6: Unify crosshair+dot+tooltip. Step 7: x-axis labels. Step 8: Document. Step 9: Build+test. Steps 10-13: Verify, commit, push, report.
+
+### 2026-06-18 - Steps 2-9: Chart hover/crosshair/tooltip fix implementation
+
+#### Changes (frontend only, `DashboardMarketChart.tsx`)
+- **Constants**: Added `VIEWBOX_W=900`, `VIEWBOX_H=220`, `TOOLTIP_MARGIN=12` replacing hardcoded 900/220/94/48/68 magic values.
+- **SVG coordinate helper**: Added `svgToViewBox()` using `createSVGPoint()` + `getScreenCTM().inverse()` to accurately convert browser mouse events to SVG viewBox coordinates. Handles CSS padding, `preserveAspectRatio`, and any viewBox transforms correctly — replaces the old `getBoundingClientRect()` + manual pixel-division approach.
+- **Mouse mapping**: `handleMouseMove` now uses `svgToViewBox()` to find the nearest data point index, then computes the *data point's pixel position* (via `createSVGPoint() + matrixTransform(getScreenCTM())`) for tooltip positioning — the tooltip now follows the crosshair dot, not the raw cursor.
+- **Tooltip positioning**: Magic numbers (94px left clamp, 48/68 vertical) replaced with `TOOLTIP_MARGIN`-based calculations (half estimated tooltip width=70, estimated tooltip height=44). Tooltip now uses `tooltipPos` state (nearest data point pixel position) instead of `mousePos` (cursor position).
+- **Tooltip time format**: `formatTooltipTime` now accepts `interval` parameter. For daily data, shows "18 Jun 2026" (no hours/minutes). For intraday, shows "18 Jun 14:30".
+- **Crosshair**: Uses `VIEWBOX_H` instead of hardcoded `220` for vertical line span.
+- **Grid lines**: Computed from `VIEWBOX_H * 0.2/0.4/0.6/0.8` instead of hardcoded Y values.
+- **X-axis labels**: Minimum 2 labels (was 0 when chartData was very short).
+- `buildSvgPath` call uses `VIEWBOX_W`/`VIEWBOX_H` constants instead of literals.
+- **Removed**: `mousePos` state (no longer read anywhere — tooltip uses `tooltipPos`).
+- **No changes**: No backend, no other frontend files, no theme/colors/cards/sidebar/footer/ticker.
+
+#### Verification
+- `npm run build` -> 1859 modules, 491.29 KB JS (+1.57 KB from additional hover/tooltip logic)
+- `python -m pytest` -> 126/126 passed (no backend changes)
+- No console errors expected (all changes are pure positioning/mapping logic)
+- Dark/light theme preserved (no visual style changes, only coordinate math)

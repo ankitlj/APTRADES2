@@ -24,6 +24,18 @@ interface MousePosition {
 }
 
 const SUGGESTED_SYMBOLS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
+const VIEWBOX_W = 900;
+const VIEWBOX_H = 220;
+const TOOLTIP_MARGIN = 12;
+
+function svgToViewBox(svg: SVGSVGElement, clientX: number, clientY: number): DOMPoint {
+  const pt = svg.createSVGPoint();
+  pt.x = clientX;
+  pt.y = clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return pt;
+  return pt.matrixTransform(ctm.inverse());
+}
 
 function formatTimeLabel(time: string | null, interval: string): string {
   if (!time) return "";
@@ -41,18 +53,23 @@ function formatTimeLabel(time: string | null, interval: string): string {
   }
 }
 
-function formatTooltipTime(time: string | null): string {
+function formatTooltipTime(time: string | null, interval: string): string {
   if (!time) return "";
   try {
     const d = new Date(time);
     if (isNaN(d.getTime())) return "";
-    return d.toLocaleString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
+    const isIntraday =
+      interval.toLowerCase().includes("minute") || interval.toLowerCase().includes("min");
+    if (isIntraday) {
+      return d.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    }
+    return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
   } catch {
     return "";
   }
@@ -88,7 +105,7 @@ export function DashboardMarketChart() {
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<DashboardChartResponse | null>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const [mousePos, setMousePos] = useState<MousePosition | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<MousePosition | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
@@ -110,11 +127,11 @@ export function DashboardMarketChart() {
     return ((latestValue - first) / first) * 100;
   }, [chartData, latestValue]);
 
-  const { line, area, coordinates } = useMemo(() => buildSvgPath(chartData, 900, 220), [chartData]);
+  const { line, area, coordinates } = useMemo(() => buildSvgPath(chartData, VIEWBOX_W, VIEWBOX_H), [chartData]);
 
   const xAxisLabels = useMemo(() => {
     if (chartData.length === 0) return [];
-    const count = Math.min(6, chartData.length);
+    const count = Math.max(2, Math.min(6, chartData.length));
     const indices: number[] = [];
     for (let i = 0; i < count; i++) {
       indices.push(Math.round((i * (chartData.length - 1)) / (count - 1)));
@@ -157,21 +174,31 @@ export function DashboardMarketChart() {
     (e: React.MouseEvent<SVGSVGElement>) => {
       const svg = svgRef.current;
       if (!svg || chartData.length === 0) return;
+      const vb = svgToViewBox(svg, e.clientX, e.clientY);
+      const xStep = chartData.length > 1 ? VIEWBOX_W / (chartData.length - 1) : VIEWBOX_W;
+      const index = Math.round(vb.x / xStep);
+      const nearestIdx = Math.max(0, Math.min(chartData.length - 1, index));
+      setHoverIndex(nearestIdx);
       const rect = svg.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const viewBoxX = (mouseX / rect.width) * 900;
-      const xStep = chartData.length > 1 ? 900 / (chartData.length - 1) : 900;
-      const index = Math.round(viewBoxX / xStep);
-      setHoverIndex(Math.max(0, Math.min(chartData.length - 1, index)));
-      setMousePos({ x: mouseX, y: mouseY, containerW: rect.width, containerH: rect.height });
+      if (coordinates[nearestIdx]) {
+        const svgPt = svg.createSVGPoint();
+        svgPt.x = coordinates[nearestIdx].x;
+        svgPt.y = coordinates[nearestIdx].y;
+        const screenPt = svgPt.matrixTransform(svg.getScreenCTM()!);
+        setTooltipPos({
+          x: screenPt.x - rect.left,
+          y: screenPt.y - rect.top,
+          containerW: rect.width,
+          containerH: rect.height,
+        });
+      }
     },
-    [chartData]
+    [chartData, coordinates]
   );
 
   const handleMouseLeave = useCallback(() => {
     setHoverIndex(null);
-    setMousePos(null);
+    setTooltipPos(null);
   }, []);
 
   const displaySymbol = response?.resolved.display_symbol ?? symbol;
@@ -247,7 +274,7 @@ export function DashboardMarketChart() {
             </linearGradient>
           </defs>
           <path
-            d="M0 44H900M0 88H900M0 132H900M0 176H900"
+            d={`M0 ${VIEWBOX_H * 0.2}H${VIEWBOX_W}M0 ${VIEWBOX_H * 0.4}H${VIEWBOX_W}M0 ${VIEWBOX_H * 0.6}H${VIEWBOX_W}M0 ${VIEWBOX_H * 0.8}H${VIEWBOX_W}`}
             stroke="currentColor"
             className="text-border"
           />
@@ -266,9 +293,9 @@ export function DashboardMarketChart() {
             <>
               <line
                 x1={coordinates[hoverIndex].x}
-                y1="0"
+                y1={0}
                 x2={coordinates[hoverIndex].x}
-                y2="220"
+                y2={VIEWBOX_H}
                 stroke="#00f2ff"
                 strokeWidth="1"
                 strokeDasharray="4 3"
@@ -299,13 +326,13 @@ export function DashboardMarketChart() {
           </div>
         )}
 
-        {hoverIndex !== null && mousePos && chartData[hoverIndex] && (
+        {hoverIndex !== null && tooltipPos && chartData[hoverIndex] && (
           <div
             ref={tooltipRef}
             className="pointer-events-none absolute z-10 rounded-md border bg-card px-2 py-1.5 text-xs shadow-lg tabular-nums"
             style={{
-              left: Math.max(94, Math.min(mousePos.x, mousePos.containerW - 94)),
-              top: Math.max(8, Math.min(mousePos.y - 48, mousePos.containerH - 68)),
+              left: Math.max(TOOLTIP_MARGIN + 70, Math.min(tooltipPos.x, tooltipPos.containerW - TOOLTIP_MARGIN - 70)),
+              top: Math.max(TOOLTIP_MARGIN, Math.min(tooltipPos.y - 44 - TOOLTIP_MARGIN, tooltipPos.containerH - 44 - TOOLTIP_MARGIN)),
               transform: "translateX(-50%)",
             }}
           >
@@ -315,7 +342,7 @@ export function DashboardMarketChart() {
               })}
             </div>
             <div className="text-muted-foreground">
-              {formatTooltipTime(chartData[hoverIndex].time)}
+              {formatTooltipTime(chartData[hoverIndex].time, response?.interval ?? "day")}
             </div>
           </div>
         )}
