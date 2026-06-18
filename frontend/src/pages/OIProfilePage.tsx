@@ -1,7 +1,9 @@
 import { Layers, Scale, Target, TrendingUp } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getOptionExpiries, getOIProfile, type OIProfileResponse, type OIRow } from "@/lib/api";
+import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
+import type { SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +22,7 @@ type OIProfileState = {
   error: string | null;
 };
 
-const underlyingOptions = ["NIFTY", "BANKNIFTY"];
+const underlyingOptions = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
 
 function OIProfileRow({ row, atmStrike, maxTotalOI }: { row: OIRow; atmStrike: number; maxTotalOI: number }) {
   const isAtm = row.strike_price === atmStrike;
@@ -117,9 +119,24 @@ export function OIProfilePage() {
     void loadData();
   }, [selectedExpiry]);
 
+  const { connectionState } = useLiveMarketData();
+  const spotSub = useMemo<SubscriptionRequest[]>(
+    () => [{ symbol: underlying, exchange: "NSE", product_type: "cash" }],
+    [underlying],
+  );
+  useLiveSubscribe(spotSub);
+  const liveQuote = useLiveQuote(underlying);
+  const liveSpot = liveQuote?.ltp ?? state.data?.underlying_ltp;
+
   const maxTotalOI = state.data
     ? Math.max(...state.data.rows.map((r) => Math.max(r.ce_oi, r.pe_oi)), 1)
     : 1;
+
+  function liveBadgeLabel(state: string): string {
+    if (state === "live") return "Live feed";
+    if (state === "connecting") return "Connecting";
+    return "REST only";
+  }
 
   return (
     <PageLayout>
@@ -127,6 +144,11 @@ export function OIProfilePage() {
         kicker="Open interest"
         title="OI Profile"
         description="OI distribution across all strikes sorted by price. ATM strike highlighted. CE left, PE right."
+        actions={
+          <Badge variant={connectionState === "live" ? "default" : "secondary"}>
+            {liveBadgeLabel(connectionState)}
+          </Badge>
+        }
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -167,7 +189,7 @@ export function OIProfilePage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatCard label="Spot" value={formatNumber(state.data?.underlying_ltp)} icon={TrendingUp} />
+        <StatCard label="Spot" value={formatNumber(liveSpot)} icon={TrendingUp} />
         <StatCard label="ATM Strike" value={formatNumber(state.data?.atm_strike, 0)} icon={Target} />
         <StatCard
           label="PCR"

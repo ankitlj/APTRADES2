@@ -7,7 +7,8 @@ import {
   type OptionChainResponse,
   type OptionChainRow,
 } from "@/lib/api";
-import { useLiveMarketData } from "@/hooks/useLiveMarketData";
+import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
+import type { SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { formatNumber, tone, toneColor } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ type OptionChainState = {
   error: string | null;
 };
 
-const underlyingOptions = ["NIFTY", "BANKNIFTY"];
+const underlyingOptions = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
 const strikeWindowOptions = [8, 12, 16, 20];
 
 function liveBadgeLabel(state: string): string {
@@ -125,11 +126,18 @@ export function OptionChainPage() {
   }, [selectedExpiry, strikeCount]);
 
   const { connectionState } = useLiveMarketData();
+  const spotSub = useMemo<SubscriptionRequest[]>(
+    () => [{ symbol: underlying, exchange: "NSE", product_type: "cash" }],
+    [underlying],
+  );
+  useLiveSubscribe(spotSub);
+  const liveQuote = useLiveQuote(underlying);
+  const liveSpot = liveQuote?.ltp ?? state.data?.underlying_ltp;
 
   const previousCloseDelta = useMemo(() => {
-    if (!state.data?.underlying_ltp || !state.data.previous_close) return null;
-    return state.data.underlying_ltp - state.data.previous_close;
-  }, [state.data]);
+    if (liveSpot == null || !state.data?.previous_close) return null;
+    return liveSpot - state.data.previous_close;
+  }, [liveSpot, state.data?.previous_close]);
 
   return (
     <PageLayout>
@@ -191,7 +199,7 @@ export function OptionChainPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <StatCard label="Spot" value={formatNumber(state.data?.underlying_ltp)} tone={tone(previousCloseDelta)} icon={TrendingUp} />
+        <StatCard label="Spot" value={formatNumber(liveSpot)} tone={tone(previousCloseDelta)} icon={TrendingUp} />
         <StatCard label="ATM strike" value={formatNumber(state.data?.atm_strike, 0)} icon={Target} />
         <StatCard
           label="PCR"

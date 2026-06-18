@@ -1,7 +1,9 @@
 import { ArrowDown, ArrowUp, BarChart3, Scale, Target } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { getOptionExpiries, getOITracker, type OITrackerResponse, type OIRow } from "@/lib/api";
+import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
+import type { SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +22,7 @@ type OITrackerState = {
   error: string | null;
 };
 
-const underlyingOptions = ["NIFTY", "BANKNIFTY"];
+const underlyingOptions = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
 
 function OISplitBar({ ceOi, peOi }: { ceOi: number; peOi: number }) {
   const total = ceOi + peOi;
@@ -118,12 +120,31 @@ export function OITrackerPage() {
     void loadData();
   }, [selectedExpiry]);
 
+  const { connectionState } = useLiveMarketData();
+  const spotSub = useMemo<SubscriptionRequest[]>(
+    () => [{ symbol: underlying, exchange: "NSE", product_type: "cash" }],
+    [underlying],
+  );
+  useLiveSubscribe(spotSub);
+  useLiveQuote(underlying);
+
+  function liveBadgeLabel(state: string): string {
+    if (state === "live") return "Live feed";
+    if (state === "connecting") return "Connecting";
+    return "REST only";
+  }
+
   return (
     <PageLayout>
       <PageHeader
         kicker="Open interest"
         title="OI Tracker"
         description="Strikes ranked by total OI. Highest CE OI = resistance. Highest PE OI = support."
+        actions={
+          <Badge variant={connectionState === "live" ? "default" : "secondary"}>
+            {liveBadgeLabel(connectionState)}
+          </Badge>
+        }
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

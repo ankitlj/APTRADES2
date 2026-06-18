@@ -1,5 +1,5 @@
 import { Target, TrendingDown, TrendingUp, Wallet } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PayoffChart } from "@/components/PayoffChart";
 import {
@@ -9,6 +9,8 @@ import {
   type PayoffResponse,
   type StrategyLeg,
 } from "@/lib/api";
+import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
+import type { SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +43,7 @@ type BuilderState = {
 };
 
 const BLANK_LEG: LegDraft = { action: "sell", right: "call", strike: "", quantity: "1", premium: "" };
-const UNDERLYINGS = ["NIFTY", "BANKNIFTY"];
+const UNDERLYINGS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
 
 function fmt(v: number | null, dec = 2): string {
   if (v === null || v === undefined) return "n/a";
@@ -174,6 +176,20 @@ export function StrategyBuilderPage() {
     }
   }
 
+  const { connectionState } = useLiveMarketData();
+  const spotSub = useMemo<SubscriptionRequest[]>(
+    () => [{ symbol: state.underlying, exchange: "NSE", product_type: "cash" }],
+    [state.underlying],
+  );
+  useLiveSubscribe(spotSub);
+  useLiveQuote(state.underlying);
+
+  function liveBadgeLabel(state: string): string {
+    if (state === "live") return "Live feed";
+    if (state === "connecting") return "Connecting";
+    return "REST only";
+  }
+
   const payoffUid = state.payoff ? `builder-${state.legs.map((l) => l.strike).join("-")}` : "builder";
 
   return (
@@ -182,6 +198,11 @@ export function StrategyBuilderPage() {
         kicker="Strategy tools"
         title="Strategy Builder"
         description="Compose multi-leg option structures, preview the payoff diagram, and save to your portfolio."
+        actions={
+          <Badge variant={connectionState === "live" ? "default" : "secondary"}>
+            {liveBadgeLabel(connectionState)}
+          </Badge>
+        }
       />
 
       <Card>
