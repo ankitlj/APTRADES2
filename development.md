@@ -2397,4 +2397,13 @@ Websocket:
   10. Dark mode toggle → all steps above work
   11. Blank query: "Type to search instruments"
   12. Debounce: rapid typing only triggers one search per 250ms
-  13. Orderbook polling refreshes every 2.5s after selection
+   13. Orderbook polling refreshes every 2.5s after selection
+
+### 2026-06-19 — Frontend polish pass: Part 1 — Global CSS polish
+
+- Added `-webkit-font-smoothing: antialiased`, `-moz-osx-font-smoothing: grayscale`, `text-rendering: optimizeLegibility` on global `*` selector for Mac-like font rendering on Windows/Edge/Chrome
+- Added `font-variant-numeric: tabular-nums` on `body` for consistent number/metric alignment
+- Added CSS transition tokens: `--ease-out-premium`, `--transition-fast`, `--transition-base`
+- Polished dark scrollbar: reduced thumb width to 5px, lowered thumb opacity, added global `.dark` scrollbar rules so modal and page scrollbars are thin/dark without requiring `.scrollbar-thin` class
+- Files changed: `frontend/src/index.css`
+- Build: passed

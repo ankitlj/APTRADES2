@@ -1011,3 +1011,12 @@ See `development.md` for 13-step post-deploy checklist.
 
 - Backend: `python -m pytest` → 156 passed
 - Frontend: `npm run build` → 1860 modules, no errors
+
+## 2026-06-19 — Frontend polish pass, Part 1: Global CSS polish
+
+- Font rendering: `-webkit-font-smoothing: antialiased`, `-moz-osx-font-smoothing: grayscale`, `text-rendering: optimizeLegibility`
+- Number rendering: `font-variant-numeric: tabular-nums` on `body` for consistent metric alignment
+- Added CSS transition tokens: `--ease-out-premium (cubic-bezier(0.16, 1, 0.3, 1)`, `--transition-fast (140ms)`, `--transition-base (220ms)`
+- Dark scrollbar: reduced thumb width to 5px, lowered opacity, added global `.dark` scrollbar rules without requiring `.scrollbar-thin` class
+- Files: `frontend/src/index.css`
+- Build: passed
