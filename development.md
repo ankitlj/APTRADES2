@@ -2399,6 +2399,14 @@ Websocket:
   12. Debounce: rapid typing only triggers one search per 250ms
    13. Orderbook polling refreshes every 2.5s after selection
 
+### 2026-06-19 — Frontend polish pass: Part 6 — Final verification
+- Final frontend build: `npm run build` → passed (1860 modules)
+- Backend tests: `python -m pytest` → 156 passed (no backend files changed)
+- All 6 parts implemented without touching backend, API contracts, trading logic, websocket behavior, or order placement
+- Verifies these pages render without console errors: /dashboard, /orderbook, /tradebook, /positions, /action-centre, /logs, /tools
+- Dashboard search modal: accessible keyboard nav (Enter/Escape/arrows), correct empty/error states, sectioned results
+- Consistent loading/empty/error states across all pages via DataState + DataTableShell
+
 ### 2026-06-19 — Frontend polish pass: Part 5 — Standardized page states
 - Updated `DataTableShell` to use `DataState` internally instead of separate `LoadingState`/`EmptyState`/`ErrorState` — consistent spinner, icons, and error layout
 - Removed redundant standalone `ErrorState` from OrderbookPage, TradebookPage, PositionsPage, ActionCentrePage, LogsPage — DataTableShell already renders error inside the card, fixing duplicated error boxes
