@@ -905,6 +905,75 @@ export function getDashboardOptionOrderbook(params: {
   return requestJson<OptionOrderbookResponse>(`/api/dashboard/option-orderbook?${search.toString()}`);
 }
 
+export interface InstrumentSearchResult {
+  broker_symbol: string;
+  display_symbol: string | null;
+  name: string | null;
+  exchange_code: string;
+  product_type: string;
+  expiry_date: string | null;
+  strike_price: string | null;
+  option_right: string | null;
+}
+
+export interface InstrumentSearchResponse {
+  status: string;
+  query: string;
+  results: InstrumentSearchResult[];
+}
+
+export interface DashboardOrderbookLevel {
+  bid_qty?: number;
+  bid_price?: number;
+  ask_price?: number;
+  ask_qty?: number;
+}
+
+export interface DashboardOrderbookResponse {
+  status: string;
+  instrument: OptionOrderbookInstrument;
+  ltp: number | null;
+  previous_close: number | null;
+  bid_price: number | null;
+  bid_qty: number | null;
+  ask_price: number | null;
+  ask_qty: number | null;
+  levels: DashboardOrderbookLevel[];
+  total_buy_qty: number;
+  total_sell_qty: number;
+  buy_percent: number;
+  sell_percent: number;
+  spot_price: number | null;
+  underlying_ltp: number | null;
+  product_type: string;
+  timestamp: string;
+  error?: string;
+}
+
+export function searchInstruments(q: string) {
+  const search = new URLSearchParams({ q });
+  return requestJson<InstrumentSearchResponse>(`/api/dashboard/search?${search.toString()}`);
+}
+
+export function getDashboardOrderbook(params: {
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  expiry_date?: string | null;
+  right?: string | null;
+  strike_price?: string | null;
+}) {
+  const search = new URLSearchParams({
+    broker_symbol: params.broker_symbol,
+    exchange_code: params.exchange_code,
+    product_type: params.product_type,
+  });
+  if (params.expiry_date) search.set("expiry_date", params.expiry_date);
+  if (params.right) search.set("right", params.right);
+  if (params.strike_price) search.set("strike_price", params.strike_price);
+  return requestJson<DashboardOrderbookResponse>(`/api/dashboard/orderbook?${search.toString()}`);
+}
+
 export function getMarketDataStatus() {
   return requestJson<MarketDataStatusResponse>("/api/market-data/status");
 }

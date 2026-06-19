@@ -49,6 +49,39 @@ def dashboard_chart() -> tuple[object, int]:
     return jsonify(payload), 200
 
 
+@dashboard_bp.get("/dashboard/search")
+def dashboard_search() -> tuple[object, int]:
+    q = str(request.args.get("q", "")).strip()
+    payload = _dashboard_service().search_instruments(q)
+    return jsonify(payload), 200
+
+
+@dashboard_bp.get("/dashboard/orderbook")
+def dashboard_orderbook() -> tuple[object, int]:
+    broker_symbol = str(request.args.get("broker_symbol", "")).strip()
+    exchange_code = str(request.args.get("exchange_code", "")).strip()
+    product_type = str(request.args.get("product_type", "")).strip()
+    expiry_date = str(request.args.get("expiry_date", "")).strip() or None
+    right = str(request.args.get("right", "")).strip().lower() or None
+    strike_price = str(request.args.get("strike_price", "")).strip() or None
+
+    if not broker_symbol:
+        return jsonify({"status": "error", "error": "broker_symbol is required."}), 400
+    if not exchange_code:
+        return jsonify({"status": "error", "error": "exchange_code is required."}), 400
+    if not product_type or product_type.lower() not in ("cash", "futures", "options"):
+        return jsonify({"status": "error", "error": "product_type must be 'cash', 'futures', or 'options'."}), 400
+
+    try:
+        payload = _dashboard_service().get_orderbook(
+            broker_symbol, exchange_code, product_type,
+            expiry_date=expiry_date, right=right, strike_price=strike_price,
+        )
+    except DashboardServiceError as error:
+        return jsonify({"status": "error", "error": str(error)}), 400
+    return jsonify(payload), 200
+
+
 @dashboard_bp.get("/dashboard/option-orderbook")
 def dashboard_option_orderbook() -> tuple[object, int]:
     underlying = str(request.args.get("underlying", "")).strip()

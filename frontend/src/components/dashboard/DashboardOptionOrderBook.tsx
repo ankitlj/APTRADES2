@@ -3,21 +3,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { useLiveQuote } from "@/hooks/useLiveMarketData";
-import { getDashboardOptionOrderbook, getOptionChain, getOptionExpiries } from "@/lib/api";
-import type { OptionOrderbookResponse } from "@/lib/api";
+import { useLiveQuote, useLiveSubscribe } from "@/hooks/useLiveMarketData";
+import { getDashboardOrderbook, type DashboardOrderbookResponse, type InstrumentSearchResult } from "@/lib/api";
+import type { SubscriptionRequest } from "@/lib/realtime";
 import { formatNumber } from "@/lib/format";
+import { DashboardInstrumentSearch } from "./DashboardInstrumentSearch";
 
-const UNDERLYING_OPTIONS = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
 const POLL_INTERVAL_MS = 2500;
-
-type Right = "call" | "put";
-
-interface StrikeOption {
-  strike: number;
-  right: Right;
-  label: string;
-}
 
 type FetchState<T> =
   | { status: "idle" }
@@ -25,19 +17,45 @@ type FetchState<T> =
   | { status: "error"; message: string }
   | { status: "ok"; data: T };
 
-export function DashboardOptionOrderBook() {
-  const [underlying, setUnderlying] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [selectedStrike, setSelectedStrike] = useState<StrikeOption | null>(null);
+function instrumentLabel(instrument: InstrumentSearchResult): string {
+  let label = instrument.broker_symbol;
+  if (instrument.product_type === "options" && instrument.expiry_date) {
+    const d = instrument.expiry_date.slice(0, 10);
+    const r = instrument.option_right === "call" ? "CE" : "PE";
+    label = `${instrument.broker_symbol} ${d} ${instrument.strike_price} ${r}`;
+  } else if (instrument.product_type === "futures" && instrument.expiry_date) {
+    label = `${instrument.broker_symbol} ${instrument.expiry_date.slice(0, 10)}`;
+  }
+  return label;
+}
 
-  const [expiries, setExpiries] = useState<FetchState<string[]>>({ status: "idle" });
-  const [strikes, setStrikes] = useState<FetchState<StrikeOption[]>>({ status: "idle" });
-  const [orderbook, setOrderbook] = useState<FetchState<OptionOrderbookResponse>>({ status: "idle" });
+function instrumentShortLabel(instrument: InstrumentSearchResult): string {
+  if (instrument.product_type === "options") {
+    const r = instrument.option_right === "call" ? "CE" : "PE";
+    return `${instrument.strike_price} ${r}`;
+  }
+  return instrument.product_type === "futures" && instrument.expiry_date
+    ? instrument.expiry_date.slice(0, 10)
+    : instrument.broker_symbol;
+}
+
+function productBadge(productType: string): string {
+  switch (productType) {
+    case "cash": return "EQ";
+    case "futures": return "FUT";
+    case "options": return "OPT";
+    default: return productType.toUpperCase();
+  }
+}
+
+export function DashboardOptionOrderBook() {
+  const [selectedInstrument, setSelectedInstrument] = useState<InstrumentSearchResult | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [orderbook, setOrderbook] = useState<FetchState<DashboardOrderbookResponse>>({ status: "idle" });
   const [confirmAction, setConfirmAction] = useState<"BUY" | "SELL" | null>(null);
   const [confirmQty, setConfirmQty] = useState(1);
 
   const cancelRef = useRef<HTMLButtonElement | null>(null);
-
   const abortRef = useRef<AbortController | null>(null);
   const hasValidDataRef = useRef(false);
 
@@ -48,39 +66,15 @@ export function DashboardOptionOrderBook() {
     abortRef.current = new AbortController();
   }, []);
 
-  const handleUnderlyingChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setUnderlying(val);
-    setExpiry("");
-    setSelectedStrike(null);
-    setExpiries(val ? { status: "loading" } : { status: "idle" });
-    setStrikes({ status: "idle" });
-    setOrderbook({ status: "idle" });
-    hasValidDataRef.current = false;
-  }, []);
-
-  const handleExpiryChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setExpiry(val);
-    setSelectedStrike(null);
-    setStrikes(val ? { status: "loading" } : { status: "idle" });
-    setOrderbook({ status: "idle" });
-    hasValidDataRef.current = false;
-  }, []);
-
-  const handleStrikeChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    if (!val) {
-      setSelectedStrike(null);
-      setOrderbook({ status: "idle" });
-      hasValidDataRef.current = false;
-      return;
-    }
-    const [strikeStr, right] = val.split("-");
-    setSelectedStrike({ strike: Number(strikeStr), right: right as Right, label: val });
+  const handleSelect = useCallback((instrument: InstrumentSearchResult) => {
+    setSelectedInstrument(instrument);
     setOrderbook({ status: "loading" });
     hasValidDataRef.current = false;
     setConfirmQty(1);
+  }, []);
+
+  const handleChange = useCallback(() => {
+    setSearchOpen(true);
   }, []);
 
   const openConfirm = useCallback((action: "BUY" | "SELL") => {
@@ -92,52 +86,19 @@ export function DashboardOptionOrderBook() {
     setConfirmAction(null);
   }, []);
 
-  useEffect(() => {
-    if (!underlying) return;
-    cancelPending();
-    const signal = abortRef.current!.signal;
-    getOptionExpiries({ underlying })
-      .then((res) => {
-        if (signal.aborted) return;
-        setExpiries({ status: "ok", data: res.expiries });
-      })
-      .catch((err: Error) => {
-        if (signal.aborted) return;
-        setExpiries({ status: "error", message: err.message });
-      });
-  }, [underlying, cancelPending]);
+  const orderbookSubscriptions: SubscriptionRequest[] = selectedInstrument
+    ? [
+        {
+          symbol: selectedInstrument.broker_symbol,
+          exchange: selectedInstrument.exchange_code,
+          product_type: selectedInstrument.product_type,
+        },
+      ]
+    : [];
+  useLiveSubscribe(orderbookSubscriptions);
 
   useEffect(() => {
-    if (!underlying || !expiry) return;
-    cancelPending();
-    const signal = abortRef.current!.signal;
-    setStrikes({ status: "loading" });
-    getOptionChain({ underlying, expiry })
-      .then((res) => {
-        if (signal.aborted) return;
-        const extracted: StrikeOption[] = [];
-        for (const row of res.rows) {
-          if (row.ce) {
-            extracted.push({ strike: row.strike_price, right: "call", label: `${row.strike_price}-call` });
-          }
-          if (row.pe) {
-            extracted.push({ strike: row.strike_price, right: "put", label: `${row.strike_price}-put` });
-          }
-        }
-        if (extracted.length === 0) {
-          setStrikes({ status: "error", message: "No strikes available for this expiry" });
-        } else {
-          setStrikes({ status: "ok", data: extracted });
-        }
-      })
-      .catch((err: Error) => {
-        if (signal.aborted) return;
-        setStrikes({ status: "error", message: err.message });
-      });
-  }, [underlying, expiry, cancelPending]);
-
-  useEffect(() => {
-    if (!underlying || !expiry || !selectedStrike) {
+    if (!selectedInstrument) {
       hasValidDataRef.current = false;
       return;
     }
@@ -147,11 +108,13 @@ export function DashboardOptionOrderBook() {
     setOrderbook({ status: "loading" });
 
     const fetchData = () => {
-      getDashboardOptionOrderbook({
-        underlying,
-        expiry,
-        strike: selectedStrike.strike,
-        right: selectedStrike.right,
+      getDashboardOrderbook({
+        broker_symbol: selectedInstrument.broker_symbol,
+        exchange_code: selectedInstrument.exchange_code,
+        product_type: selectedInstrument.product_type,
+        expiry_date: selectedInstrument.expiry_date,
+        right: selectedInstrument.option_right,
+        strike_price: selectedInstrument.strike_price,
       })
         .then((res) => {
           if (signal.aborted) return;
@@ -173,14 +136,12 @@ export function DashboardOptionOrderBook() {
     return () => {
       clearInterval(intervalId);
     };
-  }, [underlying, expiry, selectedStrike, cancelPending]);
+  }, [selectedInstrument, cancelPending]);
 
-  const numberOfStrikes =
-    strikes.status === "ok" ? strikes.data.length : 0;
   const orderbookData = orderbook.status === "ok" ? orderbook.data : null;
   const liveTick = useLiveQuote(orderbookData?.instrument?.display_symbol ?? null);
-  const hasSelection = Boolean(underlying && expiry && selectedStrike);
-  const isLive = orderbook.status === "ok" && orderbook.data?.status === "ok";
+  const hasSelection = Boolean(selectedInstrument);
+  const isLive = orderbook.status === "ok" && orderbookData?.status === "ok";
 
   const effectiveLtp = liveTick?.ltp ?? orderbookData?.ltp ?? null;
   const effectiveBidPrice = liveTick?.bid_price ?? orderbookData?.bid_price ?? null;
@@ -206,7 +167,7 @@ export function DashboardOptionOrderBook() {
       );
     }
     if (orderbook.status === "ok") {
-      const isError = orderbook.data.status === "error";
+      const isError = orderbookData?.status === "error";
       if (isError) {
         return (
           <span className="inline-flex h-5 items-center rounded-full bg-red-100 px-2 text-[10px] font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
@@ -226,7 +187,7 @@ export function DashboardOptionOrderBook() {
     }
     return (
       <span className="inline-flex h-5 items-center rounded-full bg-muted px-2 text-[10px] font-medium text-muted-foreground">
-        Awaiting selection
+        Inactive
       </span>
     );
   };
@@ -236,117 +197,82 @@ export function DashboardOptionOrderBook() {
     <Card className="overflow-hidden">
       <CardHeader className="min-h-14 gap-3 border-b px-4 py-3 md:flex-row md:items-center md:justify-between">
         <CardTitle className="text-sm">Order Book</CardTitle>
-        {statusBadge()}
+        <div className="flex items-center gap-2">
+          {hasSelection && (
+            <button
+              onClick={handleChange}
+              className="text-[11px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            >
+              Change
+            </button>
+          )}
+          {statusBadge()}
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-3 p-4">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <div>
-            <label htmlFor="ob-underlying" className="mb-1 block text-[10px] font-medium text-muted-foreground">
-              Underlying
-            </label>
-            <select
-              id="ob-underlying"
-              value={underlying}
-              onChange={handleUnderlyingChange}
-              className="h-8 w-full rounded-md border bg-background px-2 text-xs text-foreground shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
-              aria-label="Select underlying index"
-            >
-              <option value="">Select...</option>
-              {UNDERLYING_OPTIONS.map((sym) => (
-                <option key={sym} value={sym}>
-                  {sym}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="ob-expiry" className="mb-1 block text-[10px] font-medium text-muted-foreground">
-              Expiry
-            </label>
-            <select
-              id="ob-expiry"
-              value={expiry}
-              onChange={handleExpiryChange}
-              disabled={!underlying}
-              className="h-8 w-full rounded-md border bg-background px-2 text-xs text-foreground shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Select expiry date"
-            >
-              <option value="">
-                {expiries.status === "loading"
-                  ? "Loading..."
-                  : expiries.status === "error"
-                    ? "Failed to load"
-                    : underlying
-                      ? "Select expiry..."
-                      : "Select underlying first"}
-              </option>
-              {expiries.status === "ok" &&
-                expiries.data.map((d) => (
-                  <option key={d} value={d}>
-                    {d.slice(0, 10)}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="ob-strike" className="mb-1 block text-[10px] font-medium text-muted-foreground">
-              Strike
-            </label>
-            <select
-              id="ob-strike"
-              value={selectedStrike ? selectedStrike.label : ""}
-              onChange={handleStrikeChange}
-              disabled={!expiry}
-              className="h-8 w-full rounded-md border bg-background px-2 text-xs text-foreground shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40"
-              aria-label="Select strike and right"
-            >
-              <option value="">
-                {strikes.status === "loading"
-                  ? "Loading..."
-                  : strikes.status === "error"
-                    ? "Failed to load strikes"
-                    : expiry
-                      ? `Select strike (${numberOfStrikes} available)`
-                      : "Select expiry first"}
-              </option>
-              {strikes.status === "ok" &&
-                strikes.data.map((s) => (
-                  <option key={s.label} value={s.label}>
-                    {formatNumber(s.strike, 0)} {s.right === "call" ? "CE" : "PE"}
-                  </option>
-                ))}
-            </select>
-          </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-medium text-muted-foreground">
+            Instrument
+          </label>
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="flex h-9 w-full items-center justify-between rounded-md border bg-background px-3 text-xs text-muted-foreground shadow-xs hover:border-ring hover:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none"
+          >
+            {hasSelection && selectedInstrument ? (
+              <span className="flex items-center gap-2">
+                <span className="font-semibold text-foreground">
+                  {selectedInstrument.display_symbol || selectedInstrument.broker_symbol}
+                </span>
+                <span className="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {productBadge(selectedInstrument.product_type)}
+                </span>
+                <span className="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                  {selectedInstrument.exchange_code}
+                </span>
+                {(selectedInstrument.product_type === "options" || selectedInstrument.product_type === "futures") && selectedInstrument.expiry_date && (
+                  <span className="text-muted-foreground/60">
+                    {instrumentShortLabel(selectedInstrument)}
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="text-muted-foreground/60">Search instrument...</span>
+            )}
+            <kbd className="rounded border bg-muted px-1 font-mono text-[10px] text-muted-foreground/50">
+              /
+            </kbd>
+          </button>
         </div>
 
-        {hasSelection && selectedStrike ? (
+        {hasSelection && orderbookData && (
           <div className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2">
             <div className="flex items-center gap-3 text-xs">
-              <span className="font-semibold text-foreground">{underlying}</span>
-              <span className="text-muted-foreground">|</span>
-              <span className="font-medium text-foreground">{expiry.slice(0, 10)}</span>
+              <span className="font-semibold text-foreground">
+                {orderbookData.instrument.broker_symbol}
+              </span>
               <span className="text-muted-foreground">|</span>
               <span className="font-medium text-foreground">
-                {formatNumber(selectedStrike.strike, 0)} {selectedStrike.right === "call" ? "CE" : "PE"}
+                {orderbookData.product_type.toUpperCase()}
+              </span>
+              <span className="text-muted-foreground">|</span>
+              <span className="tabular-nums text-muted-foreground">
+                LTP:{" "}
+                {orderbook.status === "loading" ? (
+                  "..."
+                ) : effectiveLtp != null ? (
+                  formatNumber(effectiveLtp)
+                ) : (
+                  <span className="text-muted-foreground/50">N/A</span>
+                )}
               </span>
             </div>
-            <div className="text-xs tabular-nums text-muted-foreground">
-              LTP:{" "}
-              {orderbook.status === "loading" ? (
-                "..."
-              ) : effectiveLtp != null ? (
-                formatNumber(effectiveLtp)
-              ) : (
-                <span className="text-muted-foreground/50">N/A</span>
-              )}
-            </div>
           </div>
-        ) : (
+        )}
+
+        {!hasSelection && (
           <div className="flex min-h-[36px] items-center justify-center rounded-md border border-dashed bg-muted/10 px-3 text-xs text-muted-foreground/60">
-            Select underlying, expiry, and strike to view order book
+            Search and select an instrument to view the order book
           </div>
         )}
 
@@ -383,16 +309,16 @@ export function DashboardOptionOrderBook() {
                 {orderbookData && orderbookData.status === "ok" ? (
                   <tr className="border-b border-border/40">
                     <td className="px-3 py-2 text-green-600 dark:text-green-400">
-                      {effectiveBidQty != null ? formatNumber(effectiveBidQty, 0) : "—"}
+                      {effectiveBidQty != null ? formatNumber(effectiveBidQty, 0) : "\u2014"}
                     </td>
                     <td className="px-3 py-2 text-right text-green-600 dark:text-green-400">
-                      {effectiveBidPrice != null ? formatNumber(effectiveBidPrice) : "—"}
+                      {effectiveBidPrice != null ? formatNumber(effectiveBidPrice) : "\u2014"}
                     </td>
                     <td className="px-3 py-2 text-right text-red-500">
-                      {effectiveAskPrice != null ? formatNumber(effectiveAskPrice) : "—"}
+                      {effectiveAskPrice != null ? formatNumber(effectiveAskPrice) : "\u2014"}
                     </td>
                     <td className="px-3 py-2 text-right text-red-500">
-                      {effectiveAskQty != null ? formatNumber(effectiveAskQty, 0) : "—"}
+                      {effectiveAskQty != null ? formatNumber(effectiveAskQty, 0) : "\u2014"}
                     </td>
                   </tr>
                 ) : orderbook.status === "loading" ? (
@@ -403,15 +329,15 @@ export function DashboardOptionOrderBook() {
                   </tr>
                   ) : hasSelection && !orderbookData ? (
                   <tr className="border-b border-border/40">
-                    <td className="px-3 py-2 text-green-600 dark:text-green-400">—</td>
-                    <td className="px-3 py-2 text-right text-green-600 dark:text-green-400">—</td>
-                    <td className="px-3 py-2 text-right text-red-500">—</td>
-                    <td className="px-3 py-2 text-right text-red-500">—</td>
+                    <td className="px-3 py-2 text-green-600 dark:text-green-400">\u2014</td>
+                    <td className="px-3 py-2 text-right text-green-600 dark:text-green-400">\u2014</td>
+                    <td className="px-3 py-2 text-right text-red-500">\u2014</td>
+                    <td className="px-3 py-2 text-right text-red-500">\u2014</td>
                   </tr>
                 ) : (
                   <tr>
                     <td colSpan={4} className="px-3 py-6 text-center text-[10px] text-muted-foreground/50">
-                      No option selected
+                      No instrument selected
                     </td>
                   </tr>
                 )}
@@ -454,7 +380,7 @@ export function DashboardOptionOrderBook() {
             <p className="text-[10px] text-muted-foreground/50">Failed to load depth data</p>
           ) : (
             <p className="text-[10px] text-muted-foreground/50">
-              Depth data will appear when an option is selected
+              Depth data will appear when an instrument is selected
             </p>
           )}
         </div>
@@ -464,7 +390,7 @@ export function DashboardOptionOrderBook() {
             variant="default"
             disabled={!hasSelection || orderbook.status !== "ok" || orderbookData?.status !== "ok"}
             className="flex-1 bg-green-600 text-white hover:bg-green-700 disabled:opacity-30"
-            aria-label="Buy selected option"
+            aria-label="Buy selected instrument"
             onClick={() => openConfirm("BUY")}
           >
             BUY
@@ -473,7 +399,7 @@ export function DashboardOptionOrderBook() {
             variant="destructive"
             disabled={!hasSelection || orderbook.status !== "ok" || orderbookData?.status !== "ok"}
             className="flex-1 disabled:opacity-30"
-            aria-label="Sell selected option"
+            aria-label="Sell selected instrument"
             onClick={() => openConfirm("SELL")}
           >
             SELL
@@ -482,7 +408,13 @@ export function DashboardOptionOrderBook() {
       </CardContent>
     </Card>
 
-    {confirmAction && orderbookData && (
+    <DashboardInstrumentSearch
+      isOpen={searchOpen}
+      onClose={() => setSearchOpen(false)}
+      onSelect={handleSelect}
+    />
+
+    {confirmAction && orderbookData && selectedInstrument && (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         role="dialog"
@@ -509,21 +441,20 @@ export function DashboardOptionOrderBook() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Contract</span>
               <span className="font-medium text-foreground">
-                {underlying} {expiry.slice(0, 10)} {formatNumber(selectedStrike!.strike, 0)}{" "}
-                {selectedStrike!.right === "call" ? "CE" : "PE"}
+                {instrumentLabel(selectedInstrument)}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">LTP</span>
               <span className="font-medium tabular-nums text-foreground">
-                {effectiveLtp != null ? formatNumber(effectiveLtp) : "—"}
+                {effectiveLtp != null ? formatNumber(effectiveLtp) : "\u2014"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Bid / Ask</span>
               <span className="font-medium tabular-nums text-foreground">
-                {effectiveBidPrice != null ? formatNumber(effectiveBidPrice) : "—"} /{" "}
-                {effectiveAskPrice != null ? formatNumber(effectiveAskPrice) : "—"}
+                {effectiveBidPrice != null ? formatNumber(effectiveBidPrice) : "\u2014"} /{" "}
+                {effectiveAskPrice != null ? formatNumber(effectiveAskPrice) : "\u2014"}
               </span>
             </div>
             <div className="flex justify-between">
@@ -531,7 +462,7 @@ export function DashboardOptionOrderBook() {
               <span className="font-medium tabular-nums text-foreground">
                 {effectiveBidPrice != null && effectiveAskPrice != null
                   ? formatNumber(effectiveAskPrice - effectiveBidPrice)
-                  : "—"}
+                  : "\u2014"}
               </span>
             </div>
 

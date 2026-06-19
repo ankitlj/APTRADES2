@@ -8,6 +8,11 @@ from typing import Any
 
 from flask import current_app
 
+from sqlalchemy import or_
+
+from ..db import create_session_factory
+from ..models import Instrument
+
 from .breeze_gateway import BreezeGateway, BreezeGatewayError, BreezeInstrument
 from .master_contract_service import MasterContractService
 from .positions_service import PositionsService, PositionsServiceError
@@ -357,6 +362,220 @@ class DashboardService:
             "spot_price": spot_price,
             "underlying_ltp": spot_price,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def search_instruments(self, query: str) -> dict[str, object]:
+        normalized = query.strip().upper()
+        if not normalized or len(normalized) < 1:
+            return {"status": "ok", "query": query, "results": []}
+
+        if not self.dependencies.database_url:
+            return {"status": "ok", "query": query, "results": []}
+
+        pattern = f"%{normalized}%"
+        session_factory = create_session_factory(self.dependencies.database_url)
+        with session_factory() as session:
+            rows = (
+                session.query(Instrument)
+                .filter(
+                    Instrument.is_active.is_(True),
+                    or_(
+                        Instrument.broker_symbol.like(pattern),
+                        Instrument.display_symbol.like(pattern),
+                        Instrument.name.like(pattern),
+                    ),
+                )
+                .order_by(
+                    Instrument.product_type == "cash",
+                    Instrument.broker_symbol,
+                )
+                .limit(20)
+                .all()
+            )
+
+        results = [
+            {
+                "broker_symbol": r.broker_symbol,
+                "display_symbol": r.display_symbol,
+                "name": r.name,
+                "exchange_code": r.exchange_code,
+                "product_type": r.product_type or "cash",
+                "expiry_date": r.expiry_date.isoformat() if r.expiry_date else None,
+                "strike_price": r.strike_price,
+                "option_right": r.option_right,
+                "instrument_group": r.instrument_group,
+            }
+            for r in rows
+        ]
+
+        return {"status": "ok", "query": query, "results": results}
+
+    def get_orderbook(
+        self,
+        broker_symbol: str,
+        exchange_code: str,
+        product_type: str,
+        expiry_date: str | None = None,
+        right: str | None = None,
+        strike_price: str | None = None,
+    ) -> dict[str, object]:
+        normalized_symbol = broker_symbol.strip().upper()
+        normalized_exchange = exchange_code.strip().upper()
+        normalized_product = product_type.strip().lower()
+
+        if not normalized_symbol:
+            raise DashboardServiceError("broker_symbol is required.")
+        if not normalized_exchange:
+            raise DashboardServiceError("exchange_code is required.")
+        if normalized_product not in ("cash", "futures", "options"):
+            raise DashboardServiceError("product_type must be 'cash', 'futures', or 'options'.")
+
+        try:
+            resolver = SymbolResolver(self.dependencies.database_url)
+            parsed_expiry = None
+            if expiry_date:
+                from datetime import date as date_type
+                parsed_expiry = date_type.fromisoformat(expiry_date.split("T")[0])
+
+            resolved = resolver.resolve(
+                normalized_symbol,
+                normalized_exchange,
+                product_type=normalized_product,
+                expiry_date=parsed_expiry,
+                right=right,
+                strike_price=strike_price,
+            )
+        except Exception as error:
+            raise DashboardServiceError(f"Failed to resolve instrument: {error}") from error
+
+        breeze_instrument = BreezeInstrument(
+            display_symbol=resolved.display_symbol,
+            stock_code=resolved.broker_symbol,
+            exchange_code=resolved.exchange_code,
+            product_type=normalized_product,
+            right=resolved.right,
+            strike_price=resolved.strike_price,
+            expiry_date=f"{resolved.expiry_date.isoformat()}T06:00:00.000Z" if resolved.expiry_date else "",
+        )
+
+        try:
+            if normalized_product == "options":
+                rows = self.gateway.get_option_chain_quotes(breeze_instrument)
+            else:
+                rows = self.gateway.get_quote(breeze_instrument)
+        except BreezeGatewayError as error:
+            raise DashboardServiceError(f"Breeze request failed: {error}") from error
+
+        if not isinstance(rows, list) or len(rows) == 0:
+            return self._empty_orderbook(
+                broker_symbol=normalized_symbol,
+                exchange_code=normalized_exchange,
+                product_type=normalized_product,
+                error="Breeze returned no data for this instrument.",
+            )
+
+        row = rows[0] if isinstance(rows[0], dict) else {}
+        ltp = self._to_float(row.get("ltp"))
+        bid_price = self._to_float(row.get("best_bid_price") or row.get("bid_price"))
+        ask_price = self._to_float(row.get("best_offer_price") or row.get("ask_price"))
+        bid_qty = self._to_float(
+            row.get("best_bid_quantity") or row.get("best_bid_qty") or row.get("bid_qty")
+        )
+        ask_qty = self._to_float(
+            row.get("best_offer_quantity") or row.get("best_offer_qty") or row.get("ask_qty") or row.get("ask_quantity")
+        )
+        previous_close = self._to_float(row.get("previous_close") or row.get("close"))
+        spot_price = self._to_float(row.get("spot_price"))
+
+        total_buy_raw = self._to_float(row.get("total_buy_qty"))
+        total_sell_raw = self._to_float(row.get("total_sell_qty"))
+        if total_buy_raw is not None:
+            total_buy = total_buy_raw
+        else:
+            total_buy = bid_qty if bid_qty is not None else 0.0
+        if total_sell_raw is not None:
+            total_sell = total_sell_raw
+        else:
+            total_sell = ask_qty if ask_qty is not None else 0.0
+        total = total_buy + total_sell
+        buy_percent = round((total_buy / total) * 100, 1) if total > 0 else 50.0
+        sell_percent = round((total_sell / total) * 100, 1) if total > 0 else 50.0
+
+        token = str(row.get("token") or "").strip() or None
+
+        level = {}
+        if bid_qty is not None:
+            level["bid_qty"] = bid_qty
+        if bid_price is not None:
+            level["bid_price"] = bid_price
+        if ask_price is not None:
+            level["ask_price"] = ask_price
+        if ask_qty is not None:
+            level["ask_qty"] = ask_qty
+
+        return {
+            "status": "ok",
+            "instrument": {
+                "display_symbol": resolved.display_symbol,
+                "broker_symbol": resolved.broker_symbol,
+                "stock_code": resolved.broker_symbol,
+                "exchange_code": resolved.exchange_code,
+                "product_type": normalized_product,
+                "token": token,
+                "stock_token": token,
+            },
+            "ltp": ltp,
+            "previous_close": previous_close,
+            "bid_price": bid_price,
+            "bid_qty": bid_qty,
+            "ask_price": ask_price,
+            "ask_qty": ask_qty,
+            "levels": [level] if level else [],
+            "total_buy_qty": total_buy,
+            "total_sell_qty": total_sell,
+            "buy_percent": buy_percent,
+            "sell_percent": sell_percent,
+            "spot_price": spot_price,
+            "underlying_ltp": spot_price,
+            "product_type": normalized_product,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    @staticmethod
+    def _empty_orderbook(
+        *,
+        broker_symbol: str,
+        exchange_code: str,
+        product_type: str,
+        error: str,
+    ) -> dict[str, object]:
+        return {
+            "status": "error",
+            "instrument": {
+                "display_symbol": broker_symbol,
+                "broker_symbol": broker_symbol,
+                "stock_code": broker_symbol,
+                "exchange_code": exchange_code,
+                "product_type": product_type,
+                "token": None,
+                "stock_token": None,
+            },
+            "ltp": None,
+            "previous_close": None,
+            "bid_price": None,
+            "bid_qty": None,
+            "ask_price": None,
+            "ask_qty": None,
+            "levels": [],
+            "total_buy_qty": 0,
+            "total_sell_qty": 0,
+            "buy_percent": 50.0,
+            "sell_percent": 50.0,
+            "spot_price": None,
+            "underlying_ltp": None,
+            "product_type": product_type,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "error": error,
         }
 
     @staticmethod

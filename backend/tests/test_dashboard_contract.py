@@ -701,3 +701,179 @@ def test_option_orderbook_zero_totals_handles_percent_safely(tmp_path):
     assert payload["ask_qty"] == 0.0
     assert payload["buy_percent"] == 50.0
     assert payload["sell_percent"] == 50.0
+
+
+def test_search_endpoint_returns_matching_instruments(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'search.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIF")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["query"] == "NIF"
+    symbols = [r["broker_symbol"] for r in payload["results"]]
+    assert "NIFTY" in symbols
+
+
+def test_search_endpoint_empty_query_returns_no_results(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'search_empty.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["results"] == []
+
+
+def test_search_endpoint_no_match_returns_empty(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'search_none.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=ZZZZNOTFOUND")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["results"] == []
+
+
+def test_search_endpoint_matches_via_alias(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'search_alias.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=SBI")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    symbols = [r["broker_symbol"] for r in payload["results"]]
+    assert "STABAN" in symbols
+
+
+def test_orderbook_endpoint_cash_returns_quote(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'ob_cash.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote",
+        return_value=[{"ltp": "23440.0", "best_bid_price": "23439.0", "best_offer_price": "23441.0"}],
+    ):
+        response = client.get("/api/dashboard/orderbook?broker_symbol=NIFTY&exchange_code=NSE&product_type=cash")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["ltp"] == 23440.0
+    assert payload["bid_price"] == 23439.0
+    assert payload["ask_price"] == 23441.0
+    assert payload["product_type"] == "cash"
+
+
+def _seed_nifty_option(database_url: str) -> None:
+    """Add a NIFTY option instrument to the database."""
+    from app.db import create_session_factory
+    from app.models import Instrument
+    from datetime import date as dt_date
+    expiry = dt_date.today() + timedelta(days=14)
+    session_factory = create_session_factory(database_url)
+    with session_factory() as session:
+        option = Instrument(
+            exchange_code="NFO",
+            broker_symbol="NIFTY",
+            contract_code=f"NIFTY~CE~{expiry.isoformat()}~23500",
+            display_symbol="NIFTY",
+            name="NIFTY 23500 CE",
+            instrument_group="DERIVATIVE",
+            product_type="options",
+            token="12345",
+            lot_size=50,
+            tick_size="0.05",
+            expiry_date=expiry,
+            option_right="call",
+            strike_price="23500",
+            source="security_master",
+            is_active=True,
+        )
+        session.add(option)
+        session.commit()
+
+
+def test_orderbook_endpoint_options_returns_data(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'ob_options.sqlite'}"
+    _seed_dashboard_data(database_url)
+    _seed_nifty_option(database_url)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_option_chain_quotes",
+        return_value=[{
+            "ltp": "152.35",
+            "best_bid_price": "151.80",
+            "best_offer_price": "152.90",
+            "best_bid_quantity": "225",
+            "best_offer_quantity": "175",
+            "token": "12345",
+        }],
+    ):
+        today = date.today() + timedelta(days=14)
+        response = client.get(
+            f"/api/dashboard/orderbook?broker_symbol=NIFTY&exchange_code=NFO&product_type=options"
+            f"&expiry_date={today.isoformat()}&strike_price=23500&right=call"
+        )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["ltp"] == 152.35
+    assert payload["bid_price"] == 151.80
+    assert payload["ask_price"] == 152.90
+    assert payload["product_type"] == "options"
+
+
+def test_orderbook_endpoint_missing_broker_symbol_returns_400(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'ob_missing_bs.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/orderbook?exchange_code=NSE&product_type=cash")
+    assert response.status_code == 400
+    assert "broker_symbol" in response.get_json()["error"].lower()
+
+
+def test_orderbook_endpoint_missing_exchange_returns_400(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'ob_missing_ex.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/orderbook?broker_symbol=NIFTY&product_type=cash")
+    assert response.status_code == 400
+    assert "exchange_code" in response.get_json()["error"].lower()
+
+
+def test_orderbook_endpoint_invalid_product_type_returns_400(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'ob_bad_pt.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/orderbook?broker_symbol=NIFTY&exchange_code=NSE&product_type=bonds")
+    assert response.status_code == 400
+    assert "product_type" in response.get_json()["error"].lower()
+
+
+def test_orderbook_endpoint_empty_breeze_response_returns_safe_error(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'ob_empty.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote", return_value=[],
+    ):
+        response = client.get("/api/dashboard/orderbook?broker_symbol=NIFTY&exchange_code=NSE&product_type=cash")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "error"
+    assert "no data" in payload["error"].lower()
