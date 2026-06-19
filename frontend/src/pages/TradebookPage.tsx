@@ -2,7 +2,6 @@ import { ArrowDownRight, ArrowUpRight, ListChecks } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getTrades, type TradeRecord, type TradesResponse } from "@/lib/api";
-import { ErrorState } from "@/components/ErrorState";
 import { formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { BuySellBadge } from "@/components/ui/buy-sell-badge";
@@ -106,8 +105,6 @@ export function TradebookPage() {
         <StatCard label="Buy trades" value={state.data?.stats.buy ?? 0} icon={ArrowUpRight} />
         <StatCard label="Sell trades" value={state.data?.stats.sell ?? 0} icon={ArrowDownRight} />
       </div>
-
-      {state.error ? <ErrorState title="Trades unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
       <DataTableShell
         title="Trades"

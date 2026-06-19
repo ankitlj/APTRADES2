@@ -2399,6 +2399,20 @@ Websocket:
   12. Debounce: rapid typing only triggers one search per 250ms
    13. Orderbook polling refreshes every 2.5s after selection
 
+### 2026-06-19 — Frontend polish pass: Part 5 — Standardized page states
+- Updated `DataTableShell` to use `DataState` internally instead of separate `LoadingState`/`EmptyState`/`ErrorState` — consistent spinner, icons, and error layout
+- Removed redundant standalone `ErrorState` from OrderbookPage, TradebookPage, PositionsPage, ActionCentrePage, LogsPage — DataTableShell already renders error inside the card, fixing duplicated error boxes
+- Removed unused `ErrorState` imports from all 5 pages
+- Improved LogsPage live logs empty state: replaced bare string `"Awaiting log rows..."` with centered muted text
+- Files:
+  - `frontend/src/components/ui/data-table-shell.tsx`
+  - `frontend/src/pages/OrderbookPage.tsx`
+  - `frontend/src/pages/TradebookPage.tsx`
+  - `frontend/src/pages/PositionsPage.tsx`
+  - `frontend/src/pages/ActionCentrePage.tsx`
+  - `frontend/src/pages/LogsPage.tsx`
+- Build: passed
+
 ### 2026-06-19 — Frontend polish pass: Part 4 — Search modal polish
 - Added explicit `error` state with distinct error UI (red icon, error message, "please try again" hint) — previously errors silently collapsed to empty state
 - Replaced boolean `loading` with unified `SearchStatus` type (`idle | loading | empty | error | results`) — prevents state overlap bugs

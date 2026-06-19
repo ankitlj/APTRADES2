@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { getPositions, type PositionRecord, type PositionsResponse } from "@/lib/api";
 import { useLiveMarketData, useLiveSubscribe } from "@/hooks/useLiveMarketData";
 import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
-import { ErrorState } from "@/components/ErrorState";
 import { formatNumber, pnlColor, tone } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -231,7 +230,6 @@ export function PositionsPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">{quoteMessage}</p>
-      {state.error ? <ErrorState title="Positions unavailable" message={state.error} onRetry={() => void load()} /> : null}
 
       <DataTableShell
         title="Active Positions"

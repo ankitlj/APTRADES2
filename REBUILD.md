@@ -1031,6 +1031,14 @@ See `development.md` for 13-step post-deploy checklist.
 - 5 new files in `frontend/src/components/ui/`
 - Build: passed
 
+## 2026-06-19 — Frontend polish pass, Part 5: Standardized page states
+
+- Updated `DataTableShell` to use `DataState` internally (spinner, icon, error layout) instead of separate `LoadingState`/`EmptyState`/`ErrorState`
+- Removed redundant standalone `ErrorState` from OrderbookPage, TradebookPage, PositionsPage, ActionCentrePage, LogsPage — fixes duplicated error boxes on every async page
+- Improved LogsPage live logs empty state (bare string → centered muted text)
+- Removed unused `ErrorState` imports from 5 pages
+- Build: passed
+
 ## 2026-06-19 — Frontend polish pass, Part 4: Search modal polish
 
 - Unified `SearchStatus` type (`idle | loading | empty | error | results`) replaces boolean `loading` — prevents state overlap

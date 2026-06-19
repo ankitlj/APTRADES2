@@ -2,9 +2,7 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/EmptyState";
-import { ErrorState } from "@/components/ErrorState";
-import { LoadingState } from "@/components/ui/loading";
+import { DataState } from "@/components/ui/data-state";
 
 interface DataTableShellProps {
   title: string;
@@ -40,16 +38,15 @@ export function DataTableShell({
         ) : null}
       </CardHeader>
       {loading ? (
-        <LoadingState />
+        <DataState state="loading" />
       ) : error ? (
         <CardContent className="p-4">
-          <ErrorState message={error} onRetry={onRetry} />
+          <DataState state="error" message={error} action={onRetry ? <button onClick={onRetry} className="mt-1 text-xs font-medium text-foreground underline underline-offset-2">Retry</button> : undefined} />
         </CardContent>
       ) : !count && count === 0 ? (
-        <EmptyState
-          title={emptyTitle ?? `No ${title.toLowerCase()}`}
-          message={emptyMessage ?? "No data available."}
-        />
+        <CardContent className="p-4">
+          <DataState state="empty" title={emptyTitle ?? `No ${title.toLowerCase()}`} message={emptyMessage ?? "No data available."} />
+        </CardContent>
       ) : (
         <div className="overflow-x-auto" style={minWidth ? { minWidth } : undefined}>
           {children}

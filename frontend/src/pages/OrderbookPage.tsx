@@ -8,7 +8,6 @@ import {
   type OrderRecord,
   type OrdersResponse,
 } from "@/lib/api";
-import { ErrorState } from "@/components/ErrorState";
 import { formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { BuySellBadge } from "@/components/ui/buy-sell-badge";
@@ -167,8 +166,6 @@ export function OrderbookPage() {
           {state.actionMessage}
         </div>
       ) : null}
-      {state.error ? <ErrorState title="Orders unavailable" message={state.error} onRetry={() => void load()} /> : null}
-
       <DataTableShell
         title="Orders"
         count={orders.length}

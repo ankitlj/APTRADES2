@@ -2,7 +2,6 @@ import { AppWindow, List, Server } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { getLiveLogs, getLogs, type LiveLogsResponse, type LogRow, type LogsResponse } from "@/lib/api";
-import { ErrorState } from "@/components/ErrorState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,8 +113,6 @@ export function LogsPage() {
         <StatCard label="Visible rows" value={state.logs?.summary.total_count ?? 0} icon={List} />
       </div>
 
-      {state.error ? <ErrorState title="Logs unavailable" message={state.error} onRetry={() => void load()} /> : null}
-
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <DataTableShell
           title="Log rows"
@@ -159,9 +156,15 @@ export function LogsPage() {
             <Badge variant="secondary">{state.live?.lines.length ?? 0} lines</Badge>
           </CardHeader>
           <div className="p-3">
-            <pre className="max-h-[420px] overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
-              {(state.live?.lines ?? ["Awaiting log rows..."]).join("\n")}
-            </pre>
+            {state.live?.lines.length ? (
+              <pre className="max-h-[420px] overflow-auto rounded-md border bg-muted/50 p-3 text-xs font-mono">
+                {state.live.lines.join("\n")}
+              </pre>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <p className="text-xs text-muted-foreground/50">Awaiting log rows...</p>
+              </div>
+            )}
           </div>
         </Card>
       </div>

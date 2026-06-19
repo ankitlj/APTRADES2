@@ -8,7 +8,6 @@ import {
   type ActionCentreRecord,
   type ActionCentreResponse,
 } from "@/lib/api";
-import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { BuySellBadge } from "@/components/ui/buy-sell-badge";
@@ -132,8 +131,6 @@ export function ActionCentrePage() {
           {state.message}
         </div>
       ) : null}
-      {state.error ? <ErrorState title="Action Centre unavailable" message={state.error} onRetry={() => void load()} /> : null}
-
       <DataTableShell
         title="Action queue"
         count={actions.length}
