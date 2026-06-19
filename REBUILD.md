@@ -1031,6 +1031,18 @@ See `development.md` for 13-step post-deploy checklist.
 - 5 new files in `frontend/src/components/ui/`
 - Build: passed
 
+## 2026-06-19 — Frontend polish pass, Part 4: Search modal polish
+
+- Unified `SearchStatus` type (`idle | loading | empty | error | results`) replaces boolean `loading` — prevents state overlap
+- Added explicit error state with distinct UI (red icon, error message, "please try again") — previously errors silently collapsed to empty state
+- Added `autoComplete="off"`, `spellCheck={false}` on search input
+- Added `type="button"` on all buttons to prevent unintended form submission
+- Accessibility: `aria-pressed` on tabs, `aria-activedescendant` on listbox, `role="alert"` on error, `id` on each result
+- Footer keyboard hints now show for both "results" and "empty" states
+- Reset status/error on tab switch; re-focus input on tab switch
+- Files: `frontend/src/components/dashboard/DashboardInstrumentSearch.tsx`
+- Build: passed
+
 ## 2026-06-19 — Frontend polish pass, Part 3: Dashboard component adoption
 
 - Replaced 4 manual metric cards with `MetricCard` (loading skeleton, error fallback, submetrics via `meta`)

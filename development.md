@@ -2399,6 +2399,22 @@ Websocket:
   12. Debounce: rapid typing only triggers one search per 250ms
    13. Orderbook polling refreshes every 2.5s after selection
 
+### 2026-06-19 — Frontend polish pass: Part 4 — Search modal polish
+- Added explicit `error` state with distinct error UI (red icon, error message, "please try again" hint) — previously errors silently collapsed to empty state
+- Replaced boolean `loading` with unified `SearchStatus` type (`idle | loading | empty | error | results`) — prevents state overlap bugs
+- Added `autoComplete="off"` and `spellCheck={false}` on search input
+- Added `type="button"` on all result and tab buttons to prevent unintended form submission
+- Added `aria-pressed` on tab buttons, `aria-activedescendant` on results listbox, `id` on each result row, `role="alert"` on error state
+- Removed redundant `role="option"` wrapper `<div>` — buttons are direct children of listbox
+- Footer keyboard hint now renders for both "results" and "empty" states (so hints are available when results area shows "no matches")
+- Reset `status`/`errorMessage` on tab switch so stale state doesn't persist
+- Re-focused input on tab change for quick re-typing
+- Added `hasQuery` derived variable instead of computing `query.trim().length > 0` in multiple places
+- Fixed scrollIntoView bounds check: verifies `childIdx < listRef.current.children.length` before accessing
+- Removed `aria-selected` from non-option elements (only result buttons have it)
+- Files: `frontend/src/components/dashboard/DashboardInstrumentSearch.tsx`
+- Build: passed
+
 ### 2026-06-19 — Frontend polish pass: Part 3 — Apply components to dashboard
 - Replaced metric card loop with `MetricCard` — handles loading skeleton and error fallback per card
 - Replaced alerts empty state with `DataState(state="empty")` and `DataState(state="loading")`/`DataState(state="error")`

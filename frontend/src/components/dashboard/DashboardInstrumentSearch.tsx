@@ -79,10 +79,13 @@ function buildSections(results: InstrumentSearchResult[]): SectionedResults[] {
   return sections;
 }
 
+type SearchStatus = "idle" | "loading" | "empty" | "error" | "results";
+
 export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: DashboardInstrumentSearchProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<InstrumentSearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<SearchStatus>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tab, setTab] = useState<SearchTab>("all");
   const [activeIdx, setActiveIdx] = useState(0);
 
@@ -91,11 +94,14 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
   const listRef = useRef<HTMLDivElement>(null);
 
   const sections = useMemo(() => buildSections(results), [results]);
+  const hasQuery = query.trim().length > 0;
 
   useEffect(() => {
     if (isOpen) {
       setQuery("");
       setResults([]);
+      setStatus("idle");
+      setErrorMessage(null);
       setTab("all");
       setActiveIdx(0);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -109,21 +115,24 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
     const trimmed = query.trim();
     if (trimmed.length < 1) {
       setResults([]);
-      setLoading(false);
+      setStatus("idle");
+      setErrorMessage(null);
       return;
     }
 
-    setLoading(true);
+    setStatus("loading");
+    setErrorMessage(null);
     debounceRef.current = setTimeout(() => {
       searchInstruments(trimmed, TAB_PARAM[tab]).then(
         (data) => {
           setResults(data.results);
+          setStatus(data.results.length === 0 ? "empty" : "results");
           setActiveIdx(0);
-          setLoading(false);
         },
-        () => {
+        (reason: unknown) => {
           setResults([]);
-          setLoading(false);
+          setStatus("error");
+          setErrorMessage(reason instanceof Error ? reason.message : "Search failed");
         },
       );
     }, DEBOUNCE_MS);
@@ -166,8 +175,11 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
 
   useEffect(() => {
     if (listRef.current && activeIdx >= 0) {
-      const item = listRef.current.children[activeIdx + sections.length] as HTMLElement | undefined;
-      item?.scrollIntoView({ block: "nearest" });
+      const childIdx = activeIdx + sections.length;
+      if (childIdx < listRef.current.children.length) {
+        const item = listRef.current.children[childIdx] as HTMLElement | undefined;
+        item?.scrollIntoView({ block: "nearest" });
+      }
     }
   }, [activeIdx, sections.length]);
 
@@ -184,7 +196,7 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-lg overflow-hidden rounded-xl border border-border/60 bg-background shadow-2xl dark:border-border/40">
+      <div className="flex w-full max-w-lg flex-col rounded-xl border border-border/60 bg-background shadow-2xl dark:border-border/40">
         <div className="border-b border-border/50 px-4 py-3">
           <div className="relative">
             <svg
@@ -193,6 +205,7 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
               viewBox="0 0 24 24"
               strokeWidth="2"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
@@ -203,6 +216,8 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
               placeholder='Search stocks, indices, futures, options... (e.g. "NIFTY", "SBIN")'
               className="h-10 border border-border/40 bg-muted/20 pl-9 pr-3 text-sm shadow-none transition-colors focus-visible:border-ring/50 focus-visible:ring-0"
               aria-label="Search instruments"
+              autoComplete="off"
+              spellCheck={false}
             />
           </div>
         </div>
@@ -211,10 +226,14 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
           {(["all", "stocks", "fno"] as const).map((t) => (
             <button
               key={t}
+              type="button"
               onClick={() => {
                 setTab(t);
                 setActiveIdx(0);
                 setResults([]);
+                setStatus("idle");
+                setErrorMessage(null);
+                inputRef.current?.focus();
               }}
               className={cn(
                 "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
@@ -222,23 +241,35 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
                   ? "bg-primary text-primary-foreground shadow-xs"
                   : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
               )}
+              aria-pressed={tab === t}
             >
               {t === "all" ? "All" : t === "stocks" ? "Stocks" : "F&O"}
             </button>
           ))}
         </div>
 
-        <div ref={listRef} className="max-h-[55vh] overflow-y-auto" role="listbox" aria-label="Search results">
-          {loading && (
+        <div ref={listRef} className="max-h-[55vh] overflow-y-auto" role="listbox" aria-label="Search results" aria-activedescendant={status === "results" ? `search-result-${activeIdx}` : undefined}>
+          {status === "loading" && (
             <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
               <span className="mr-2 inline-block h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/60" />
               Searching...
             </div>
           )}
 
-          {!loading && query.trim().length > 0 && results.length === 0 && (
+          {status === "error" && (
+            <div className="flex flex-col items-center justify-center px-6 py-10 text-center" role="alert">
+              <svg className="mb-2 h-8 w-8 text-destructive/40" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <p className="text-sm font-medium text-destructive">Search failed</p>
+              {errorMessage && <p className="mt-1 max-w-xs text-xs text-muted-foreground">{errorMessage}</p>}
+              <p className="mt-4 text-[10px] text-muted-foreground/40">Please try again</p>
+            </div>
+          )}
+
+          {status === "empty" && (
             <div className="flex flex-col items-center justify-center py-12">
-              <svg className="mb-2 h-8 w-8 text-muted-foreground/20" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <svg className="mb-2 h-8 w-8 text-muted-foreground/20" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
               <p className="text-sm text-muted-foreground">No matching instruments found</p>
@@ -248,25 +279,28 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
             </div>
           )}
 
-          {!loading && !query.trim() && (
+          {status === "idle" && !hasQuery && (
             <div className="flex flex-col items-center justify-center py-12">
-              <svg className="mb-2 h-8 w-8 text-muted-foreground/15" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <svg className="mb-2 h-8 w-8 text-muted-foreground/15" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
               </svg>
               <p className="text-xs text-muted-foreground/40">Type to search instruments</p>
             </div>
           )}
 
-          {!loading && results.length > 0 && sections.map((section) => (
+          {status === "results" && sections.map((section) => (
             <div key={section.kind}>
               <div className="sticky top-0 bg-background/95 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 backdrop-blur-sm">
                 {section.label}
               </div>
               {section.items.map((instrument, localIdx) => {
                 const globalIdx = section.globalStartIdx + localIdx;
+                const resultId = `search-result-${globalIdx}`;
                 return (
                   <button
+                    id={resultId}
                     key={`${instrument.id}-${instrument.broker_symbol}-${instrument.exchange_code}-${instrument.instrument_kind}-${instrument.expiry_date ?? ""}-${instrument.strike_price ?? ""}`}
+                    type="button"
                     role="option"
                     aria-selected={globalIdx === activeIdx}
                     className={cn(
@@ -278,11 +312,9 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
                     onClick={() => handleSelect(instrument)}
                   >
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-sm font-semibold text-foreground">
-                          {instrument.label || instrument.display_symbol || instrument.broker_symbol}
-                        </span>
-                      </div>
+                      <span className="truncate text-sm font-semibold text-foreground">
+                        {instrument.label || instrument.display_symbol || instrument.broker_symbol}
+                      </span>
                       {instrument.sublabel && (
                         <span className="mt-0.5 truncate text-[11px] text-muted-foreground/60">
                           {instrument.sublabel}
@@ -311,7 +343,7 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
           ))}
         </div>
 
-        {results.length > 0 && (
+        {(status === "results" || status === "empty") && (
           <div className="border-t border-border/50 px-4 py-2 text-[10px] text-muted-foreground/35">
             <kbd className="rounded border border-border/50 bg-muted/30 px-1 font-mono text-[10px]">&uarr;</kbd>{" "}
             <kbd className="rounded border border-border/50 bg-muted/30 px-1 font-mono text-[10px]">&darr;</kbd> navigate{" "}
