@@ -1020,3 +1020,20 @@ See `development.md` for 13-step post-deploy checklist.
 - Dark scrollbar: reduced thumb width to 5px, lowered opacity, added global `.dark` scrollbar rules without requiring `.scrollbar-thin` class
 - Files: `frontend/src/index.css`
 - Build: passed
+
+## 2026-06-19 — Frontend polish pass, Part 2: Reusable UI components
+
+- `SurfaceCard`: ORIENS card with tone (default/active/danger/success), interactive mode (focus ring + keyboard), accessible `role="button"` + tabIndex
+- `MetricCard`: loading skeleton, error fallback, tone-colored value, meta line, icon slot, 110px min-height
+- `DataState`: unified loading/empty/error component with compact mode — replaces inline LoadingState/EmptyState/ErrorState patterns
+- `StatusBadge`: 8 consistent status types (live/connected/stale/offline/loading/error/success/warning) with dot indicator
+- `ActionButton`: wraps `ui/button` with inline loading spinner that preserves width
+- 5 new files in `frontend/src/components/ui/`
+- Build: passed
+
+- Font rendering: `-webkit-font-smoothing: antialiased`, `-moz-osx-font-smoothing: grayscale`, `text-rendering: optimizeLegibility`
+- Number rendering: `font-variant-numeric: tabular-nums` on `body` for consistent metric alignment
+- Added CSS transition tokens: `--ease-out-premium (cubic-bezier(0.16, 1, 0.3, 1)`, `--transition-fast (140ms)`, `--transition-base (220ms)`
+- Dark scrollbar: reduced thumb width to 5px, lowered opacity, added global `.dark` scrollbar rules without requiring `.scrollbar-thin` class
+- Files: `frontend/src/index.css`
+- Build: passed

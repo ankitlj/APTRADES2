@@ -2399,6 +2399,16 @@ Websocket:
   12. Debounce: rapid typing only triggers one search per 250ms
    13. Orderbook polling refreshes every 2.5s after selection
 
+### 2026-06-19 — Frontend polish pass: Part 2 — Reusable UI component contract
+- Created `SurfaceCard` — tone variants (default/active/danger/success), interactive mode with focus ring and keyboard support
+- Created `MetricCard` — loading skeleton, error fallback, tone coloring, meta line, icon slot, stable min-height
+- Created `DataState` — loads all three state displays into one component with `compact` mode
+- Created `StatusBadge` — 8 status types (live/connected/stale/offline/loading/error/success/warning) with consistent dot + color mapping
+- Created `ActionButton` — wraps Button with loading spinner (preserves button width)
+- Files: `frontend/src/components/ui/{surface-card,metric-card,data-state,status-badge,action-button}.tsx`
+- Build: passed
+- No existing components modified — new components coexist alongside existing Card/Button/Badge/EmptyState/ErrorState/LoadingState
+
 ### 2026-06-19 — Frontend polish pass: Part 1 — Global CSS polish
 
 - Added `-webkit-font-smoothing: antialiased`, `-moz-osx-font-smoothing: grayscale`, `text-rendering: optimizeLegibility` on global `*` selector for Mac-like font rendering on Windows/Edge/Chrome
