@@ -2399,6 +2399,15 @@ Websocket:
   12. Debounce: rapid typing only triggers one search per 250ms
    13. Orderbook polling refreshes every 2.5s after selection
 
+### 2026-06-19 — Frontend polish pass: Part 3 — Apply components to dashboard
+- Replaced metric card loop with `MetricCard` — handles loading skeleton and error fallback per card
+- Replaced alerts empty state with `DataState(state="empty")` and `DataState(state="loading")`/`DataState(state="error")`
+- Replaced alert dot spans with `StatusBadge` (error/warning/success levels)
+- Removed deprecated imports: `AlertTriangle`, `CircleAlert`, `toneColor`, `alertDotColor`
+- Files: `frontend/src/pages/DashboardPage.tsx`
+- Preserved all existing data values, API behavior, websocket subscriptions, and page layout
+- Build: passed
+
 ### 2026-06-19 — Frontend polish pass: Part 2 — Reusable UI component contract
 - Created `SurfaceCard` — tone variants (default/active/danger/success), interactive mode with focus ring and keyboard support
 - Created `MetricCard` — loading skeleton, error fallback, tone coloring, meta line, icon slot, stable min-height

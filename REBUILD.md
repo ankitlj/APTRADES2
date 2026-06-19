@@ -1031,6 +1031,23 @@ See `development.md` for 13-step post-deploy checklist.
 - 5 new files in `frontend/src/components/ui/`
 - Build: passed
 
+## 2026-06-19 — Frontend polish pass, Part 3: Dashboard component adoption
+
+- Replaced 4 manual metric cards with `MetricCard` (loading skeleton, error fallback, submetrics via `meta`)
+- Replaced alerts empty/loading/error states with `DataState`
+- Replaced alert dot colors with `StatusBadge` (error/warning/success)
+- Removed unused imports (`AlertTriangle`, `CircleAlert`, `toneColor`, `alertDotColor`)
+- Files: `frontend/src/pages/DashboardPage.tsx`
+- Build: passed
+
+- `SurfaceCard`: ORIENS card with tone (default/active/danger/success), interactive mode (focus ring + keyboard), accessible `role="button"` + tabIndex
+- `MetricCard`: loading skeleton, error fallback, tone-colored value, meta line, icon slot, 110px min-height
+- `DataState`: unified loading/empty/error component with compact mode — replaces inline LoadingState/EmptyState/ErrorState patterns
+- `StatusBadge`: 8 consistent status types (live/connected/stale/offline/loading/error/success/warning) with dot indicator
+- `ActionButton`: wraps `ui/button` with inline loading spinner that preserves width
+- 5 new files in `frontend/src/components/ui/`
+- Build: passed
+
 - Font rendering: `-webkit-font-smoothing: antialiased`, `-moz-osx-font-smoothing: grayscale`, `text-rendering: optimizeLegibility`
 - Number rendering: `font-variant-numeric: tabular-nums` on `body` for consistent metric alignment
 - Added CSS transition tokens: `--ease-out-premium (cubic-bezier(0.16, 1, 0.3, 1)`, `--transition-fast (140ms)`, `--transition-base (220ms)`

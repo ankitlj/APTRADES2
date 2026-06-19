@@ -1,8 +1,4 @@
-import {
-  AlertTriangle,
-  Bell,
-  CircleAlert,
-} from "lucide-react";
+import { Bell } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -16,10 +12,13 @@ import {
 import { useLiveMarketData, useLiveSubscribe } from "@/hooks/useLiveMarketData";
 import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
 import { DashboardOptionOrderBook } from "@/components/dashboard/DashboardOptionOrderBook";
-import { formatNumber, formatCurrency, formatPercent, pnlColor, toneColor, alertDotColor } from "@/lib/format";
+import { formatNumber, formatCurrency, formatPercent, pnlColor } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DataState } from "@/components/ui/data-state";
+import { MetricCard } from "@/components/ui/metric-card";
 import { PageLayout } from "@/components/ui/page-layout";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 
 type AsyncState<T> = {
@@ -60,6 +59,19 @@ function submetricLabel(submetric: NonNullable<DashboardMetric["submetrics"]>[nu
     return `${value} ${submetric.label}`;
   }
   return `${submetric.label}: ${value}`;
+}
+
+function submetricsNode(submetrics: NonNullable<DashboardMetric["submetrics"]>) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      {submetrics.map((sm, i) => (
+        <span key={sm.label} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          {i > 0 && <span className="text-muted-foreground/45">|</span>}
+          <span className="tabular-nums">{submetricLabel(sm)}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 function applyLiveTick(position: DashboardPosition, tick: LiveTick | undefined): DashboardPosition {
@@ -216,60 +228,21 @@ export function DashboardPage() {
   return (
     <PageLayout>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {(metrics.length
-          ? metrics
-          : (Array.from({ length: 4 }, () => undefined) as (DashboardMetric | undefined)[])
+        {(summaryState.loading && metrics.length === 0
+          ? ([null, null, null, null] as const)
+          : metrics
         ).map((metric, index) => (
-            <Card
-              key={metric?.key ?? `loading-${index}`}
-              className="glow-card overflow-hidden dark:bg-white/[0.035] dark:backdrop-blur-md"
-            >
-              <CardContent className="flex min-h-[126px] flex-col justify-center p-5">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                    {metric?.label ?? "Loading"}
-                  </p>
-                  <p
-                    className={cn(
-                      "mt-3 text-2xl font-bold tabular-nums",
-                      toneColor(metric?.tone)
-                    )}
-                  >
-                    {metric ? metricValue(metric) : "..."}
-                  </p>
-                  {metric?.submetrics?.length ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground sm:text-[13px]">
-                      {metric.submetrics.map((submetric, submetricIndex) => (
-                        <span
-                          key={`${metric.key}-${submetric.label}`}
-                          className="inline-flex items-center gap-2 whitespace-nowrap"
-                        >
-                          {submetricIndex > 0 ? (
-                            <span className="text-muted-foreground/45">|</span>
-                          ) : null}
-                          <span className={cn("tabular-nums", toneColor(submetric.tone))}>
-                            {submetricLabel(submetric)}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  ) : metric?.meta ? (
-                    <p className="mt-2 text-xs text-muted-foreground">{metric.meta}</p>
-                  ) : !metric ? (
-                    <p className="mt-2 text-xs text-muted-foreground">Syncing dashboard summary...</p>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          <MetricCard
+            key={metric?.key ?? `loading-${index}`}
+            label={metric?.label ?? "Loading"}
+            value={metric ? metricValue(metric) : "..."}
+            meta={metric?.submetrics?.length ? submetricsNode(metric.submetrics) : (metric?.meta ?? undefined)}
+            tone={metric?.tone === "positive" ? "positive" : metric?.tone === "negative" ? "negative" : metric?.tone === "warning" ? "warning" : "neutral"}
+            loading={summaryState.loading}
+            error={summaryState.error && !metric ? summaryState.error : null}
+          />
+        ))}
       </div>
-
-      {summaryState.error && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          {summaryState.error}
-        </div>
-      )}
 
       <Card className="min-h-[306px] overflow-hidden">
         <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
@@ -290,25 +263,25 @@ export function DashboardPage() {
             </CardTitle>
             <Badge variant="secondary">{alerts.length} Active</Badge>
           </CardHeader>
-          <CardContent className="p-0">
-            {alerts.length === 0 ? (
-              <div className="flex min-h-[250px] flex-col items-center justify-center px-6 text-center">
-                <CircleAlert className="h-8 w-8 text-muted-foreground/50" />
-                <p className="mt-3 text-sm font-medium">No active trade alerts</p>
-                <p className="mt-1 max-w-56 text-xs text-muted-foreground">
-                  Stop-loss, target, and rejected-order alerts will appear here.
-                </p>
-              </div>
+          <CardContent className={alertsState.error ? "p-4" : "p-0"}>
+            {alertsState.loading ? (
+              <DataState state="loading" compact />
+            ) : alertsState.error ? (
+              <DataState state="error" message={alertsState.error} compact />
+            ) : alerts.length === 0 ? (
+              <DataState
+                state="empty"
+                title="No active trade alerts"
+                message="Stop-loss, target, and rejected-order alerts will appear here."
+                compact
+              />
             ) : (
               <div className="divide-y">
                 {alerts.map((alert) => (
                   <div key={`${alert.level}-${alert.title}`} className="flex gap-3 p-4">
-                    <span
-                      className={cn(
-                        "mt-1.5 h-2 w-2 shrink-0 rounded-full",
-                        alertDotColor(alert.level)
-                      )}
-                    />
+                    <StatusBadge status={alert.level === "error" ? "error" : alert.level === "warning" ? "warning" : "success"}>
+                      {alert.level}
+                    </StatusBadge>
                     <div>
                       <p className="text-sm font-medium">{alert.title}</p>
                       <p className="mt-1 text-xs text-muted-foreground">{alert.message}</p>
