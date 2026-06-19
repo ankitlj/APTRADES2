@@ -952,3 +952,62 @@ From this point onward, the project is renamed ORIENS.
 ### Remaining risk
 
 - Option-specific websocket subscription requires `realtime.py` enhancements (passing `token`/`expiry`/`strike`/`right` through to `SymbolResolver`). REST fix provides the primary bid/ask data.
+
+## 2026-06-19 — Phase 13: Groww-style search-first instrument launcher
+
+Replaced the 3-step dropdown (underlying → expiry → strike) with a search-first modal. Backend: ranked search service with normalization, alias resolution, expiry filtering, and option diversity (5 ATM strikes × 2 nearest expiries). Frontend: keyboard-nav search, tab filters (All/Stocks/F&O), section headers, dark mode polish. Orderbook loads for cash, futures, and options on selection.
+
+### Part 1 — Backend search service + frontend wiring
+
+- New `backend/app/services/instrument_search_service.py` — 288 lines:
+  - `normalize_query()`: uppercases, strips, maps aliases (BANKNIFTY, FINNIFTY, MIDCAP, SENSEX)
+  - `normalize_display_strike()`: divides raw strike >=100000 by 100 for display
+  - `classify_instrument()`: cash/future/option from exchange + product + right + expiry
+  - `_rank_key()`: 6-level priority (exact > alias > prefix symbol > prefix name > contains symbol > contains name), cash before futures before options, near-expiry first for options
+  - `_apply_option_diversity()`: groups options by underlying+expiry, selects 5 central (ATM-near) strikes, limits to 2 nearest expiries
+  - `.search()`: expiry filtering (past derivatives excluded), tab filtering, 40-result limit
+- Wired into `DashboardService.search_instruments()` and search route (added `tab` param)
+- Frontend `api.ts`: `InstrumentSearchResult` extended with `id`, `symbol`, `instrument_kind`, `display_strike`, `right`, `label`, `sublabel`, `badges`, `rank`
+- `searchInstruments()` sends `tab` param to backend
+- `DashboardInstrumentSearch.tsx` rewritten: sends `tab`, uses backend `label`/`sublabel`/`badges`, keyboard nav (arrows/Enter/Escape), fixed empty state (only when results === 0 AND not loading)
+- `DashboardOptionOrderBook.tsx`: uses `instrument.right`, `instrument.instrument_kind`, `instrument.label`
+- 10 new search tests (ranking, alias, expiry filter, strike normalization, ADANI, etc.)
+
+### Part 2 — Frontend search UX polish
+
+- Sectioned results: "Stocks", "Futures", "Options" headers (sticky, `bg-background/95`, `backdrop-blur-sm`)
+- Dark mode: `bg-black/60` backdrop, reduced border opacity, `bg-accent/60` active selection, search icon SVG in input
+- `scrollIntoView({ block: "nearest" })` adjusted for section header DOM nodes
+- Empty state: search icon SVG, `py-12`, "Try a different search term" subtext
+- "Type to search instruments" hint with icon
+- Tab buttons: `shadow-xs` on active, visible border on input
+- Footer keyboard hints only render with results
+
+### Part 3 — Orderbook selection compatibility
+
+- `productBadge()` uses `instrument_kind` (always set) not `product_type` (nullable in DB)
+- Expiry display condition uses `instrument_kind` instead of `product_type`
+- Added `test_orderbook_endpoint_futures_returns_quote` — futures orderbook via `get_quote`
+
+### Part 4 — Deployed verification checklist
+
+See `development.md` for 13-step post-deploy checklist.
+
+### Files changed (Phase 13)
+
+| File | Change |
+|---|---|
+| `backend/app/services/instrument_search_service.py` | NEW — ranked search, aliases, strike normalization, option diversity |
+| `backend/app/services/dashboard_service.py` | Delegates `search_instruments()` to `InstrumentSearchService`; cleaned unused imports |
+| `backend/app/api/dashboard.py` | Search route accepts `tab` param |
+| `frontend/src/lib/api.ts` | Extended `InstrumentSearchResult` type; `searchInstruments()` sends `tab` |
+| `frontend/src/components/dashboard/DashboardInstrumentSearch.tsx` | Rewritten: search-first UX, section headers, keyboard nav, dark polish |
+| `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` | Uses `instrument_kind` for badge/expiry display; consumes new search result fields |
+| `backend/tests/test_dashboard_contract.py` | 11 new tests (10 search + 1 futures orderbook) |
+| `development.md` | Phase 13 parts 1-4 entries |
+| `REBUILD.md` | Phase 13 summary entry |
+
+### Verification
+
+- Backend: `python -m pytest` → 156 passed
+- Frontend: `npm run build` → 1860 modules, no errors

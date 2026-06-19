@@ -106,15 +106,17 @@ def _seed_dashboard_data(database_url: str) -> None:
                     alias_type="display",
                     source="seed_aliases",
                 ),
-                InstrumentAlias(
-                    instrument_id=sbin.id,
-                    alias="SBIN",
-                    normalized_alias="SBIN",
-                    alias_scope="NSE",
-                    alias_type="display",
-                    source="stock_script_csv",
-                ),
-            ]
+            InstrumentAlias(
+                instrument_id=sbin.id,
+                alias="SBIN",
+                normalized_alias="SBIN",
+                alias_scope="NSE",
+                alias_type="display",
+                source="stock_script_csv",
+            ),
+        ]
+        # FINNIFTY and NIFTYMID50 aliases won't exist in _seed_dashboard_data
+        # They will be added via _seed_search_test_data
         )
         session.add(
             MasterContractRun(
@@ -703,53 +705,306 @@ def test_option_orderbook_zero_totals_handles_percent_safely(tmp_path):
     assert payload["sell_percent"] == 50.0
 
 
-def test_search_endpoint_returns_matching_instruments(tmp_path):
-    database_url = f"sqlite:///{tmp_path / 'search.sqlite'}"
+def _seed_search_test_data(database_url: str) -> None:
+    """Extended seed data for search ranking tests: adds options, expired rows, ADANI."""
+    from app.db import ensure_tables
+    ensure_tables(database_url)
     _seed_dashboard_data(database_url)
-    with _client_with_db(database_url) as client:
-        response = client.get("/api/dashboard/search?q=NIF")
+    session_factory = create_session_factory(database_url)
+    today = date.today()
+    future_expiry = today + timedelta(days=14)
+    past_expiry = today - timedelta(days=5)
+    with session_factory() as session:
+        options = [
+            Instrument(
+                exchange_code="NFO", broker_symbol="NIFTY",
+                contract_code=f"NIFTY~CE~{future_expiry.isoformat()}~2400000",
+                display_symbol="NIFTY", name="NIFTY 24000 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70001", lot_size=50, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="2400000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="NIFTY",
+                contract_code=f"NIFTY~PE~{future_expiry.isoformat()}~2400000",
+                display_symbol="NIFTY", name="NIFTY 24000 PE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70002", lot_size=50, tick_size="0.05",
+                expiry_date=future_expiry, option_right="put", strike_price="2400000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="NIFTY",
+                contract_code=f"NIFTY~CE~{future_expiry.isoformat()}~2350000",
+                display_symbol="NIFTY", name="NIFTY 23500 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70003", lot_size=50, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="2350000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="NIFTY",
+                contract_code=f"NIFTY~CE~{future_expiry.isoformat()}~2500000",
+                display_symbol="NIFTY", name="NIFTY 25000 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70004", lot_size=50, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="2500000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="NIFTY",
+                contract_code=f"NIFTY~CE~{future_expiry.isoformat()}~2000000",
+                display_symbol="NIFTY", name="NIFTY 20000 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70005", lot_size=50, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="2000000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="NIFTY",
+                contract_code=f"NIFTY~F~{past_expiry.strftime('%d-%b-%Y').upper()}",
+                display_symbol="NIFTY", name="NIFTY FUT EXPIRED",
+                instrument_group="DERIVATIVE", product_type="futures",
+                token="70006", lot_size=50, tick_size="0.05",
+                expiry_date=past_expiry, option_right="others", strike_price="0",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="CNXBAN",
+                contract_code=f"CNXBAN~F~{past_expiry.strftime('%d-%b-%Y').upper()}",
+                display_symbol="BANKNIFTY", name="BANKNIFTY FUT EXPIRED",
+                instrument_group="DERIVATIVE", product_type="futures",
+                token="70007", lot_size=30, tick_size="0.05",
+                expiry_date=past_expiry, option_right="others", strike_price="0",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NSE", broker_symbol="ADANIENT",
+                contract_code="ADANIENT", display_symbol="ADANIENT",
+                name="ADANI ENTERPRISES LTD", instrument_group="EQUITY",
+                product_type="cash", token="70008", lot_size=1,
+                tick_size="0.05", isin="INE423A01024", series="EQ",
+                source="stock_script_csv", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NSE", broker_symbol="ADANIPORTS",
+                contract_code="ADANIPORTS", display_symbol="ADANIPORTS",
+                name="ADANI PORT AND SEZ LTD", instrument_group="EQUITY",
+                product_type="cash", token="70009", lot_size=1,
+                tick_size="0.05", isin="INE742F01042", series="EQ",
+                source="stock_script_csv", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NSE", broker_symbol="ADANIGREEN",
+                contract_code="ADANIGREEN", display_symbol="ADANIGREEN",
+                name="ADANI GREEN ENERGY LTD", instrument_group="EQUITY",
+                product_type="cash", token="70010", lot_size=1,
+                tick_size="0.05", isin="INE364U01010", series="EQ",
+                source="stock_script_csv", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="ADANIENT",
+                contract_code=f"ADANIENT~F:{future_expiry.strftime('%d-%b-%Y').upper()}",
+                display_symbol="ADANIENT", name="ADANIENT FUT",
+                instrument_group="DERIVATIVE", product_type="futures",
+                token="70011", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="others", strike_price="0",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="ADANIPORTS",
+                contract_code=f"ADANIPORTS~CE~{future_expiry.isoformat()}~180000",
+                display_symbol="ADANIPORTS", name="ADANIPORTS 1800 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70012", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="180000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NSE", broker_symbol="NIFFIN",
+                contract_code="NIFFIN", display_symbol="FINNIFTY",
+                name="NIFTY FINANCIAL SERVICES", instrument_group="EQUITY",
+                product_type="cash", token="70013", lot_size=1,
+                tick_size="0", isin="", series="",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NSE", broker_symbol="NIFMID",
+                contract_code="NIFMID", display_symbol="NIFTYMID50",
+                name="NIFTY MIDCAP 50", instrument_group="EQUITY",
+                product_type="cash", token="70014", lot_size=1,
+                tick_size="0", isin="", series="",
+                source="security_master", is_active=True,
+            ),
+        ]
+        session.add_all(options)
+        session.commit()
 
+
+def test_search_nifty_ranks_nifty_before_banknifty(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's1.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIFTY&tab=all")
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["status"] == "ok"
-    assert payload["query"] == "NIF"
     symbols = [r["broker_symbol"] for r in payload["results"]]
-    assert "NIFTY" in symbols
+    nifty_idx = symbols.index("NIFTY") if "NIFTY" in symbols else len(symbols)
+    banknifty_idx = symbols.index("CNXBAN") if "CNXBAN" in symbols else len(symbols)
+    assert nifty_idx < banknifty_idx, f"NIFTY should rank before CNXBAN, got order: {symbols}"
+    assert payload.get("tab") == "all"
 
 
-def test_search_endpoint_empty_query_returns_no_results(tmp_path):
-    database_url = f"sqlite:///{tmp_path / 'search_empty.sqlite'}"
-    _seed_dashboard_data(database_url)
+def test_search_banknifty_ranks_banknifty_first(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's2.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=BANKNIFTY&tab=all")
+    assert response.status_code == 200
+    payload = response.get_json()
+    symbols = [r["broker_symbol"] for r in payload["results"]]
+    # CNXBAN is the broker_symbol for BANKNIFTY alias
+    banknifty_idx = symbols.index("CNXBAN") if "CNXBAN" in symbols else len(symbols)
+    assert banknifty_idx == 0, f"BANKNIFTY/CNXBAN should be first, got: {symbols}"
+
+
+def test_search_finnifty_alias_works(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's3.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=FINNIFTY&tab=all")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) > 0
+
+
+def test_search_midcap_alias_works(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's4.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=MIDCAP&tab=all")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) > 0
+
+
+def test_search_expired_derivatives_excluded(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's5.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIFTY&tab=all")
+    assert response.status_code == 200
+    payload = response.get_json()
+    for r in payload["results"]:
+        if r["instrument_kind"] in ("future", "option"):
+            assert r["expiry_date"] is not None, f"Derivative missing expiry: {r}"
+            expiry = date.fromisoformat(r["expiry_date"])
+            assert expiry >= date.today(), f"Expired derivative returned: {r}"
+
+
+def test_search_futures_appear_in_fno_tab(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's6.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIFTY&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    kinds = [r["instrument_kind"] for r in payload["results"]]
+    assert "future" in kinds, f"No futures found in F&O tab: {kinds}"
+    assert "option" in kinds, f"No options found in F&O tab: {kinds}"
+    assert "cash" not in kinds, f"Cash found in F&O tab: {kinds}"
+
+
+def test_search_stocks_tab_contains_no_derivatives(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's7.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIFTY&tab=stocks")
+    assert response.status_code == 200
+    payload = response.get_json()
+    for r in payload["results"]:
+        assert r["instrument_kind"] == "cash", f"Non-cash in stocks tab: {r}"
+
+
+def test_search_strike_normalization_displays_24000(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's8.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=24000&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    for r in payload["results"]:
+        if r["instrument_kind"] == "option" and r["display_strike"]:
+            assert r["display_strike"] == "24000", f"Expected display_strike 24000 got {r['display_strike']}"
+
+
+def test_search_adani_returns_multiple_adani_rows(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's9.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=ADANI&tab=stocks")
+    assert response.status_code == 200
+    payload = response.get_json()
+    symbols = set(r["broker_symbol"] for r in payload["results"])
+    adani_matches = [s for s in symbols if "ADANI" in s.upper()]
+    assert len(adani_matches) >= 3, f"Expected at least 3 ADANI symbols, got {adani_matches}"
+
+
+def test_search_options_near_atm_before_deep_strikes(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's10.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIFTY&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    option_rows = [r for r in payload["results"] if r["instrument_kind"] == "option"]
+    if len(option_rows) >= 2:
+        strikes = [abs(int(r["strike_price"] or 0)) for r in option_rows]
+        central = sum(strikes) // len(strikes)
+        for r in option_rows:
+            strike_abs = abs(int(r["strike_price"] or 0))
+            assert strike_abs >= central - 500000, f"Deep ITM/OTM before central: {r}"
+
+
+def test_search_explicit_strike_allowed(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's11.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=ADANIPORTS&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    strikes = [r["strike_price"] for r in payload["results"] if r["instrument_kind"] == "option"]
+    assert "180000" in strikes, f"Expected strike 180000 in results, got {strikes}"
+
+
+def test_search_empty_query_returns_no_results(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's12.sqlite'}"
+    _seed_search_test_data(database_url)
     with _client_with_db(database_url) as client:
         response = client.get("/api/dashboard/search?q=")
-
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["status"] == "ok"
     assert payload["results"] == []
 
 
-def test_search_endpoint_no_match_returns_empty(tmp_path):
-    database_url = f"sqlite:///{tmp_path / 'search_none.sqlite'}"
-    _seed_dashboard_data(database_url)
+def test_search_no_match_returns_empty(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's13.sqlite'}"
+    _seed_search_test_data(database_url)
     with _client_with_db(database_url) as client:
         response = client.get("/api/dashboard/search?q=ZZZZNOTFOUND")
-
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["status"] == "ok"
     assert payload["results"] == []
 
 
-def test_search_endpoint_matches_via_alias(tmp_path):
-    database_url = f"sqlite:///{tmp_path / 'search_alias.sqlite'}"
-    _seed_dashboard_data(database_url)
+def test_search_matches_via_alias(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 's14.sqlite'}"
+    _seed_search_test_data(database_url)
     with _client_with_db(database_url) as client:
         response = client.get("/api/dashboard/search?q=SBI")
-
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["status"] == "ok"
     symbols = [r["broker_symbol"] for r in payload["results"]]
     assert "STABAN" in symbols
 
@@ -877,3 +1132,28 @@ def test_orderbook_endpoint_empty_breeze_response_returns_safe_error(tmp_path):
     payload = response.get_json()
     assert payload["status"] == "error"
     assert "no data" in payload["error"].lower()
+
+
+def test_orderbook_endpoint_futures_returns_quote(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'ob_fut.sqlite'}"
+    _seed_dashboard_data(database_url)
+    expiry = date.today() + timedelta(days=14)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured",
+        return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_quote",
+        return_value=[{"ltp": "23500.0", "best_bid_price": "23499.0", "best_offer_price": "23501.0"}],
+    ):
+        response = client.get(
+            f"/api/dashboard/orderbook?broker_symbol=NIFTY&exchange_code=NFO"
+            f"&product_type=futures&expiry_date={expiry.isoformat()}"
+        )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["ltp"] == 23500.0
+    assert payload["bid_price"] == 23499.0
+    assert payload["ask_price"] == 23501.0
+    assert payload["product_type"] == "futures"

@@ -8,12 +8,8 @@ from typing import Any
 
 from flask import current_app
 
-from sqlalchemy import or_
-
-from ..db import create_session_factory
-from ..models import Instrument
-
 from .breeze_gateway import BreezeGateway, BreezeGatewayError, BreezeInstrument
+from .instrument_search_service import InstrumentSearchService
 from .master_contract_service import MasterContractService
 from .positions_service import PositionsService, PositionsServiceError
 from .quote_service import QuoteRequest, QuoteService, QuoteServiceError
@@ -74,6 +70,7 @@ class DashboardService:
             security_master_read_timeout=dependencies.security_master_read_timeout,
         )
         self.gateway = dependencies.gateway
+        self.instrument_search = InstrumentSearchService(dependencies.database_url)
 
     def get_summary(self) -> dict[str, Any]:
         quote_results = self.quote_service.get_batch_quotes(
@@ -364,51 +361,8 @@ class DashboardService:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-    def search_instruments(self, query: str) -> dict[str, object]:
-        normalized = query.strip().upper()
-        if not normalized or len(normalized) < 1:
-            return {"status": "ok", "query": query, "results": []}
-
-        if not self.dependencies.database_url:
-            return {"status": "ok", "query": query, "results": []}
-
-        pattern = f"%{normalized}%"
-        session_factory = create_session_factory(self.dependencies.database_url)
-        with session_factory() as session:
-            rows = (
-                session.query(Instrument)
-                .filter(
-                    Instrument.is_active.is_(True),
-                    or_(
-                        Instrument.broker_symbol.like(pattern),
-                        Instrument.display_symbol.like(pattern),
-                        Instrument.name.like(pattern),
-                    ),
-                )
-                .order_by(
-                    Instrument.product_type == "cash",
-                    Instrument.broker_symbol,
-                )
-                .limit(20)
-                .all()
-            )
-
-        results = [
-            {
-                "broker_symbol": r.broker_symbol,
-                "display_symbol": r.display_symbol,
-                "name": r.name,
-                "exchange_code": r.exchange_code,
-                "product_type": r.product_type or "cash",
-                "expiry_date": r.expiry_date.isoformat() if r.expiry_date else None,
-                "strike_price": r.strike_price,
-                "option_right": r.option_right,
-                "instrument_group": r.instrument_group,
-            }
-            for r in rows
-        ]
-
-        return {"status": "ok", "query": query, "results": results}
+    def search_instruments(self, query: str, tab: str = "all") -> dict[str, object]:
+        return self.instrument_search.search(query, tab=tab)
 
     def get_orderbook(
         self,

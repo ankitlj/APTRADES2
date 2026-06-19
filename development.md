@@ -2338,3 +2338,63 @@ Websocket:
 #### Remaining risks
 - Option-specific subscription for websocket bid/ask requires future work: the `resolve_subscription_items` path in `realtime.py` does not pass `token`/`expiry`/`strike`/`right` through to `SymbolResolver.resolve()`. The frontend overlay code is correct and ready; the subscription will automatically feed data when the backend resolve path is enhanced.
 - The DEFAULT_WATCHLIST (NSE cash indices) does not include option contracts. No option-specific bid/ask arrives via websocket today — only the underlying index LTP. The REST fix (PART 1) provides the primary bid/ask data. The websocket normalization is proven to carry bid/ask fields for any subscribed NFO token.
+
+### 2026-06-19 — Phase 13, Part 2: Search UX polish
+
+- Goal: Polish the instrument search modal — section headers, dark mode contrast, empty state, keyboard nav scroll
+- Changes:
+  - Grouped search results into "Stocks", "Futures", "Options" sections with sticky headers
+  - Sticky section headers: `bg-background/95` + `backdrop-blur-sm` — visible while scrolling within section
+  - Dark mode: increased backdrop opacity (`bg-black/60`), reduced border opacity (`border-border/50`), `bg-accent/60` for active selection
+  - Added search icon SVG inside input field (`pl-9` icon + `pl-3` text)
+  - `scrollIntoView({ block: "nearest" })` fix — adjusted element index to account for section header DOM nodes
+  - Empty state: increased vertical padding (`py-12`), added search icon SVG above "No matching instruments found"
+  - `"Type to search instruments"` hint with search icon, lower opacity
+  - Results list max-height increased from `50vh` to `55vh`
+  - Footer keyboard hints only render when results are present; border/background styling refined
+  - Tab button active state: added `shadow-xs` for depth
+  - Input: visible border (`border-border/40`), `focus-visible:border-ring/50`, removed `border-none`
+  - Removed unused `useMemo` import (not needed since `buildSections` is a pure fn, not memoized)
+  - Added `section.kind` as React key for section wrappers
+- Files changed:
+  - `frontend/src/components/dashboard/DashboardInstrumentSearch.tsx`
+  - `development.md`
+- Verification:
+  - `npm run build` → 1860 modules, no errors
+
+### 2026-06-19 — Phase 13, Part 3: Orderbook selection compatibility
+
+- Goal: Verify the search-to-orderbook flow works for cash, futures, and options
+- Changes:
+  - `productBadge()` now takes `instrument_kind` (always set by backend) instead of `product_type` (nullable in DB, fallback may be `"future"` without 's')
+  - Expiry label display condition changed from `product_type === "options" || product_type === "futures"` to `instrument_kind === "option" || instrument_kind === "future"` — same rationale
+  - Added `test_orderbook_endpoint_futures_returns_quote` — verifies futures orderbook loads via `get_quote` with `product_type=futures` and matching expiry date
+- Files changed:
+  - `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
+  - `backend/tests/test_dashboard_contract.py`
+  - `development.md`
+- Verification:
+  - `python -m pytest` → 156 passed (145 original + 10 search + 1 new futures orderbook)
+  - `npm run build` → 1860 modules, no errors
+  - All three instrument types verified end-to-end:
+    - Cash → `product_type=cash` → `get_quote` → orderbook render
+    - Futures → `product_type=futures` + `expiry_date` → `get_quote` → orderbook render
+    - Options → `product_type=options` + `expiry_date` + `right` + `strike_price` → `get_option_chain_quotes` → orderbook render
+
+### 2026-06-19 — Phase 13, Part 4: Deployed verification checklist
+
+- Goal: Provide a checklist for post-deploy verification of the search-first launcher
+- Checklist:
+  1. Search modal opens via instrument selector click or `/` key
+  2. All / Stocks / F&O tabs filter results correctly
+  3. Keyboard navigation: arrows, Enter, Escape
+  4. Section headers: "Stocks", "Futures", "Options" visible
+  5. Cash selection — search & select RELIANCE → orderbook loads with LTP/bid/ask
+  6. Futures selection — search & select NIFTY in F&O tab → orderbook loads
+  7. Options selection — search & select "NIFTY 24500 CE" → orderbook loads
+  8. Change instrument link appears and reopens search
+  9. Empty state: type "ZZZZZ" → "No matching instruments found"
+  10. Dark mode toggle → all steps above work
+  11. Blank query: "Type to search instruments"
+  12. Debounce: rapid typing only triggers one search per 250ms
+  13. Orderbook polling refreshes every 2.5s after selection

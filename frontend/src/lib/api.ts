@@ -906,19 +906,28 @@ export function getDashboardOptionOrderbook(params: {
 }
 
 export interface InstrumentSearchResult {
+  id: number;
+  symbol: string;
   broker_symbol: string;
   display_symbol: string | null;
   name: string | null;
   exchange_code: string;
   product_type: string;
+  instrument_kind: string;
   expiry_date: string | null;
   strike_price: string | null;
-  option_right: string | null;
+  display_strike: string | null;
+  right: string | null;
+  label: string;
+  sublabel: string;
+  badges: string[];
+  rank: number;
 }
 
 export interface InstrumentSearchResponse {
   status: string;
   query: string;
+  tab: string;
   results: InstrumentSearchResult[];
 }
 
@@ -950,8 +959,8 @@ export interface DashboardOrderbookResponse {
   error?: string;
 }
 
-export function searchInstruments(q: string) {
-  const search = new URLSearchParams({ q });
+export function searchInstruments(q: string, tab = "all") {
+  const search = new URLSearchParams({ q, tab });
   return requestJson<InstrumentSearchResponse>(`/api/dashboard/search?${search.toString()}`);
 }
 

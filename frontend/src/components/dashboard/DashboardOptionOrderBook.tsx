@@ -18,34 +18,24 @@ type FetchState<T> =
   | { status: "ok"; data: T };
 
 function instrumentLabel(instrument: InstrumentSearchResult): string {
-  let label = instrument.broker_symbol;
-  if (instrument.product_type === "options" && instrument.expiry_date) {
-    const d = instrument.expiry_date.slice(0, 10);
-    const r = instrument.option_right === "call" ? "CE" : "PE";
-    label = `${instrument.broker_symbol} ${d} ${instrument.strike_price} ${r}`;
-  } else if (instrument.product_type === "futures" && instrument.expiry_date) {
-    label = `${instrument.broker_symbol} ${instrument.expiry_date.slice(0, 10)}`;
-  }
-  return label;
+  return instrument.label || instrument.broker_symbol;
 }
 
 function instrumentShortLabel(instrument: InstrumentSearchResult): string {
-  if (instrument.product_type === "options") {
-    const r = instrument.option_right === "call" ? "CE" : "PE";
-    return `${instrument.strike_price} ${r}`;
+  if (instrument.instrument_kind === "option") {
+    return `${instrument.display_strike ?? instrument.strike_price ?? "?"} ${instrument.right ?? ""}`;
   }
-  return instrument.product_type === "futures" && instrument.expiry_date
-    ? instrument.expiry_date.slice(0, 10)
-    : instrument.broker_symbol;
+  if (instrument.instrument_kind === "future" && instrument.expiry_date) {
+    return instrument.expiry_date.slice(0, 10);
+  }
+  return instrument.broker_symbol;
 }
 
-function productBadge(productType: string): string {
-  switch (productType) {
-    case "cash": return "EQ";
-    case "futures": return "FUT";
-    case "options": return "OPT";
-    default: return productType.toUpperCase();
-  }
+function productBadge(kind: string): string {
+  if (kind === "cash") return "EQ";
+  if (kind === "future") return "FUT";
+  if (kind === "option") return "OPT";
+  return kind.toUpperCase();
 }
 
 export function DashboardOptionOrderBook() {
@@ -111,9 +101,9 @@ export function DashboardOptionOrderBook() {
       getDashboardOrderbook({
         broker_symbol: selectedInstrument.broker_symbol,
         exchange_code: selectedInstrument.exchange_code,
-        product_type: selectedInstrument.product_type,
+        product_type: selectedInstrument.instrument_kind === "option" ? "options" : selectedInstrument.instrument_kind === "future" ? "futures" : "cash",
         expiry_date: selectedInstrument.expiry_date,
-        right: selectedInstrument.option_right,
+        right: selectedInstrument.right ? selectedInstrument.right.toLowerCase() : null,
         strike_price: selectedInstrument.strike_price,
       })
         .then((res) => {
@@ -225,12 +215,12 @@ export function DashboardOptionOrderBook() {
                   {selectedInstrument.display_symbol || selectedInstrument.broker_symbol}
                 </span>
                 <span className="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {productBadge(selectedInstrument.product_type)}
+                  {productBadge(selectedInstrument.instrument_kind)}
                 </span>
                 <span className="rounded bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
                   {selectedInstrument.exchange_code}
                 </span>
-                {(selectedInstrument.product_type === "options" || selectedInstrument.product_type === "futures") && selectedInstrument.expiry_date && (
+                {(selectedInstrument.instrument_kind === "option" || selectedInstrument.instrument_kind === "future") && selectedInstrument.expiry_date && (
                   <span className="text-muted-foreground/60">
                     {instrumentShortLabel(selectedInstrument)}
                   </span>

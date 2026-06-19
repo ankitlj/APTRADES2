@@ -52,7 +52,10 @@ def dashboard_chart() -> tuple[object, int]:
 @dashboard_bp.get("/dashboard/search")
 def dashboard_search() -> tuple[object, int]:
     q = str(request.args.get("q", "")).strip()
-    payload = _dashboard_service().search_instruments(q)
+    tab = str(request.args.get("tab", "all")).strip().lower()
+    if tab not in ("all", "stocks", "fno"):
+        tab = "all"
+    payload = _dashboard_service().search_instruments(q, tab=tab)
     return jsonify(payload), 200
 
 
