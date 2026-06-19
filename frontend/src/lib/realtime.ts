@@ -20,6 +20,12 @@ export interface LiveTick {
   change_percent: number | null;
   volume: number | null;
   oi: number | null;
+  bid_price?: number | null;
+  bid_qty?: number | null;
+  ask_price?: number | null;
+  ask_qty?: number | null;
+  total_buy_qty?: number | null;
+  total_sell_qty?: number | null;
   ts: string;
 }
 

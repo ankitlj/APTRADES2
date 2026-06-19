@@ -419,6 +419,12 @@ class MarketDataWorker:
             "change_percent": change_percent,
             "volume": self._to_float(tick.get("ttq") if "ttq" in tick else tick.get("volume")),
             "oi": self._to_float(tick.get("oi")),
+            "bid_price": self._to_float(tick.get("bPrice")),
+            "bid_qty": self._to_float(tick.get("bQty")),
+            "ask_price": self._to_float(tick.get("sPrice")),
+            "ask_qty": self._to_float(tick.get("sQty")),
+            "total_buy_qty": self._to_float(tick.get("totalBuyQt")),
+            "total_sell_qty": self._to_float(tick.get("totalSellQ")),
             "ts": self._utc_now(),
         }
 

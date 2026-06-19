@@ -2294,3 +2294,47 @@ Bundle growth is 3.1% JS / 4.7% CSS — attributable to:
 | Part 4 (Live Overlay) | `DashboardOptionOrderBook.tsx`, `development.md`, `REBUILD.md` | 3 modified, +98/-22 lines |
 | Part 5 (Confirm Modal) | `DashboardOptionOrderBook.tsx`, `development.md`, `REBUILD.md` | 3 modified, +161 lines |
 | **Total** | | **~9 files changed, ~1190 lines added** |
+
+### 2026-06-19 - Step 4: Fix missing bid/ask quantities in option orderbook
+
+#### Root cause
+Two independent bugs caused bid/ask qty and market depth totals to show `—` in the dashboard orderbook:
+
+1. **REST field-name mismatch** (`dashboard_service.py:291-292`): `get_option_orderbook()` read `best_bid_qty` / `best_offer_qty` from the Breeze response, but Breeze actually returns `best_bid_quantity` / `best_offer_quantity`. The lookup fell through all fallbacks and returned `None`.
+2. **Websocket bid/ask fields dropped** (`market_data_worker.py:406-423`): `_normalize_tick()` did not extract any of the 6 bid/ask fields that Breeze sends (`bPrice`, `bQty`, `sPrice`, `sQty`, `totalBuyQt`, `totalSellQ`). Normalized ticks had no bid/ask data.
+3. **Frontend type gap** (`realtime.ts:7-24`): `LiveTick` interface lacked bid/ask fields, so even if the backend emitted them, TypeScript consumers could not access them.
+4. **No websocket overlay in orderbook component** (`DashboardOptionOrderBook.tsx`): The orderbook was purely REST-polled (2.5s) and had no mechanism to consume live ticks.
+
+#### Files changed (7 files)
+
+| File | Change | Lines |
+|---|---|---|
+| `dashboard_service.py` | Fixed field read order: `best_bid_quantity`/`best_offer_quantity` first; read `total_buy_qty`/`total_sell_qty` from Breeze response directly when present; extract `token` from response row | +16/-9 |
+| `market_data_worker.py` | Added 6 normalized bid/ask fields to `_normalize_tick()`: `bid_price`, `bid_qty`, `ask_price`, `ask_qty`, `total_buy_qty`, `total_sell_qty` | +6/-1 |
+| `realtime.ts` | Added 6 optional fields to `LiveTick` interface | +6/-1 |
+| `DashboardOptionOrderBook.tsx` | Added `useLiveQuote` hook for websocket overlay; computed effective values (WS > REST fallback); replaced raw `orderbookData.*` refs with `effective*` values | +21/-14 |
+| `test_dashboard_contract.py` | Updated mocks to use real Breeze field names (`best_bid_quantity`/`best_offer_quantity`); added `token` field to mock; added token assertion | +3/-3 |
+| `test_market_data_worker.py` | No changes needed — existing tests validate normalized shape and new fields are optional | 0 |
+| `development.md`, `REBUILD.md` | Documentation of this fix pass | +documented here |
+
+#### Field mapping applied
+
+REST:
+- `best_bid_quantity` → `bid_qty` (fallback: `best_bid_qty`, `bid_qty`)
+- `best_offer_quantity` → `ask_qty` (fallback: `best_offer_qty`, `ask_qty`, `ask_quantity`)
+- `total_buy_qty` / `total_sell_qty` read directly from Breeze when present; fallback to derived from best-level qty
+
+Websocket:
+- `bPrice` → `bid_price`, `bQty` → `bid_qty`, `sPrice` → `ask_price`, `sQty` → `ask_qty`
+- `totalBuyQt` → `total_buy_qty`, `totalSellQ` → `total_sell_qty`
+
+#### Verification
+- Backend: 36/36 tests passed (20 dashboard + 16 market data worker)
+- Frontend: `tsc -b && vite build` — 0 errors, 498.79 kB JS
+- REST response keys unchanged (`bid_qty`, `ask_qty`, `total_buy_qty`, `total_sell_qty`)
+- `LiveTick` fields are optional — no existing consumer breaks
+- Orderbook merge priority: websocket tick > REST snapshot > null-safe fallback
+
+#### Remaining risks
+- Option-specific subscription for websocket bid/ask requires future work: the `resolve_subscription_items` path in `realtime.py` does not pass `token`/`expiry`/`strike`/`right` through to `SymbolResolver.resolve()`. The frontend overlay code is correct and ready; the subscription will automatically feed data when the backend resolve path is enhanced.
+- The DEFAULT_WATCHLIST (NSE cash indices) does not include option contracts. No option-specific bid/ask arrives via websocket today — only the underlying index LTP. The REST fix (PART 1) provides the primary bid/ask data. The websocket normalization is proven to carry bid/ask fields for any subscribed NFO token.

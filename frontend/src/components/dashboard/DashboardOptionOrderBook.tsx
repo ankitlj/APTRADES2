@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useLiveQuote } from "@/hooks/useLiveMarketData";
 import { getDashboardOptionOrderbook, getOptionChain, getOptionExpiries } from "@/lib/api";
 import type { OptionOrderbookResponse } from "@/lib/api";
 import { formatNumber } from "@/lib/format";
@@ -177,8 +178,17 @@ export function DashboardOptionOrderBook() {
   const numberOfStrikes =
     strikes.status === "ok" ? strikes.data.length : 0;
   const orderbookData = orderbook.status === "ok" ? orderbook.data : null;
+  const liveTick = useLiveQuote(orderbookData?.instrument?.display_symbol ?? null);
   const hasSelection = Boolean(underlying && expiry && selectedStrike);
   const isLive = orderbook.status === "ok" && orderbook.data?.status === "ok";
+
+  const effectiveLtp = liveTick?.ltp ?? orderbookData?.ltp ?? null;
+  const effectiveBidPrice = liveTick?.bid_price ?? orderbookData?.bid_price ?? null;
+  const effectiveAskPrice = liveTick?.ask_price ?? orderbookData?.ask_price ?? null;
+  const effectiveBidQty = liveTick?.bid_qty ?? orderbookData?.bid_qty ?? null;
+  const effectiveAskQty = liveTick?.ask_qty ?? orderbookData?.ask_qty ?? null;
+  const effectiveTotalBuyQty = liveTick?.total_buy_qty ?? orderbookData?.total_buy_qty ?? 0;
+  const effectiveTotalSellQty = liveTick?.total_sell_qty ?? orderbookData?.total_sell_qty ?? 0;
 
   const statusBadge = () => {
     if (orderbook.status === "loading") {
@@ -327,8 +337,8 @@ export function DashboardOptionOrderBook() {
               LTP:{" "}
               {orderbook.status === "loading" ? (
                 "..."
-              ) : orderbookData && orderbookData.ltp != null ? (
-                formatNumber(orderbookData.ltp)
+              ) : effectiveLtp != null ? (
+                formatNumber(effectiveLtp)
               ) : (
                 <span className="text-muted-foreground/50">N/A</span>
               )}
@@ -370,30 +380,28 @@ export function DashboardOptionOrderBook() {
                 </tr>
               </thead>
               <tbody>
-                {orderbookData && orderbookData.status === "ok" && orderbookData.levels.length > 0 ? (
-                  orderbookData.levels.map((level, i) => (
-                    <tr key={i} className="border-b border-border/40">
-                      <td className="px-3 py-2 text-green-600 dark:text-green-400">
-                        {level.bid_qty != null ? formatNumber(level.bid_qty, 0) : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right text-green-600 dark:text-green-400">
-                        {level.bid_price != null ? formatNumber(level.bid_price) : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right text-red-500">
-                        {level.ask_price != null ? formatNumber(level.ask_price) : "—"}
-                      </td>
-                      <td className="px-3 py-2 text-right text-red-500">
-                        {level.ask_qty != null ? formatNumber(level.ask_qty, 0) : "—"}
-                      </td>
-                    </tr>
-                  ))
+                {orderbookData && orderbookData.status === "ok" ? (
+                  <tr className="border-b border-border/40">
+                    <td className="px-3 py-2 text-green-600 dark:text-green-400">
+                      {effectiveBidQty != null ? formatNumber(effectiveBidQty, 0) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-green-600 dark:text-green-400">
+                      {effectiveBidPrice != null ? formatNumber(effectiveBidPrice) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-red-500">
+                      {effectiveAskPrice != null ? formatNumber(effectiveAskPrice) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-right text-red-500">
+                      {effectiveAskQty != null ? formatNumber(effectiveAskQty, 0) : "—"}
+                    </td>
+                  </tr>
                 ) : orderbook.status === "loading" ? (
                   <tr>
                     <td colSpan={4} className="px-3 py-6 text-center text-[10px] text-muted-foreground/50">
                       Loading...
                     </td>
                   </tr>
-                ) : hasSelection ? (
+                  ) : hasSelection && !orderbookData ? (
                   <tr className="border-b border-border/40">
                     <td className="px-3 py-2 text-green-600 dark:text-green-400">—</td>
                     <td className="px-3 py-2 text-right text-green-600 dark:text-green-400">—</td>
@@ -436,8 +444,8 @@ export function DashboardOptionOrderBook() {
                 />
               </div>
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>Buy: {formatNumber(orderbookData.total_buy_qty, 0)}</span>
-                <span>Sell: {formatNumber(orderbookData.total_sell_qty, 0)}</span>
+                <span>Buy: {formatNumber(effectiveTotalBuyQty, 0)}</span>
+                <span>Sell: {formatNumber(effectiveTotalSellQty, 0)}</span>
               </div>
             </div>
           ) : orderbook.status === "loading" ? (
@@ -508,21 +516,21 @@ export function DashboardOptionOrderBook() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">LTP</span>
               <span className="font-medium tabular-nums text-foreground">
-                {orderbookData.ltp != null ? formatNumber(orderbookData.ltp) : "—"}
+                {effectiveLtp != null ? formatNumber(effectiveLtp) : "—"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Bid / Ask</span>
               <span className="font-medium tabular-nums text-foreground">
-                {orderbookData.bid_price != null ? formatNumber(orderbookData.bid_price) : "—"} /{" "}
-                {orderbookData.ask_price != null ? formatNumber(orderbookData.ask_price) : "—"}
+                {effectiveBidPrice != null ? formatNumber(effectiveBidPrice) : "—"} /{" "}
+                {effectiveAskPrice != null ? formatNumber(effectiveAskPrice) : "—"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Spread</span>
               <span className="font-medium tabular-nums text-foreground">
-                {orderbookData.bid_price != null && orderbookData.ask_price != null
-                  ? formatNumber(orderbookData.ask_price - orderbookData.bid_price)
+                {effectiveBidPrice != null && effectiveAskPrice != null
+                  ? formatNumber(effectiveAskPrice - effectiveBidPrice)
                   : "—"}
               </span>
             </div>

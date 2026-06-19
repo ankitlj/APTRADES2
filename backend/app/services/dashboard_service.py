@@ -288,8 +288,12 @@ class DashboardService:
         ltp = self._to_float(row.get("ltp"))
         bid_price = self._to_float(row.get("best_bid_price") or row.get("bid_price"))
         ask_price = self._to_float(row.get("best_offer_price") or row.get("ask_price"))
-        bid_qty = self._to_float(row.get("best_bid_qty") or row.get("bid_qty"))
-        ask_qty = self._to_float(row.get("best_offer_qty") or row.get("ask_qty") or row.get("ask_quantity"))
+        bid_qty = self._to_float(
+            row.get("best_bid_quantity") or row.get("best_bid_qty") or row.get("bid_qty")
+        )
+        ask_qty = self._to_float(
+            row.get("best_offer_quantity") or row.get("best_offer_qty") or row.get("ask_qty") or row.get("ask_quantity")
+        )
         previous_close = self._to_float(row.get("previous_close") or row.get("close"))
         oi = self._to_float(row.get("open_interest") or row.get("oi") or row.get("openinterest"))
         volume = self._to_float(
@@ -297,11 +301,21 @@ class DashboardService:
         )
         spot_price = self._to_float(row.get("spot_price"))
 
-        total_buy = bid_qty if bid_qty is not None else 0.0
-        total_sell = ask_qty if ask_qty is not None else 0.0
+        total_buy_raw = self._to_float(row.get("total_buy_qty"))
+        total_sell_raw = self._to_float(row.get("total_sell_qty"))
+        if total_buy_raw is not None:
+            total_buy = total_buy_raw
+        else:
+            total_buy = bid_qty if bid_qty is not None else 0.0
+        if total_sell_raw is not None:
+            total_sell = total_sell_raw
+        else:
+            total_sell = ask_qty if ask_qty is not None else 0.0
         total = total_buy + total_sell
         buy_percent = round((total_buy / total) * 100, 1) if total > 0 else 50.0
         sell_percent = round((total_sell / total) * 100, 1) if total > 0 else 50.0
+
+        token = str(row.get("token") or "").strip() or None
 
         level = {}
         if bid_qty is not None:
@@ -326,8 +340,8 @@ class DashboardService:
                 "stock_code": broker_symbol,
                 "exchange_code": normalized_exchange,
                 "product_type": "options",
-                "token": None,
-                "stock_token": None,
+                "token": token,
+                "stock_token": token,
             },
             "ltp": ltp,
             "previous_close": previous_close,

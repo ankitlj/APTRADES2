@@ -539,14 +539,15 @@ def _option_chain_response(instrument):
             "ltp": "152.35",
             "best_bid_price": "151.80",
             "best_offer_price": "152.90",
-            "best_bid_qty": "225",
-            "best_offer_qty": "175",
+            "best_bid_quantity": "225",
+            "best_offer_quantity": "175",
             "open_interest": "1245000",
             "total_quantity_traded": "8500",
             "previous_close": "148.20",
             "spot_price": "23420.00",
             "strike_price": "23500",
             "expiry_date": "2026-06-30T06:00:00.000Z",
+            "token": "12345",
         }
     ]
 
@@ -587,6 +588,7 @@ def test_option_orderbook_valid_request_returns_expected_keys(tmp_path):
     assert payload["sell_percent"] == 43.8
     assert payload["timestamp"] is not None
     assert payload["instrument"]["exchange_code"] == "NFO"
+    assert payload["instrument"]["token"] == "12345"
 
 
 def test_option_orderbook_missing_underlying_returns_400(tmp_path):
@@ -687,8 +689,8 @@ def test_option_orderbook_zero_totals_handles_percent_safely(tmp_path):
             "ltp": "100.00",
             "best_bid_price": "99.50",
             "best_offer_price": "100.50",
-            "best_bid_qty": "0",
-            "best_offer_qty": "0",
+            "best_bid_quantity": "0",
+            "best_offer_quantity": "0",
         }],
     ):
         response = client.get("/api/dashboard/option-orderbook?underlying=NIFTY&expiry=2026-06-30&strike=23500&right=call")

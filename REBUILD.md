@@ -922,3 +922,33 @@ From this point onward, the project is renamed ORIENS.
 - All 6 parts complete: shell -> API -> data wiring -> live overlay -> confirm modal -> verification.
 - No regressions in any existing functionality.
 - Total: ~1190 lines added across 9 files.
+
+## 2026-06-19 - Step 4: Fix missing bid/ask quantities in option orderbook
+
+### Root cause (two independent bugs)
+
+1. **REST field-name mismatch** (`dashboard_service.py`): `get_option_orderbook()` read `best_bid_qty` / `best_offer_qty` from Breeze response, but Breeze returns `best_bid_quantity` / `best_offer_quantity`.
+2. **Websocket normalization gap** (`market_data_worker.py`): `_normalize_tick()` dropped all 6 bid/ask fields that Breeze sends (`bPrice`, `bQty`, `sPrice`, `sQty`, `totalBuyQt`, `totalSellQ`).
+3. **Frontend type gap** (`realtime.ts`): `LiveTick` lacked bid/ask fields.
+4. **No websocket overlay** (`DashboardOptionOrderBook.tsx`): Purely REST-polled.
+
+### Changes
+
+| File | Change |
+|---|---|
+| `dashboard_service.py` | `best_bid_qty` -> `best_bid_quantity` (correct Breeze field); `total_buy_qty`/`total_sell_qty` read from Breeze directly when present; `token` extracted from response |
+| `market_data_worker.py` | Added 6 normalized fields: `bid_price`, `bid_qty`, `ask_price`, `ask_qty`, `total_buy_qty`, `total_sell_qty` |
+| `realtime.ts` | Added 6 optional fields to `LiveTick` |
+| `DashboardOptionOrderBook.tsx` | Added `useLiveQuote` hook; computed `effective*` values (WS > REST > null); replaced all raw refs |
+| `test_dashboard_contract.py` | Updated mocks to use real Breeze field names; added `token` to mock |
+
+### Verification
+
+- Backend: 36/36 tests (20 dashboard contract + 16 market data worker)
+- Frontend: `tsc -b && vite build` — 0 errors
+- REST response shape unchanged; LiveTick fields optional (no regressions)
+- Merge priority: websocket tick > REST snapshot > null-safe fallback
+
+### Remaining risk
+
+- Option-specific websocket subscription requires `realtime.py` enhancements (passing `token`/`expiry`/`strike`/`right` through to `SymbolResolver`). REST fix provides the primary bid/ask data.
