@@ -44,6 +44,7 @@ export interface SubscriptionRequest {
   symbol: string;
   exchange: string;
   product_type?: string;
+  token?: string;
 }
 
 export function createMarketDataSocket(): Socket {

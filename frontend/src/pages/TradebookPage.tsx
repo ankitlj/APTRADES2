@@ -2,6 +2,8 @@ import { ArrowDownRight, ArrowUpRight, ListChecks } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { getTrades, type TradeRecord, type TradesResponse } from "@/lib/api";
+import { useLiveMarketData, useLiveSubscribe } from "@/hooks/useLiveMarketData";
+import type { SubscriptionRequest } from "@/lib/realtime";
 import { formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { BuySellBadge } from "@/components/ui/buy-sell-badge";
@@ -9,6 +11,7 @@ import { DataTableShell } from "@/components/ui/data-table-shell";
 import { PageLayout } from "@/components/ui/page-layout";
 import { SymbolCell } from "@/components/ui/symbol-cell";
 import { Field, PageHeader, StatCard, selectClass } from "@/components/common/page";
+import { cn } from "@/lib/utils";
 
 type TradebookState = {
   data: TradesResponse | null;
@@ -63,6 +66,16 @@ export function TradebookPage() {
   }, [exchange, actionFilter]);
 
   const trades = state.data?.trades ?? [];
+
+  const { ticks } = useLiveMarketData();
+  const tradeSubs = trades
+    .filter((t) => t.symbol && t.exchange_code)
+    .map((t) => ({
+      symbol: t.symbol,
+      exchange: t.exchange_code,
+      product_type: t.product_type,
+    }));
+  useLiveSubscribe(tradeSubs);
 
   return (
     <PageLayout>
@@ -125,6 +138,7 @@ export function TradebookPage() {
               <th className="px-4 py-3 font-medium">Action</th>
               <th className="px-4 py-3 text-right font-medium">Qty</th>
               <th className="px-4 py-3 text-right font-medium">Price</th>
+              <th className="px-4 py-3 text-right font-medium">LTP</th>
               <th className="px-4 py-3 font-medium">Time</th>
             </tr>
           </thead>
@@ -139,6 +153,9 @@ export function TradebookPage() {
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatNumber(trade.quantity, 0)}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatNumber(trade.price)}</td>
+                <td className={cn("px-4 py-3 text-right tabular-nums", ticks[trade.symbol.toUpperCase()] && "text-primary")}>
+                  {formatNumber(ticks[trade.symbol.toUpperCase()]?.ltp)}
+                </td>
                 <td className="px-4 py-3 text-muted-foreground">{trade.trade_time || "n/a"}</td>
               </tr>
             ))}

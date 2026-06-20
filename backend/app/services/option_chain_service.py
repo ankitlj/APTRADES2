@@ -218,6 +218,7 @@ class OptionChainService:
 
     @staticmethod
     def _normalize_leg(row: dict[str, Any]) -> dict[str, Any]:
+        token = str(row.get("token") or "").strip() or None
         return {
             "ltp": OptionChainService._float_value(row.get("ltp")),
             "bid": OptionChainService._float_value(row.get("best_bid_price") or row.get("bid_price")),
@@ -232,6 +233,7 @@ class OptionChainService:
                 or row.get("volume")
                 or row.get("trade_volume")
             ),
+            "token": token,
         }
 
     @staticmethod

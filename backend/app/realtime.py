@@ -73,16 +73,41 @@ def resolve_subscription_items(
     requests: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Resolve display symbols to broker tokens so the worker can subscribe by
-    Breeze stock-token. Unresolvable rows are skipped (degraded-safe)."""
+    Breeze stock-token. Unresolvable rows are skipped (degraded-safe).
+
+    When an item already supplies a ``token``, DB resolution is skipped and the
+    item is passed through directly. This allows the frontend to subscribe option
+    contracts whose tokens were pre-resolved from an option-chain response."""
     if not database_url:
         return []
 
     resolver = SymbolResolver(database_url)
     resolved_items: list[dict[str, Any]] = []
     for item in requests:
-        symbol = str(item.get("symbol") or "").strip()
+        token = str(item.get("token") or "").strip()
         exchange = str(item.get("exchange") or item.get("exchange_code") or "").strip().upper()
+        symbol = str(item.get("symbol") or "").strip()
         product_type = item.get("product_type")
+
+        # Pre-resolved token shortcut — skip DB resolve
+        if token:
+            display_symbol = symbol or str(item.get("display_symbol") or "?").strip().upper()
+            broker_symbol = str(item.get("broker_symbol") or display_symbol).strip().upper()
+            if not exchange:
+                continue
+            if display_symbol == "BANK NIFTY":
+                display_symbol = "BANKNIFTY"
+            resolved_items.append(
+                {
+                    "display_symbol": display_symbol,
+                    "broker_symbol": broker_symbol,
+                    "exchange_code": exchange,
+                    "product_type": product_type or "",
+                    "token": token,
+                }
+            )
+            continue
+
         if not symbol or not exchange:
             continue
         try:

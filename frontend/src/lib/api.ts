@@ -432,6 +432,7 @@ export interface OptionChainLeg {
   ask: number | null;
   oi: number | null;
   volume: number | null;
+  token: string | null;
 }
 
 export interface OptionChainRow {
@@ -464,6 +465,8 @@ export interface OIRow {
   total_oi: number;
   ce_ltp: number | null;
   pe_ltp: number | null;
+  ce_token: string | null;
+  pe_token: string | null;
 }
 
 export interface OITrackerResponse {

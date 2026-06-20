@@ -1711,7 +1711,7 @@
 - **Fix pass complete: All targeted endpoints verified and accepted.**
 
 ## Deployment Notes
-- Last commit: `feb22da` (Part C docs update)
+- Last commit: pending (websocket architecture pass)
 - Last deployed URL: `https://aptrades-2.vercel.app` and `https://web-production-39a4a.up.railway.app`
 - Smoke test result: deployed readiness, Breeze diagnostics, options, OI, and strategy flows are already verified; Phase 16 websocket live market data is verified locally through 68 passing backend tests, an 88-module production frontend build, and a live `socketio.run` boot where the REST market-data endpoints plus the Socket.IO handshake all responded and `/api/health` stayed green
 - Railway note: Phase 16 changes the start command to a single gthread gunicorn worker (`--worker-class gthread --threads 8 --workers 1`) so one worker owns the Breeze websocket connection while REST stays multi-threaded
@@ -2489,3 +2489,33 @@ Websocket:
 
 #### Remaining risk
 - If DB has bad token rows for instruments, they will now be skipped with a structured log warning instead of silently subscribing with an invalid stock_token. This is correct — a DB data quality issue should be diagnosed and fixed at the source, not silently passed through to Breeze.
+
+### 2026-06-20 — Websocket Architecture Pass: Per-Page Live Subscriptions + Pre-Resolved Token Shortcut
+- **Goal**: Complete production websocket architecture — make live updates work across /tradebook, /optionchain, /oi-tracker, /oi-profile, /strategy-builder without breaking current dashboard behavior or Breeze-only architecture.
+- **Root causes**:
+  - `resolve_subscription_items()` had no pre-resolved token shortcut — composite keys like `NIFTY|24000|CE` were passed to `SymbolResolver.resolve()` which threw `SymbolResolverError` and silently skipped all option-contract subscriptions.
+  - TradebookPage had no websocket subscription or live LTP column.
+  - OIProfilePage/OITrackerPage only subscribed underlying spot — CE/PE LTP cells were REST-only.
+  - OptionChainPage LegCells rendered REST-only bid/ask/ltp with no live overlay.
+  - StrategyBuilderPage subscribed underlying spot but discarded the live value.
+- **Backend changes**:
+  - `backend/app/realtime.py:resolve_subscription_items()` — added pre-resolved token shortcut at lines 86-108: when `item.get("token")` is present and non-empty, skips DB SymbolResolver lookup and builds subscription object directly from provided fields (display_symbol, broker_symbol, exchange_code, product_type, token). Preserves existing symbol-resolve flow for pages without tokens. BANKNIFTY normalization intact.
+  - `backend/app/services/option_chain_service.py:_normalize_leg()` — returns `token` field from Breeze response row (line 236).
+  - `backend/app/services/oi_service.py:_flatten_row()` — passes through `ce_token` and `pe_token` from the chain (lines 102-103).
+- **Frontend changes**:
+  - `frontend/src/lib/realtime.ts` — added optional `token` field to `SubscriptionRequest` (line 47).
+  - `frontend/src/lib/api.ts` — added `token` to `OptionChainLeg` (line 435), `ce_token`/`pe_token` to `OIRow` (lines 468-469).
+  - `frontend/src/hooks/useLiveMarketData.tsx` — `useLiveSubscribe` already correct: diff-based subscribe/unsubscribe (lines 178-204), reconnect re-subscribe via `prevRef` reset on `socketConnected` change (lines 172-176), unmount cleanup via ref (lines 207-214).
+  - `frontend/src/pages/TradebookPage.tsx` — subscribes symbols from visible trade rows via `useLiveSubscribe(tradeSubs)` (lines 70-78); added live LTP column with `text-primary` highlight when tick present (lines 141, 156-158).
+  - `frontend/src/pages/OptionChainPage.tsx` — subscribes all visible CE/PE contracts via composite keys with pre-resolved tokens (lines 137-162); live LTP/bid/ask overlay in `LegCells` with `text-primary` styling (lines 39-49).
+  - `frontend/src/pages/OITrackerPage.tsx` — subscribes CE/PE contracts via `ce_token`/`pe_token` with composite keys (lines 122-149); live LTP overlay on `ce_ltp`/`pe_ltp` cells (lines 38-56).
+  - `frontend/src/pages/OIProfilePage.tsx` — subscribes CE/PE contracts via `ce_token`/`pe_token` (lines 133-156); live LTP overlay on `ce_ltp`/`pe_ltp` cells (lines 27-56).
+  - `frontend/src/pages/StrategyBuilderPage.tsx` — captures `useLiveQuote(state.underlying)` return value (lines 180-181); displays live spot price in control bar (lines 251-253).
+- **Verification**:
+  - `python -m pytest` → 167/167 passed
+  - `npx tsc --noEmit` → clean
+  - `npx vite build` → 1861 modules, 509.51 kB JS, clean
+- **Files changed**: 11 files across backend and frontend
+- **Remaining risks**:
+  - Option-contract websocket ticks depend on Breeze streaming market data during market hours — the pre-resolved token path is structurally correct but unproven with live Breeze ticks.
+  - TradebookPage subscribes by symbol/exchange/product_type (no tokens) — if Breeze requires exact token for some symbols, trades may not get live LTP. Acceptable for MVP scope.

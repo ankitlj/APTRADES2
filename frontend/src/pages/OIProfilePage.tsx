@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getOptionExpiries, getOIProfile, type OIProfileResponse, type OIRow } from "@/lib/api";
 import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
-import type { SubscriptionRequest } from "@/lib/realtime";
+import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -24,10 +24,12 @@ type OIProfileState = {
 
 const underlyingOptions = ["NIFTY", "BANKNIFTY", "FINNIFTY", "NIFTYMID50"];
 
-function OIProfileRow({ row, atmStrike, maxTotalOI }: { row: OIRow; atmStrike: number; maxTotalOI: number }) {
+function OIProfileRow({ row, atmStrike, maxTotalOI, ceTick, peTick }: { row: OIRow; atmStrike: number; maxTotalOI: number; ceTick?: LiveTick; peTick?: LiveTick }) {
   const isAtm = row.strike_price === atmStrike;
   const ceBarWidth = maxTotalOI > 0 ? (row.ce_oi / maxTotalOI) * 100 : 0;
   const peBarWidth = maxTotalOI > 0 ? (row.pe_oi / maxTotalOI) * 100 : 0;
+  const ceLtp = ceTick?.ltp ?? row.ce_ltp;
+  const peLtp = peTick?.ltp ?? row.pe_ltp;
   return (
     <tr className={cn("hover:bg-muted/20", isAtm && "bg-primary/5")}>
       <td className={cn("px-4 py-3 text-center tabular-nums", isAtm && "font-semibold text-primary")}>
@@ -49,8 +51,8 @@ function OIProfileRow({ row, atmStrike, maxTotalOI }: { row: OIRow; atmStrike: n
           <span className="tabular-nums text-red-500">{formatNumber(row.pe_oi, 0)}</span>
         </div>
       </td>
-      <td className="px-4 py-3 text-right tabular-nums">{formatNumber(row.ce_ltp)}</td>
-      <td className="px-4 py-3 text-right tabular-nums">{formatNumber(row.pe_ltp)}</td>
+      <td className={cn("px-4 py-3 text-right tabular-nums", ceTick && "text-primary")}>{formatNumber(ceLtp)}</td>
+      <td className={cn("px-4 py-3 text-right tabular-nums", peTick && "text-primary")}>{formatNumber(peLtp)}</td>
     </tr>
   );
 }
@@ -119,7 +121,7 @@ export function OIProfilePage() {
     void loadData();
   }, [selectedExpiry]);
 
-  const { connectionState } = useLiveMarketData();
+  const { connectionState, ticks } = useLiveMarketData();
   const spotSub = useMemo<SubscriptionRequest[]>(
     () => [{ symbol: underlying, exchange: "NSE", product_type: "cash" }],
     [underlying],
@@ -127,6 +129,31 @@ export function OIProfilePage() {
   useLiveSubscribe(spotSub);
   const liveQuote = useLiveQuote(underlying);
   const liveSpot = liveQuote?.ltp ?? state.data?.underlying_ltp;
+
+  const contractSubs = useMemo<SubscriptionRequest[]>(() => {
+    const rows = state.data?.rows ?? [];
+    const subs: SubscriptionRequest[] = [];
+    for (const row of rows) {
+      if (row.ce_token) {
+        subs.push({
+          symbol: `${underlying}|${row.strike_price}|CE`,
+          exchange: exchangeCode,
+          product_type: "options",
+          token: row.ce_token,
+        });
+      }
+      if (row.pe_token) {
+        subs.push({
+          symbol: `${underlying}|${row.strike_price}|PE`,
+          exchange: exchangeCode,
+          product_type: "options",
+          token: row.pe_token,
+        });
+      }
+    }
+    return subs;
+  }, [state.data, underlying, exchangeCode]);
+  useLiveSubscribe(contractSubs);
 
   const maxTotalOI = state.data
     ? Math.max(...state.data.rows.map((r) => Math.max(r.ce_oi, r.pe_oi)), 1)
@@ -231,7 +258,14 @@ export function OIProfilePage() {
               </thead>
               <tbody className="divide-y">
                 {state.data.rows.map((row) => (
-                  <OIProfileRow key={row.strike_price} row={row} atmStrike={state.data!.atm_strike} maxTotalOI={maxTotalOI} />
+                  <OIProfileRow
+                    key={row.strike_price}
+                    row={row}
+                    atmStrike={state.data!.atm_strike}
+                    maxTotalOI={maxTotalOI}
+                    ceTick={ticks[`${underlying}|${row.strike_price}|CE`]}
+                    peTick={ticks[`${underlying}|${row.strike_price}|PE`]}
+                  />
                 ))}
               </tbody>
             </table>

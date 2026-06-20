@@ -33,6 +33,8 @@ interface LiveMarketDataContextValue {
   ticks: Record<string, LiveTick>;
   /** Request additional symbols to be streamed. */
   subscribe: (items: SubscriptionRequest[]) => void;
+  /** Request symbols to be removed from the stream. */
+  unsubscribe: (items: SubscriptionRequest[]) => void;
 }
 
 const LiveMarketDataContext = createContext<LiveMarketDataContextValue | null>(null);
@@ -115,12 +117,20 @@ export function LiveMarketDataProvider({ children }: PropsWithChildren) {
     socket.emit("subscribe", { symbols: items });
   }, []);
 
+  const unsubscribe = useCallback((items: SubscriptionRequest[]) => {
+    const socket = socketRef.current;
+    if (!socket || !items.length) {
+      return;
+    }
+    socket.emit("unsubscribe", { symbols: items });
+  }, []);
+
   const connectionState = deriveConnectionState(socketConnected, status, graceElapsed);
   const lastTickAt = status?.last_tick_at ?? null;
 
   const value = useMemo<LiveMarketDataContextValue>(
-    () => ({ status, socketConnected, connectionState, lastTickAt, ticks, subscribe }),
-    [status, socketConnected, connectionState, lastTickAt, ticks, subscribe],
+    () => ({ status, socketConnected, connectionState, lastTickAt, ticks, subscribe, unsubscribe }),
+    [status, socketConnected, connectionState, lastTickAt, ticks, subscribe, unsubscribe],
   );
 
   return <LiveMarketDataContext.Provider value={value}>{children}</LiveMarketDataContext.Provider>;
@@ -143,18 +153,63 @@ export function useLiveQuote(symbol: string | null | undefined): LiveTick | unde
   return ticks[symbol.toUpperCase()];
 }
 
-/** Subscribe to a set of symbols for the lifetime of the calling component. */
+/** Subscribe to a set of symbols for the lifetime of the calling component.
+ *
+ * On mount and on `items` change, computes a diff against the previous set and
+ * emits subscribe/unsubscribe socket events for the delta. On unmount,
+ * unsubscribes every tracked item. On socket reconnect, re-subscribes all
+ * current items.
+ */
 export function useLiveSubscribe(items: SubscriptionRequest[]): void {
-  const { subscribe, socketConnected } = useLiveMarketData();
+  const { subscribe, unsubscribe, socketConnected } = useLiveMarketData();
+  const prevRef = useRef<string>("");
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
   const serialized = JSON.stringify(items);
 
+  // Reset prev tracking on reconnect so all items are re-subscribed.
+  useEffect(() => {
+    if (socketConnected) {
+      prevRef.current = "";
+    }
+  }, [socketConnected]);
+
+  // Compute diff against prev and emit subscribe / unsubscribe for the delta.
   useEffect(() => {
     if (!socketConnected) {
       return;
     }
     const parsed = JSON.parse(serialized) as SubscriptionRequest[];
-    if (parsed.length) {
-      subscribe(parsed);
+    if (!parsed.length) {
+      return;
     }
-  }, [serialized, socketConnected, subscribe]);
+
+    const prevJson = prevRef.current;
+    prevRef.current = serialized;
+
+    const prev: SubscriptionRequest[] = prevJson ? JSON.parse(prevJson) : [];
+    const prevKeys = new Set(prev.map((k) => JSON.stringify(k)));
+    const currKeys = new Set(parsed.map((k) => JSON.stringify(k)));
+
+    const removed = prev.filter((k) => !currKeys.has(JSON.stringify(k)));
+    const added = parsed.filter((k) => !prevKeys.has(JSON.stringify(k)));
+
+    if (removed.length) {
+      unsubscribe(removed);
+    }
+    if (added.length) {
+      subscribe(added);
+    }
+  }, [serialized, socketConnected, subscribe, unsubscribe]);
+
+  // Cleanup on unmount — unsubscribe all tracked items.
+  useEffect(() => {
+    return () => {
+      const current = itemsRef.current;
+      if (current.length) {
+        unsubscribe(current);
+      }
+    };
+  }, [unsubscribe]);
 }

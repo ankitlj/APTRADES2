@@ -99,4 +99,6 @@ class OIService:
             "total_oi": ce_oi + pe_oi,
             "ce_ltp": ce.get("ltp"),
             "pe_ltp": pe.get("ltp"),
+            "ce_token": str(ce.get("token") or "").strip() or None,
+            "pe_token": str(pe.get("token") or "").strip() or None,
         }

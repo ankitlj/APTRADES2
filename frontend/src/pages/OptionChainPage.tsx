@@ -8,7 +8,7 @@ import {
   type OptionChainRow,
 } from "@/lib/api";
 import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
-import type { SubscriptionRequest } from "@/lib/realtime";
+import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { formatNumber, tone, toneColor } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -36,15 +36,18 @@ function liveBadgeLabel(state: string): string {
   return "REST only";
 }
 
-function LegCells({ row, side }: { row: OptionChainRow; side: "ce" | "pe" }) {
+function LegCells({ row, side, liveTick }: { row: OptionChainRow; side: "ce" | "pe"; liveTick?: LiveTick }) {
   const leg = row[side];
+  const ltp = liveTick?.ltp ?? leg?.ltp;
+  const bid = liveTick?.bid_price ?? leg?.bid;
+  const ask = liveTick?.ask_price ?? leg?.ask;
   return (
     <>
       <td className="px-3 py-2 text-right tabular-nums">{formatNumber(leg?.oi, 0)}</td>
       <td className="px-3 py-2 text-right tabular-nums">{formatNumber(leg?.volume, 0)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(leg?.bid)}</td>
-      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(leg?.ask)}</td>
-      <td className="px-3 py-2 text-right font-medium tabular-nums">{formatNumber(leg?.ltp)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(bid)}</td>
+      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(ask)}</td>
+      <td className={cn("px-3 py-2 text-right font-medium tabular-nums", liveTick && "text-primary")}>{formatNumber(ltp)}</td>
     </>
   );
 }
@@ -125,7 +128,7 @@ export function OptionChainPage() {
     void loadChain();
   }, [selectedExpiry, strikeCount]);
 
-  const { connectionState } = useLiveMarketData();
+  const { connectionState, ticks } = useLiveMarketData();
   const spotSub = useMemo<SubscriptionRequest[]>(
     () => [{ symbol: underlying, exchange: "NSE", product_type: "cash" }],
     [underlying],
@@ -133,6 +136,26 @@ export function OptionChainPage() {
   useLiveSubscribe(spotSub);
   const liveQuote = useLiveQuote(underlying);
   const liveSpot = liveQuote?.ltp ?? state.data?.underlying_ltp;
+
+  const contractSubs = useMemo<SubscriptionRequest[]>(() => {
+    const rows = state.data?.rows ?? [];
+    const subs: SubscriptionRequest[] = [];
+    for (const row of rows) {
+      for (const side of ["ce", "pe"] as const) {
+        const leg = row[side];
+        if (leg?.token) {
+          subs.push({
+            symbol: `${underlying}|${row.strike_price}|${side.toUpperCase()}`,
+            exchange: exchangeCode,
+            product_type: "options",
+            token: leg.token,
+          });
+        }
+      }
+    }
+    return subs;
+  }, [state.data, underlying, exchangeCode]);
+  useLiveSubscribe(contractSubs);
 
   const previousCloseDelta = useMemo(() => {
     if (liveSpot == null || !state.data?.previous_close) return null;
@@ -253,9 +276,13 @@ export function OptionChainPage() {
               <tbody className="divide-y">
                 {state.data.rows.map((row) => {
                   const isAtm = row.strike_price === state.data?.atm_strike;
+                  const ceKey = `${underlying}|${row.strike_price}|CE`;
+                  const peKey = `${underlying}|${row.strike_price}|PE`;
+                  const ceTick = ticks[ceKey];
+                  const peTick = ticks[peKey];
                   return (
                     <tr key={row.strike_price} className={cn("hover:bg-muted/20", isAtm && "bg-primary/5")}>
-                      <LegCells row={row} side="ce" />
+                      <LegCells row={row} side="ce" liveTick={ceTick} />
                       <td
                         className={cn(
                           "px-3 py-2 text-center font-semibold tabular-nums",
@@ -264,11 +291,7 @@ export function OptionChainPage() {
                       >
                         {formatNumber(row.strike_price, 0)}
                       </td>
-                      <td className="px-3 py-2 text-right font-medium tabular-nums">{formatNumber(row.pe?.ltp)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.pe?.bid)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.pe?.ask)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.pe?.volume, 0)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatNumber(row.pe?.oi, 0)}</td>
+                      <LegCells row={row} side="pe" liveTick={peTick} />
                     </tr>
                   );
                 })}

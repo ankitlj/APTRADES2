@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getOptionExpiries, getOITracker, type OITrackerResponse, type OIRow } from "@/lib/api";
 import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
-import type { SubscriptionRequest } from "@/lib/realtime";
+import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +35,10 @@ function OISplitBar({ ceOi, peOi }: { ceOi: number; peOi: number }) {
   );
 }
 
-function OITrackerRow({ row, atmStrike }: { row: OIRow; atmStrike: number }) {
+function OITrackerRow({ row, atmStrike, ceTick, peTick }: { row: OIRow; atmStrike: number; ceTick?: LiveTick; peTick?: LiveTick }) {
   const isAtm = row.strike_price === atmStrike;
+  const ceLtp = ceTick?.ltp ?? row.ce_ltp;
+  const peLtp = peTick?.ltp ?? row.pe_ltp;
   return (
     <tr className={cn("hover:bg-muted/20", isAtm && "bg-primary/5")}>
       <td className={cn("px-4 py-3 text-right tabular-nums", isAtm && "font-semibold text-primary")}>
@@ -50,8 +52,8 @@ function OITrackerRow({ row, atmStrike }: { row: OIRow; atmStrike: number }) {
       <td className="px-4 py-3">
         <OISplitBar ceOi={row.ce_oi} peOi={row.pe_oi} />
       </td>
-      <td className="px-4 py-3 text-right tabular-nums">{formatNumber(row.ce_ltp)}</td>
-      <td className="px-4 py-3 text-right tabular-nums">{formatNumber(row.pe_ltp)}</td>
+      <td className={cn("px-4 py-3 text-right tabular-nums", ceTick && "text-primary")}>{formatNumber(ceLtp)}</td>
+      <td className={cn("px-4 py-3 text-right tabular-nums", peTick && "text-primary")}>{formatNumber(peLtp)}</td>
     </tr>
   );
 }
@@ -120,13 +122,39 @@ export function OITrackerPage() {
     void loadData();
   }, [selectedExpiry]);
 
-  const { connectionState } = useLiveMarketData();
+  const { connectionState, ticks } = useLiveMarketData();
+  const liveQuote = useLiveQuote(underlying);
+  const liveSpot = liveQuote?.ltp ?? state.data?.underlying_ltp;
   const spotSub = useMemo<SubscriptionRequest[]>(
     () => [{ symbol: underlying, exchange: "NSE", product_type: "cash" }],
     [underlying],
   );
   useLiveSubscribe(spotSub);
-  useLiveQuote(underlying);
+
+  const contractSubs = useMemo<SubscriptionRequest[]>(() => {
+    const rows = state.data?.rows ?? [];
+    const subs: SubscriptionRequest[] = [];
+    for (const row of rows) {
+      if (row.ce_token) {
+        subs.push({
+          symbol: `${underlying}|${row.strike_price}|CE`,
+          exchange: exchangeCode,
+          product_type: "options",
+          token: row.ce_token,
+        });
+      }
+      if (row.pe_token) {
+        subs.push({
+          symbol: `${underlying}|${row.strike_price}|PE`,
+          exchange: exchangeCode,
+          product_type: "options",
+          token: row.pe_token,
+        });
+      }
+    }
+    return subs;
+  }, [state.data, underlying, exchangeCode]);
+  useLiveSubscribe(contractSubs);
 
   function liveBadgeLabel(state: string): string {
     if (state === "live") return "Live feed";
@@ -184,7 +212,8 @@ export function OITrackerPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+        <StatCard label="Spot" value={formatNumber(liveSpot)} icon={Target} />
         <StatCard label="ATM Strike" value={formatNumber(state.data?.atm_strike, 0)} icon={Target} />
         <StatCard
           label="PCR"
@@ -225,7 +254,13 @@ export function OITrackerPage() {
               </thead>
               <tbody className="divide-y">
                 {state.data.rows.map((row) => (
-                  <OITrackerRow key={row.strike_price} row={row} atmStrike={state.data!.atm_strike} />
+                  <OITrackerRow
+                    key={row.strike_price}
+                    row={row}
+                    atmStrike={state.data!.atm_strike}
+                    ceTick={ticks[`${underlying}|${row.strike_price}|CE`]}
+                    peTick={ticks[`${underlying}|${row.strike_price}|PE`]}
+                  />
                 ))}
               </tbody>
             </table>

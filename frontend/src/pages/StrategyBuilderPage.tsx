@@ -177,12 +177,13 @@ export function StrategyBuilderPage() {
   }
 
   const { connectionState } = useLiveMarketData();
+  const liveQuote = useLiveQuote(state.underlying);
+  const liveSpot = liveQuote?.ltp;
   const spotSub = useMemo<SubscriptionRequest[]>(
     () => [{ symbol: state.underlying, exchange: "NSE", product_type: "cash" }],
     [state.underlying],
   );
   useLiveSubscribe(spotSub);
-  useLiveQuote(state.underlying);
 
   function liveBadgeLabel(state: string): string {
     if (state === "live") return "Live feed";
@@ -246,6 +247,9 @@ export function StrategyBuilderPage() {
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Spot">
+            <span className="tabular-nums text-sm font-medium">{liveSpot ? fmt(liveSpot, 0) : "n/a"}</span>
           </Field>
           <label className="flex flex-col gap-1 text-xs text-muted-foreground">
             <span className="font-medium">Strategy name</span>
