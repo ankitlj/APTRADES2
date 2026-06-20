@@ -56,12 +56,20 @@ class Subscription:
     stock_token: str
 
 
+def _is_numeric_token(token: object) -> bool:
+    """Return True when *token* is a non-empty string of digits (no sign,
+    no decimal point, no whitespace). Non-numeric tokens cannot be sent to
+    the Breeze websocket and indicate a bad DB row or resolver output."""
+    text = str(token or "").strip()
+    return text.isdigit()
+
+
 def build_stock_token(exchange_code: str, token: str) -> str | None:
     """Return the Breeze ``X.Y!token`` exchange-quote stream key, or None if it
-    cannot be built (unknown exchange or missing token)."""
+    cannot be built (unknown exchange, missing token, or non-numeric token)."""
     prefix = _EXCHANGE_WS_PREFIX.get((exchange_code or "").strip().upper())
     cleaned_token = (token or "").strip()
-    if not prefix or not cleaned_token:
+    if not prefix or not cleaned_token or not _is_numeric_token(cleaned_token):
         return None
     return f"{prefix}.{_QUOTE_LEVEL}!{cleaned_token}"
 
@@ -319,6 +327,16 @@ class MarketDataWorker:
     def _to_subscription(self, item: dict[str, Any]) -> Subscription | None:
         exchange_code = str(item.get("exchange_code") or item.get("exchange") or "").strip().upper()
         token = str(item.get("token") or "").strip()
+        if not _is_numeric_token(token):
+            logger.warning(
+                "market-data subscribe skipped: non-numeric token "
+                "symbol=%s exchange=%s product_type=%s token=%s reason=non_numeric_token",
+                item.get("display_symbol") or item.get("symbol") or "?",
+                exchange_code,
+                item.get("product_type") or "?",
+                token,
+            )
+            return None
         stock_token = build_stock_token(exchange_code, token)
         if stock_token is None:
             return None

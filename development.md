@@ -2464,3 +2464,28 @@ Websocket:
 - Polished dark scrollbar: reduced thumb width to 5px, lowered thumb opacity, added global `.dark` scrollbar rules so modal and page scrollbars are thin/dark without requiring `.scrollbar-thin` class
 - Files changed: `frontend/src/index.css`
 - Build: passed
+
+### 2026-06-20 — Decimal strike + non-numeric websocket token hardening
+
+#### Root cause 1: Decimal strike crash in instrument search diversity
+- `instrument_search_service.py:263` used `int(item[0].strike_price or 0)` which crashed with `ValueError` on decimal strings like `"292.5"`.
+- Stock options for lower-priced stocks have fractional strikes (e.g. 292.5, 182.5, 97.5).
+- **Fix**: Added `_parse_strike()` helper using `Decimal` (consistent with existing `normalize_display_strike()`). Replaced the `int()` list comprehension with a safe loop that skips unparseable strikes.
+- **Files**: `backend/app/services/instrument_search_service.py`
+
+#### Root cause 2: Non-numeric websocket token subscription
+- `build_stock_token()` in `market_data_worker.py` did not validate token numeric-ness. If DB `Instrument.token` contained a broker symbol name (e.g. `"NIFTY 50"`) instead of a numeric Breeze token, the resulting `stock_token` was `"4.1!NIFTY 50"` — an invalid Breeze subscription key.
+- Railway log showed: `market-data feed subscribe skipped: breeze not connected for 4.1!NIFTY 50`
+- **Fix**: Added `_is_numeric_token()` module-level guard. Used in `_to_subscription()` to reject non-numeric tokens with structured log warning before any subscription is created. Also added to `build_stock_token()` as defense-in-depth.
+- **Files**: `backend/app/services/market_data_worker.py`
+
+#### Tests added
+- `test_dashboard_contract.py`: 5 new tests — decimal strike does not crash, decimal strike included in results, display_strike shows raw decimal value, bad strike value does not crash, mixed integer and decimal strikes work.
+- `test_market_data_worker.py`: 7 new tests — `_is_numeric_token` rejects text inputs, `_is_numeric_token` accepts digits, `build_stock_token` rejects non-numeric tokens, subscribe skips non-numeric token, non-numeric token does not crash, numeric token still works alongside non-numeric skip.
+
+#### Verification
+- `python -m pytest` → 167 passed (12 new)
+- `npm.cmd run build` → 1861 modules, clean
+
+#### Remaining risk
+- If DB has bad token rows for instruments, they will now be skipped with a structured log warning instead of silently subscribing with an invalid stock_token. This is correct — a DB data quality issue should be diagnosed and fixed at the source, not silently passed through to Breeze.

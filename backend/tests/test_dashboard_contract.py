@@ -967,6 +967,147 @@ def test_search_options_near_atm_before_deep_strikes(tmp_path):
             assert strike_abs >= central - 500000, f"Deep ITM/OTM before central: {r}"
 
 
+def test_search_decimal_strike_does_not_crash(tmp_path):
+    """Option row with fractional strike like 292.5 must not crash _apply_option_diversity."""
+    database_url = f"sqlite:///{tmp_path / 's_decimal_strike.sqlite'}"
+    _seed_search_test_data(database_url)
+    session_factory = create_session_factory(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    with session_factory() as session:
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="SBIN",
+            contract_code=f"SBIN~CE~{future_expiry.isoformat()}~29250",
+            display_symbol="SBIN", name="SBIN 292.5 CE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80001", lot_size=3000, tick_size="0.05",
+            expiry_date=future_expiry, option_right="call", strike_price="292.5",
+            source="security_master", is_active=True,
+        ))
+        session.commit()
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=SBIN&tab=fno")
+    assert response.status_code == 200, f"Decimal strike caused 500: {response.get_json()}"
+
+
+def test_search_decimal_strike_included_in_results(tmp_path):
+    """Decimal strike option row must appear in search results."""
+    database_url = f"sqlite:///{tmp_path / 's_decimal_included.sqlite'}"
+    _seed_search_test_data(database_url)
+    session_factory = create_session_factory(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    with session_factory() as session:
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="SBIN",
+            contract_code=f"SBIN~CE~{future_expiry.isoformat()}~29250",
+            display_symbol="SBIN", name="SBIN 292.5 CE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80002", lot_size=3000, tick_size="0.05",
+            expiry_date=future_expiry, option_right="call", strike_price="292.5",
+            source="security_master", is_active=True,
+        ))
+        session.commit()
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=SBIN&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    strikes = [r["strike_price"] for r in payload["results"] if r["instrument_kind"] == "option"]
+    assert "292.5" in strikes, f"Decimal strike not found in results: {strikes}"
+
+
+def test_search_decimal_strike_display_is_raw(tmp_path):
+    """display_strike must show the real decimal value, not an integer truncation."""
+    database_url = f"sqlite:///{tmp_path / 's_decimal_display.sqlite'}"
+    _seed_search_test_data(database_url)
+    session_factory = create_session_factory(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    with session_factory() as session:
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="SBIN",
+            contract_code=f"SBIN~CE~{future_expiry.isoformat()}~29250",
+            display_symbol="SBIN", name="SBIN 292.5 CE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80003", lot_size=3000, tick_size="0.05",
+            expiry_date=future_expiry, option_right="call", strike_price="292.5",
+            source="security_master", is_active=True,
+        ))
+        session.commit()
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=SBIN&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    for r in payload["results"]:
+        if r["instrument_kind"] == "option" and r["strike_price"] == "292.5":
+            assert r["display_strike"] == "292.5", f"Expected display_strike '292.5', got '{r['display_strike']}'"
+
+
+def test_search_bad_strike_value_does_not_crash(tmp_path):
+    """Option with completely non-numeric strike must not crash."""
+    database_url = f"sqlite:///{tmp_path / 's_bad_strike.sqlite'}"
+    _seed_search_test_data(database_url)
+    session_factory = create_session_factory(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    with session_factory() as session:
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="NIFTY",
+            contract_code=f"NIFTY~CE~{future_expiry.isoformat()}~BAD",
+            display_symbol="NIFTY", name="NIFTY BAD CE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80004", lot_size=50, tick_size="0.05",
+            expiry_date=future_expiry, option_right="call", strike_price="ABC",
+            source="security_master", is_active=True,
+        ))
+        session.commit()
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIFTY&tab=fno")
+    assert response.status_code == 200, f"Bad strike 'ABC' caused 500: {response.get_json()}"
+
+
+def test_search_mixed_integer_and_decimal_strikes_works(tmp_path):
+    """Search with a mix of integer and decimal strike options must not crash
+    and must return results from both strike types."""
+    database_url = f"sqlite:///{tmp_path / 's_mixed_strikes.sqlite'}"
+    _seed_search_test_data(database_url)
+    session_factory = create_session_factory(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    with session_factory() as session:
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="SBIN",
+            contract_code=f"SBIN~CE~{future_expiry.isoformat()}~30000",
+            display_symbol="SBIN", name="SBIN 300 CE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80005", lot_size=3000, tick_size="0.05",
+            expiry_date=future_expiry, option_right="call", strike_price="30000",
+            source="security_master", is_active=True,
+        ))
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="SBIN",
+            contract_code=f"SBIN~PE~{future_expiry.isoformat()}~29250",
+            display_symbol="SBIN", name="SBIN 292.5 PE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80006", lot_size=3000, tick_size="0.05",
+            expiry_date=future_expiry, option_right="put", strike_price="292.5",
+            source="security_master", is_active=True,
+        ))
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="SBIN",
+            contract_code=f"SBIN~CE~{future_expiry.isoformat()}~28000",
+            display_symbol="SBIN", name="SBIN 280 CE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80007", lot_size=3000, tick_size="0.05",
+            expiry_date=future_expiry, option_right="call", strike_price="28000",
+            source="security_master", is_active=True,
+        ))
+        session.commit()
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=SBIN&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    strikes = [r["strike_price"] for r in payload["results"] if r["instrument_kind"] == "option"]
+    assert "292.5" in strikes, f"Decimal strike missing in mixed results: {strikes}"
+    assert "30000" in strikes, f"Integer strike missing in mixed results: {strikes}"
+    assert "28000" in strikes, f"Integer strike missing in mixed results: {strikes}"
+
+
 def test_search_explicit_strike_allowed(tmp_path):
     database_url = f"sqlite:///{tmp_path / 's11.sqlite'}"
     _seed_search_test_data(database_url)

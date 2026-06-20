@@ -48,6 +48,23 @@ def normalize_display_strike(raw_strike: Any) -> Decimal | None:
     return val
 
 
+def _parse_strike(value: object) -> Decimal | None:
+    """Safely parse a strike price value to Decimal for comparison/sorting.
+
+    Returns None for any unparseable input (None, empty, non-numeric) so callers
+    never raise on fractional strikes like "292.5" or garbage text.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except (InvalidOperation, ValueError):
+        return None
+
+
 def classify_instrument(exchange_code: str, product_type: str | None, option_right: str | None, expiry_date: date | None) -> str:
     exchange = (exchange_code or "").strip().upper()
     product = (product_type or "").strip().lower()
@@ -260,7 +277,11 @@ class InstrumentSearchService:
 
             for exp_key in sorted_expiries[:2]:
                 group = expiry_groups[exp_key]
-                strikes_with_kind = [(item, abs(int(item[0].strike_price or 0))) for item in group]
+                strikes_with_kind: list[tuple[tuple[Instrument, str], Decimal]] = []
+                for item in group:
+                    parsed = _parse_strike(item[0].strike_price)
+                    if parsed is not None:
+                        strikes_with_kind.append((item, abs(parsed)))
                 strikes_with_kind.sort(key=lambda x: x[1])
                 central_idx = len(strikes_with_kind) // 2
                 start = max(0, central_idx - 2)

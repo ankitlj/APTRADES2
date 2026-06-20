@@ -1081,3 +1081,12 @@ See `development.md` for 13-step post-deploy checklist.
 - Dark scrollbar: reduced thumb width to 5px, lowered opacity, added global `.dark` scrollbar rules without requiring `.scrollbar-thin` class
 - Files: `frontend/src/index.css`
 - Build: passed
+
+## 2026-06-20 — Decimal strike + non-numeric websocket token hardening
+
+- **Root 1**: `int(strike_price)` crashed on decimal strings like `"292.5"` in `_apply_option_diversity()`. Fixed with `_parse_strike()` using Decimal, skips unparseable strikes.
+- **Root 2**: `build_stock_token()` accepted non-numeric tokens (e.g. `"NIFTY 50"`), producing invalid `4.1!NIFTY 50` for Breeze websocket. Fixed with `_is_numeric_token()` guard in `_to_subscription()` and `build_stock_token()`.
+- **Files**: `backend/app/services/instrument_search_service.py`, `backend/app/services/market_data_worker.py`
+- **Tests**: +12 new tests (5 decimal strike, 7 token guard)
+- **Verification**: 167 pytest passed, frontend build 1861 modules clean
+- **Risk**: Bad DB token rows now skipped with structured log warnings instead of silently passed to Breeze

@@ -3,6 +3,7 @@ from unittest.mock import patch
 from app.services.market_data_worker import (
     STATE_OFFLINE,
     MarketDataWorker,
+    _is_numeric_token,
     build_stock_token,
 )
 
@@ -57,6 +58,30 @@ def test_build_stock_token_rejects_unknown_exchange_or_missing_token() -> None:
     assert build_stock_token("", "123") is None
 
 
+def test_build_stock_token_rejects_non_numeric_token() -> None:
+    """A non-numeric token must not produce a stock_token for Breeze websocket."""
+    assert build_stock_token("NSE", "NIFTY 50") is None
+    assert build_stock_token("NFO", "BANK NIFTY") is None
+    assert build_stock_token("NSE", "RELIND") is None
+    assert build_stock_token("NFO", "4.1!62329") is None  # already-formatted is not digits-only
+
+
+def test_numeric_token_guard_rejects_expected_inputs() -> None:
+    assert _is_numeric_token("NIFTY 50") is False
+    assert _is_numeric_token("BANK NIFTY") is False
+    assert _is_numeric_token("RELIND") is False
+    assert _is_numeric_token("") is False
+    assert _is_numeric_token(None) is False
+    assert _is_numeric_token("4.1!62329") is False
+
+
+def test_numeric_token_guard_accepts_valid_inputs() -> None:
+    assert _is_numeric_token("2885") is True
+    assert _is_numeric_token("62329") is True
+    assert _is_numeric_token("0") is True
+    assert _is_numeric_token("999999") is True
+
+
 def test_not_configured_worker_stays_offline() -> None:
     worker = MarketDataWorker(app_key=None, secret_key=None, session_token=None)
     assert worker.is_configured() is False
@@ -103,6 +128,80 @@ def test_subscribe_skips_rows_without_token() -> None:
     assert result["accepted"] == []
     assert result["skipped"][0]["symbol"] == "NIFTY"
     assert breeze.subscribed == []
+
+
+def test_subscribe_skips_non_numeric_token() -> None:
+    """A subscription request with a non-numeric token must be skipped."""
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+
+    result = worker.subscribe(
+        [
+            {
+                "display_symbol": "NIFTY",
+                "broker_symbol": "NIFTY",
+                "exchange_code": "NSE",
+                "product_type": "cash",
+                "token": "NIFTY 50",
+            }
+        ]
+    )
+
+    assert result["accepted"] == []
+    assert len(result["skipped"]) == 1
+    assert result["skipped"][0]["symbol"] == "NIFTY"
+    assert breeze.subscribed == [], "Non-numeric token must not reach Breeze"
+
+
+def test_subscribe_non_numeric_token_does_not_crash() -> None:
+    """Rejecting a non-numeric token must not raise."""
+    worker = _configured_worker()
+    result = worker.subscribe(
+        [
+            {
+                "display_symbol": "BANKNIFTY",
+                "broker_symbol": "CNXBAN",
+                "exchange_code": "NSE",
+                "product_type": "cash",
+                "token": "BANK NIFTY",
+            }
+        ]
+    )
+    assert result["accepted"] == []
+    assert len(result["skipped"]) == 1
+
+
+def test_subscribe_numeric_token_still_works_after_non_numeric_skipped() -> None:
+    """A numeric token in the same batch as a non-numeric token must still be
+    subscribed successfully."""
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+
+    result = worker.subscribe(
+        [
+            {
+                "display_symbol": "BANKNIFTY",
+                "broker_symbol": "CNXBAN",
+                "exchange_code": "NSE",
+                "product_type": "cash",
+                "token": "BANK NIFTY",
+            },
+            {
+                "display_symbol": "NIFTY",
+                "broker_symbol": "NIFTY",
+                "exchange_code": "NSE",
+                "product_type": "cash",
+                "token": "2885",
+            },
+        ]
+    )
+
+    assert len(result["accepted"]) == 1
+    assert len(result["skipped"]) == 1
+    assert "4.1!2885" in breeze.subscribed
+    assert "4.1!BANK NIFTY" not in breeze.subscribed
 
 
 def test_on_ticks_normalizes_maps_symbol_and_publishes() -> None:
