@@ -231,7 +231,34 @@ export function DashboardOptionOrderBook() {
     startPreviewInterval,
   ]);
 
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setValidationError(null);
+  }, [confirmPrice, confirmQty, confirmAction]);
+
+  const validateOrder = useCallback((): string | null => {
+    if (!confirmPrice || parseFloat(confirmPrice) <= 0) {
+      return "Price must be greater than 0";
+    }
+    if (!confirmQty || confirmQty < 1) {
+      return "Quantity must be at least 1";
+    }
+    if (selectedInstrument?.lot_size && confirmQty * selectedInstrument.lot_size > 999999) {
+      return "Total quantity exceeds maximum allowed";
+    }
+    return null;
+  }, [confirmPrice, confirmQty, selectedInstrument]);
+
   const handlePlaceOrder = useCallback(() => {
+    setValidationError(null);
+
+    const error = validateOrder();
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+
     if (!selectedInstrument || !confirmAction) return;
 
     setPlaceState({ status: "placing" });
@@ -259,7 +286,7 @@ export function DashboardOptionOrderBook() {
     }).catch((err: Error) => {
       setPlaceState({ status: "error", error: err.message });
     });
-  }, [selectedInstrument, confirmAction, confirmQty, confirmPrice]);
+  }, [selectedInstrument, confirmAction, confirmQty, confirmPrice, validateOrder]);
 
   const orderbookData = orderbook.status === "ok" ? orderbook.data : null;
   const liveTick = useLiveQuote(orderbookData?.instrument?.display_symbol ?? null);
@@ -705,6 +732,13 @@ export function DashboardOptionOrderBook() {
             )}
           </div>
 
+          {/* Validation error */}
+          {validationError && (
+            <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-400">
+              {validationError}
+            </div>
+          )}
+
           {/* Place order error/success */}
           {placeState.status === "error" && (
             <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400">
@@ -733,9 +767,7 @@ export function DashboardOptionOrderBook() {
               }`}
               disabled={
                 placeState.status === "placing" ||
-                placeState.status === "ok" ||
-                !confirmPrice ||
-                parseFloat(confirmPrice) <= 0
+                placeState.status === "ok"
               }
               onClick={handlePlaceOrder}
               aria-label={`Place ${confirmAction} order`}
