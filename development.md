@@ -2519,3 +2519,26 @@ Websocket:
 - **Remaining risks**:
   - Option-contract websocket ticks depend on Breeze streaming market data during market hours — the pre-resolved token path is structurally correct but unproven with live Breeze ticks.
   - TradebookPage subscribes by symbol/exchange/product_type (no tokens) — if Breeze requires exact token for some symbols, trades may not get live LTP. Acceptable for MVP scope.
+
+## 2026-06-21 — Phase 1: Global/Dashboard copy cleanup
+
+#### Root cause
+- Footer strip displayed `TRACK | TRADE | TRIUMPH - ORIENS Trading Dashboard` text, which is redundant branding copy.
+- Dashboard orderbook empty state showed `Search and select an instrument to view the order book` helper text that adds no value once users are familiar with the UI.
+
+#### Fix (frontend-only)
+- `frontend/src/components/layout/Footer.tsx` — removed the text content from the footer strip; kept the footer container with `px-4 py-4` spacer so layout height is preserved.
+- `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` — removed the `!hasSelection` empty-state block that displayed the helper text. The search button placeholder (`Search instrument...`) already serves as the prompt.
+
+#### Verification
+- `npm run build` → 1861 modules, 508.74 kB JS, clean build.
+- Footer strip renders as an empty bar (border + minimal height).
+- Orderbook card no longer shows the helper text when no instrument is selected.
+- No backend changes. No console errors expected.
+
+#### Files changed
+- `frontend/src/components/layout/Footer.tsx`
+- `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
+
+#### Remaining risks
+- The orderbook empty state now shows `No instrument selected` in the table body (line 330) and the search placeholder `Search instrument...` — both are sufficient prompts. No functionality loss.

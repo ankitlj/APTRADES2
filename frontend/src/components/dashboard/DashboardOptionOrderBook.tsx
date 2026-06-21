@@ -260,12 +260,6 @@ export function DashboardOptionOrderBook() {
           </div>
         )}
 
-        {!hasSelection && (
-          <div className="flex min-h-[36px] items-center justify-center rounded-md border border-dashed bg-muted/10 px-3 text-xs text-muted-foreground/60">
-            Search and select an instrument to view the order book
-          </div>
-        )}
-
         {orderbook.status === "error" && (
           <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400">
             {orderbook.message}
