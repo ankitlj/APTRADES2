@@ -236,8 +236,10 @@ export function DashboardPage() {
             key={metric?.key ?? `loading-${index}`}
             label={metric?.label ?? "Loading"}
             value={metric ? metricValue(metric) : "..."}
-            meta={metric?.submetrics?.length ? submetricsNode(metric.submetrics) : (metric?.meta ?? undefined)}
-            tone={metric?.tone === "positive" ? "positive" : metric?.tone === "negative" ? "negative" : metric?.tone === "warning" ? "warning" : "neutral"}
+            meta={metric?.key === "margin_used" && metric ? (
+              <span className="tabular-nums">Total Margin: {formatCurrency(metric.value)}</span>
+            ) : metric?.submetrics?.length ? submetricsNode(metric.submetrics) : (metric?.meta ?? undefined)}
+            tone={metric?.key === "margin_used" ? "neutral" : metric?.tone === "positive" ? "positive" : metric?.tone === "negative" ? "negative" : metric?.tone === "warning" ? "warning" : "neutral"}
             loading={summaryState.loading}
             error={summaryState.error && !metric ? summaryState.error : null}
           />
@@ -245,7 +247,7 @@ export function DashboardPage() {
       </div>
 
       <Card className="min-h-[306px] overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-3">
+        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-2">
           <CardTitle className="text-sm">Active Positions</CardTitle>
           <Badge variant="secondary">{positions.length}</Badge>
         </CardHeader>
@@ -256,7 +258,7 @@ export function DashboardPage() {
         <DashboardOptionOrderBook />
 
         <Card>
-          <CardHeader className="flex-row items-center justify-between border-b px-4 py-3">
+          <CardHeader className="flex-row items-center justify-between border-b px-4 py-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Bell className="h-4 w-4" />
               Alerts

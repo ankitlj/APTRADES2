@@ -131,16 +131,12 @@ export function DashboardOptionOrderBook() {
   const orderbookData = orderbook.status === "ok" ? orderbook.data : null;
   const liveTick = useLiveQuote(orderbookData?.instrument?.display_symbol ?? null);
   const hasSelection = Boolean(selectedInstrument);
-  const isLive = orderbook.status === "ok" && orderbookData?.status === "ok";
 
   const effectiveLtp = liveTick?.ltp ?? orderbookData?.ltp ?? null;
   const effectiveBidPrice = liveTick?.bid_price ?? orderbookData?.bid_price ?? null;
   const effectiveAskPrice = liveTick?.ask_price ?? orderbookData?.ask_price ?? null;
   const effectiveBidQty = liveTick?.bid_qty ?? orderbookData?.bid_qty ?? null;
   const effectiveAskQty = liveTick?.ask_qty ?? orderbookData?.ask_qty ?? null;
-  const effectiveTotalBuyQty = liveTick?.total_buy_qty ?? orderbookData?.total_buy_qty ?? 0;
-  const effectiveTotalSellQty = liveTick?.total_sell_qty ?? orderbookData?.total_sell_qty ?? 0;
-
   const statusBadge = () => {
     if (orderbook.status === "loading") {
       return (
@@ -185,7 +181,7 @@ export function DashboardOptionOrderBook() {
   return (
     <>
     <Card className="overflow-hidden">
-      <CardHeader className="min-h-14 gap-3 border-b px-4 py-3 md:flex-row md:items-center md:justify-between">
+      <CardHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-2">
         <CardTitle className="text-sm">Order Book</CardTitle>
         <div className="flex items-center gap-2">
           {hasSelection && (
@@ -331,40 +327,6 @@ export function DashboardOptionOrderBook() {
           {hasSelection && (
             <p className="mt-1 text-[10px] text-muted-foreground/40">
               Full market depth is unavailable from Breeze. Only the best bid/ask is shown.
-            </p>
-          )}
-        </div>
-
-        <div className="rounded-md border bg-muted/10 p-3">
-          <p className="mb-2 text-[10px] font-medium text-muted-foreground">Market Depth</p>
-          {orderbookData && orderbookData.status === "ok" ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-green-600 dark:text-green-400">Buy {orderbookData.buy_percent}%</span>
-                <span className="text-red-500">Sell {orderbookData.sell_percent}%</span>
-              </div>
-              <div className="flex h-2 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-green-500"
-                  style={{ width: `${orderbookData.buy_percent}%` }}
-                />
-                <div
-                  className="h-full rounded-full bg-red-500"
-                  style={{ width: `${orderbookData.sell_percent}%` }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>Buy: {formatNumber(effectiveTotalBuyQty, 0)}</span>
-                <span>Sell: {formatNumber(effectiveTotalSellQty, 0)}</span>
-              </div>
-            </div>
-          ) : orderbook.status === "loading" ? (
-            <p className="text-[10px] text-muted-foreground/50">Loading depth data...</p>
-          ) : orderbook.status === "error" ? (
-            <p className="text-[10px] text-muted-foreground/50">Failed to load depth data</p>
-          ) : (
-            <p className="text-[10px] text-muted-foreground/50">
-              Depth data will appear when an instrument is selected
             </p>
           )}
         </div>

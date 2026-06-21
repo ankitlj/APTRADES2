@@ -2608,3 +2608,37 @@ Websocket:
 #### Remaining risks
 - ToolsPage `subtitle` field in the `Tool` interface is now only used for the Option Greeks `"Coming soon"` text. No functionality loss.
 - The `Badge` component import was restored in ToolsPage for the conditional Option Greeks badge. No unused import.
+
+## 2026-06-21 — Phase 1: Dashboard card/table header compaction
+
+#### Root cause
+- Active Positions count badge was already on the same row as the title, but card header padding (`py-3`) wasted vertical space that could be used by the table body.
+- Order Book panel used `md:flex-row` (column on mobile) so the status badge stacked below the title on small screens; the Market Depth section (buy/sell percentage bar + helper text) consumed unnecessary panel space.
+- Alerts panel count badge was already on the same row, but header padding was identical to the other panels.
+- Margin Used value rendered in amber (`tone: "warning"`) while all other cards use white; no secondary metric line existed.
+
+#### Fix (frontend-only)
+- `DashboardPage.tsx`:
+  - Reduced `py-3` to `py-2` on Active Positions and Alerts CardHeaders — reclaims ~8px vertical space each.
+  - Overrode `tone` to `"neutral"` for the `margin_used` metric so its value renders white instead of amber.
+  - Injected a `Total Margin: {formatCurrency(metric.value)}` secondary line in the `meta` slot for the margin card, matching the submetric pattern of other cards.
+- `DashboardOptionOrderBook.tsx`:
+  - Removed `md:` prefix from CardHeader so title and status badge are always on the same row (flex-row at all breakpoints).
+  - Removed the entire `Market Depth` section (buy/sell percentage bar + helper texts + loading/error/empty states).
+  - Removed now-unused `effectiveTotalBuyQty`, `effectiveTotalSellQty`, and `isLive` variables.
+
+#### Verification
+- `npm run build` → 1861 modules, 505.30 kB JS, clean build.
+- Active Positions: badge inline with title, header padding reduced.
+- Order Book: status badge always inline with title, Market Depth section removed, remaining content flows cleanly (search → info bar → bid/ask table → buy/sell buttons).
+- Alerts: badge inline with title, header padding reduced.
+- Margin Used: value renders white, shows `Total Margin: ₹0.00` secondary line matching other cards' submetric style.
+- No backend changes. No console errors expected.
+
+#### Files changed
+- `frontend/src/pages/DashboardPage.tsx`
+- `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
+
+#### Remaining risks
+- `Total Margin` value is currently the same as `Margin Used` (both 0.0) because the backend does not expose a separate total-margin metric. The label is named clearly so users understand it shows the total margin figure. When backend adds a real total-margin field, this frontend injection should be replaced with the actual submetric.
+- The order book footnote (`Full market depth is unavailable from Breeze...`) remains visible below the bid/ask table — it still applies to the top-of-book limitation.
