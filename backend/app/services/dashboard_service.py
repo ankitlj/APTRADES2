@@ -754,7 +754,8 @@ class DashboardService:
             return {"status": "error", "error": f"Failed to resolve instrument: {error}"}
 
         lot_size = resolved.lot_size or 1
-        quantity = max(1, int(float(quantity_str)))
+        quantity_lots = max(1, int(float(quantity_str)))
+        quantity = quantity_lots * lot_size
         price = float(price_str) if price_str else 0.0
 
         breeze_product = product_type
@@ -792,15 +793,17 @@ class DashboardService:
                     "open_quantity": "0",
                 }
                 calc_resp = self.gateway.get_margin_calculator([calc_position], exchange_code)
+                span_margin = self._to_float(calc_resp.get("span_margin_required"))
+                non_span_margin = self._to_float(calc_resp.get("non_span_margin_required"))
                 margin_result = {
                     "margin_status": "ok",
-                    "span_margin": self._to_float(calc_resp.get("span_margin_required")),
-                    "non_span_margin": self._to_float(calc_resp.get("non_span_margin_required")),
+                    "span_margin": span_margin,
+                    "non_span_margin": non_span_margin,
                     "order_value": self._to_float(calc_resp.get("order_value")),
                     "order_margin": self._to_float(calc_resp.get("order_margin")),
                     "trade_margin": self._to_float(calc_resp.get("trade_margin")),
                     "block_trade_margin": self._to_float(calc_resp.get("block_trade_margin")),
-                    "total_margin": self._to_float(calc_resp.get("span_margin_required")),
+                    "total_margin": (span_margin or 0) + (non_span_margin or 0),
                 }
             except Exception as error:
                 margin_result = {"margin_status": "error", "error": str(error)}
@@ -889,13 +892,17 @@ class DashboardService:
         except Exception as error:
             raise DashboardServiceError(f"Failed to resolve instrument: {error}")
 
+        lot_size = resolved.lot_size or 1
+        quantity_lots = max(1, int(float(quantity)))
+        quantity_actual = quantity_lots * lot_size
+
         breeze_payload: dict[str, str] = {
             "stock_code": resolved.broker_symbol,
             "exchange_code": resolved.exchange_code,
             "product": product_type,
             "action": action,
             "order_type": order_type,
-            "quantity": str(quantity),
+            "quantity": str(quantity_actual),
             "price": str(price),
             "validity": validity,
             "stoploss": "",
