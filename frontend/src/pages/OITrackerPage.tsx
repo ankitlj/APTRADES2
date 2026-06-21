@@ -165,9 +165,7 @@ export function OITrackerPage() {
   return (
     <PageLayout>
       <PageHeader
-        kicker="Open interest"
         title="OI Tracker"
-        description="Strikes ranked by total OI. Highest CE OI = resistance. Highest PE OI = support."
         actions={
           <Badge variant={connectionState === "live" ? "default" : "secondary"}>
             {liveBadgeLabel(connectionState)}

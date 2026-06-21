@@ -18,7 +18,7 @@ interface Tool {
 const tools: Tool[] = [
   {
     title: "Strategy Builder",
-    subtitle: "Phase 14 live",
+    subtitle: "",
     description: "Build multi-leg option structures, preview payoff diagrams, and save to your portfolio.",
     status: "next",
     href: "/strategy-builder",
@@ -26,7 +26,7 @@ const tools: Tool[] = [
   },
   {
     title: "Strategy Portfolio",
-    subtitle: "Phase 14 live",
+    subtitle: "",
     description: "View saved strategies with on-demand payoff calculation, metrics, and delete controls.",
     status: "next",
     href: "/strategy-portfolio",
@@ -34,7 +34,7 @@ const tools: Tool[] = [
   },
   {
     title: "Option Chain",
-    subtitle: "Phase 11 live",
+    subtitle: "",
     description: "Open the first live option-chain tool with expiry control, ATM context, and normalized CE/PE rows.",
     status: "next",
     href: "/optionchain",
@@ -42,7 +42,7 @@ const tools: Tool[] = [
   },
   {
     title: "Option Greeks",
-    subtitle: "Manual calc later",
+    subtitle: "Coming soon",
     description: "Reserved in the MVP grid, but real Greeks logic stays deferred until an explicit calculation phase.",
     status: "deferred",
     href: null,
@@ -50,7 +50,7 @@ const tools: Tool[] = [
   },
   {
     title: "OI Tracker",
-    subtitle: "Phase 13 live",
+    subtitle: "",
     description: "Strikes ranked by total OI. Spot resistance at max CE OI strike, support at max PE OI strike.",
     status: "next",
     href: "/oi-tracker",
@@ -58,7 +58,7 @@ const tools: Tool[] = [
   },
   {
     title: "OI Profile",
-    subtitle: "Phase 13 live",
+    subtitle: "",
     description: "Full OI distribution across all strikes sorted by price with proportional CE/PE bars.",
     status: "next",
     href: "/oi-profile",
@@ -69,12 +69,7 @@ const tools: Tool[] = [
 export function ToolsPage() {
   return (
     <PageLayout>
-      <PageHeader
-        kicker="Reduced tools scope"
-        title="Tools"
-        description="Only the six approved ORIENS tools remain visible in the MVP flow."
-        actions={<Badge variant="secondary">6 visible</Badge>}
-      />
+      <PageHeader title="Tools" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {tools.map((tool) => {
@@ -87,9 +82,11 @@ export function ToolsPage() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 dark:shadow-[0_0_14px_-3px_rgba(0,242,255,0.6)]">
                     <Icon className="glow-icon h-5 w-5" aria-hidden="true" />
                   </div>
-                  <Badge variant={tool.status === "next" ? "default" : "secondary"}>
-                    {tool.subtitle}
-                  </Badge>
+                  {tool.subtitle && (
+                    <Badge variant={tool.status === "next" ? "default" : "secondary"}>
+                      {tool.subtitle}
+                    </Badge>
+                  )}
                 </div>
                 <div className="relative">
                   <p className="font-semibold">{tool.title}</p>
@@ -109,10 +106,6 @@ export function ToolsPage() {
         })}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Removed from the visible MVP tools flow: Max Pain, Straddle Chart, Straddle P&amp;L, Vol
-        Surface, GEX, and IV Smile.
-      </p>
     </PageLayout>
   );
 }

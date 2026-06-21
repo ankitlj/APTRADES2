@@ -122,9 +122,7 @@ export function StrategyPortfolioPage() {
   return (
     <PageLayout>
       <PageHeader
-        kicker="Strategy tools"
         title="Strategy Portfolio"
-        description="Saved option strategies. View on-demand payoff diagrams or delete positions."
         actions={
           <Button variant="outline" size="sm" onClick={loadStrategies} disabled={state.loading}>
             {state.loading ? "Loading..." : "Refresh"}

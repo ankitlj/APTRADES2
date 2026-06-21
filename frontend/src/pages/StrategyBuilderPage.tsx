@@ -196,9 +196,7 @@ export function StrategyBuilderPage() {
   return (
     <PageLayout>
       <PageHeader
-        kicker="Strategy tools"
         title="Strategy Builder"
-        description="Compose multi-leg option structures, preview the payoff diagram, and save to your portfolio."
         actions={
           <Badge variant={connectionState === "live" ? "default" : "secondary"}>
             {liveBadgeLabel(connectionState)}

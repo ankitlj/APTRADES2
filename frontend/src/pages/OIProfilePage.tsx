@@ -168,9 +168,7 @@ export function OIProfilePage() {
   return (
     <PageLayout>
       <PageHeader
-        kicker="Open interest"
         title="OI Profile"
-        description="OI distribution across all strikes sorted by price. ATM strike highlighted. CE left, PE right."
         actions={
           <Badge variant={connectionState === "live" ? "default" : "secondary"}>
             {liveBadgeLabel(connectionState)}

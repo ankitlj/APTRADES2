@@ -2574,3 +2574,37 @@ Websocket:
 #### Remaining risks
 - PositionsPage `isLive` variable (line 157) is still computed but only used by the `quoteMessage` string. The websocket status is still shown in the quote message below filters. No loss of status visibility.
 - The `Badge` component is still used elsewhere; removal from PositionsPage import is safe.
+
+## 2026-06-21 — Phase 3: Tools + Strategy/OI/Option copy cleanup
+
+#### Root cause
+- ToolsPage had a `REDUCED TOOLS SCOPE` banner, a `6 visible` count badge, per-card `Phase X live` badges, and a footer paragraph listing removed tools — all redundant once the user is familiar with the tool suite.
+- StrategyBuilderPage, StrategyPortfolioPage, OptionChainPage, OITrackerPage, OIProfilePage each had redundant kicker labels (`STRATEGY TOOLS`, `OPTIONS DATA`, `OPEN INTEREST`) and descriptive subtitle text.
+
+#### Fix (frontend-only)
+- `ToolsPage.tsx`:
+  - Removed `kicker="Reduced tools scope"`, `description`, and `actions` (6 visible badge) from `PageHeader`.
+  - Cleared all per-card `subtitle` phase badges (Phase 14 live, Phase 11 live, Phase 13 live) to empty string.
+  - Changed Option Greeks `subtitle` from `"Manual calc later"` to `"Coming soon"`.
+  - Badge rendering conditionally shows only when `subtitle` is non-empty (only Option Greeks shows "Coming soon").
+  - Removed footer paragraph listing removed tools.
+- Removed `kicker` and `description` props from `PageHeader` on all 5 pages: StrategyBuilderPage, StrategyPortfolioPage, OptionChainPage, OITrackerPage, OIProfilePage.
+
+#### Verification
+- `npm run build` → 1861 modules, 506.62 kB JS, clean build.
+- ToolsPage renders with clean `"Tools"` header only; no banner, no count badge, no footer paragraph.
+- Tool cards no longer show Phase badges; Option Greeks shows `"Coming soon"` badge.
+- All 5 tool pages render with clean title-only headers.
+- No backend changes. No console errors expected.
+
+#### Files changed
+- `frontend/src/pages/ToolsPage.tsx`
+- `frontend/src/pages/StrategyBuilderPage.tsx`
+- `frontend/src/pages/StrategyPortfolioPage.tsx`
+- `frontend/src/pages/OptionChainPage.tsx`
+- `frontend/src/pages/OITrackerPage.tsx`
+- `frontend/src/pages/OIProfilePage.tsx`
+
+#### Remaining risks
+- ToolsPage `subtitle` field in the `Tool` interface is now only used for the Option Greeks `"Coming soon"` text. No functionality loss.
+- The `Badge` component import was restored in ToolsPage for the conditional Option Greeks badge. No unused import.

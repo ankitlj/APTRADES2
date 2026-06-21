@@ -165,9 +165,7 @@ export function OptionChainPage() {
   return (
     <PageLayout>
       <PageHeader
-        kicker="Options data"
         title="Option Chain"
-        description="Live Breeze chain normalized into a strike grid with expiry control, ATM context, and real broker errors."
         actions={
           <Badge variant={connectionState === "live" ? "default" : "secondary"}>
             {liveBadgeLabel(connectionState)}
