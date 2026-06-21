@@ -1,11 +1,52 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Phase 2 — NSE-only search scope
-- Last completed phase: Phase 1 — Common-name mapping for derivatives
-- Planned next: Phase 2 — Enforce NSE-only search scope
+- Current phase: Instrument search/mapping fix pass — complete
+- Last completed phase: Phase 4 — Final regression + report
+- Planned next: Deploy to Railway, trigger master-contract import, verify RELIANCE search returns futures/options
+
+### 2026-06-21 — Phase 1: Common-name mapping for derivatives
+- **Goal**: Make searching by common name (e.g., "RELIANCE") return NFO futures and options, not just NSE cash.
+- **Root cause**: Derivatives obtained `display_symbol` from SecurityMaster's `AssetName` field (broker code "RELIND"), not the common name ("RELIANCE"). No aliases were created for derivatives (`_build_payloads` skipped `product_type != "cash"`). So searching "RELIANCE" matched cash at priority 0, but derivatives matched only via `name` at priority 3-5, and 40+ cash results filled the limit before derivatives appeared.
+- **Fix**: Three changes to `_build_payloads` in `master_contract_service.py`:
+  1. Build a `broker_to_common` mapping from NSE equity CSV rows (`SC → NS` columns).
+  2. Override `display_symbol` for derivatives whose current display_symbol equals their broker_code (e.g., `"RELIND"` → `"RELIANCE"`), so they get exact-match priority 0 during search.
+  3. Insert common-name aliases (`"RELIANCE"`) for all derivatives of each mapped broker symbol, so alias-based search finds them too.
+- **Files changed**: `backend/app/services/master_contract_service.py` (lines 381-433 added)
+- **Verification**: `python -m pytest` → 167 passed (all tests), `npm run build` → clean build (1861 modules). No existing tests regressed because test data manually seeds correct display_symbols on derivatives.
+- **Next**: Phase 2.
+
+### 2026-06-21 — Phase 2: NSE-only search scope
+- **Goal**: Exclude BSE, BFO, MCX, and bond instruments from search results.
+- **Root cause**: No exchange-code filter existed in the search query, so searching "RELIANCE" returned both NSE and BSE equity results. BSE/BFO instruments were interleaved with NSE/NFO in the same result set.
+- **Fix**: Added `Instrument.exchange_code.in_(["NSE", "NFO"])` filter to the SQL query in `InstrumentSearchService.search()` — filters out all non-NSE/NFO rows before any Python-side processing.
+- **Files changed**: `backend/app/services/instrument_search_service.py` (1 line added)
+- **Verification**: `python -m pytest` → 167 passed, `npm run build` → clean build. Existing test data only has NSE and NFO instruments, so no tests regressed.
+- **Next**: Phase 3.
 
 ### 2026-06-21 — Phase 3: Search quality hardening
+- **Goal**: Ensure futures and options appear alongside cash in common-name searches, even when many cash results exist.
+- **Changes**:
+  1. Increased result limit from 40 to 60 — gives more room for derivatives.
+  2. Added kind-diversity guarantee: at least 3 futures and 5 options (if available) are always included in results, extracted from the ranked list before the 60-item cap and placed early in the output.
+- **Files changed**: `backend/app/services/instrument_search_service.py` (1 block: diversity logic + limit change)
+- **Verification**: `python -m pytest` → 167 passed, `npm run build` → clean build.
+- **Next**: Phase 4.
+
+### 2026-06-21 — Phase 4: Final regression + report
+- **Changes**: No code changes. Final verification pass.
+- **Verification**: `python -m pytest` → 167 passed, `npm run build` → clean build (1861 modules, 504.74 kB JS).
+- **Summary of all changes in this fix pass**:
+  | Phase | File | Change |
+  |---|---|---|
+  | 1 | `master_contract_service.py` | Common-name mapping for derivatives: override `display_symbol` + create aliases |
+  | 2 | `instrument_search_service.py` | NSE/NFO exchange filter in search SQL query |
+  | 3 | `instrument_search_service.py` | Result limit 40→60 + kind-diversity guarantee (3 futures, 5 options) |
+- **Total lines added**: ~70 across 2 backend files.
+- **No frontend changes** — all changes are backend search/import logic.
+- **Next**: Deploy to Railway, trigger a fresh master-contract import, then verify search returns RELIND futures/options for "RELIANCE" query.
+
+### 2026-06-18 - Step 3: Dashboard chart hover fix
 - **Goal**: Ensure futures and options appear alongside cash in common-name searches, even when many cash results exist.
 - **Changes**:
   1. Increased result limit from 40 to 60 — gives more room for derivatives.
