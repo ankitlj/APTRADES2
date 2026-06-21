@@ -180,8 +180,23 @@ class InstrumentSearchService:
 
         tops = self._apply_option_diversity(ranked, cleaned_query)
 
+        # Ensure kind diversity: guarantee at least 3 futures and 5 options
+        # appear in results when available, even if native rank/kind_order
+        # would push them past the limit.
+        diverse: list[tuple[Instrument, str]] = []
+        held_futures: list[tuple[Instrument, str]] = []
+        held_options: list[tuple[Instrument, str]] = []
+        for item in tops:
+            if item[1] == "future" and len(held_futures) < 3:
+                held_futures.append(item)
+            elif item[1] == "option" and len(held_options) < 5:
+                held_options.append(item)
+            else:
+                diverse.append(item)
+        interleaved = held_futures + held_options + diverse
+
         results = []
-        for r, kind in tops[:40]:
+        for r, kind in interleaved[:60]:
             raw_strike = r.strike_price
             display_strike = normalize_display_strike(raw_strike)
             right_str = None

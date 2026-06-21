@@ -5,6 +5,15 @@
 - Last completed phase: Phase 1 — Common-name mapping for derivatives
 - Planned next: Phase 2 — Enforce NSE-only search scope
 
+### 2026-06-21 — Phase 3: Search quality hardening
+- **Goal**: Ensure futures and options appear alongside cash in common-name searches, even when many cash results exist.
+- **Changes**:
+  1. Increased result limit from 40 to 60 — gives more room for derivatives.
+  2. Added kind-diversity guarantee: at least 3 futures and 5 options (if available) are always included in results, extracted from the ranked list before the 60-item cap and placed early in the output.
+- **Files changed**: `backend/app/services/instrument_search_service.py` (1 block: diversity logic + limit change)
+- **Verification**: `python -m pytest` → 167 passed, `npm run build` → clean build.
+- **Next**: Phase 4 — Final regression + report.
+
 ### 2026-06-21 — Phase 2: NSE-only search scope
 - **Goal**: Exclude BSE, BFO, MCX, and bond instruments from search results.
 - **Root cause**: No exchange-code filter existed in the search query, so searching "RELIANCE" returned both NSE and BSE equity results. BSE/BFO instruments were interleaved with NSE/NFO in the same result set.
