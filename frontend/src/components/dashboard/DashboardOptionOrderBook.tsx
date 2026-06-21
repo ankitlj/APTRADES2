@@ -4,7 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useLiveQuote, useLiveSubscribe } from "@/hooks/useLiveMarketData";
-import { getDashboardOrderbook, type DashboardOrderbookResponse, type InstrumentSearchResult } from "@/lib/api";
+import {
+  getDashboardOrderbook,
+  getOrderPreview,
+  placeOrder,
+  type DashboardOrderbookResponse,
+  type InstrumentSearchResult,
+  type OrderPreviewResponse,
+  type PlaceOrderResponse,
+} from "@/lib/api";
 import type { SubscriptionRequest } from "@/lib/realtime";
 import { formatNumber } from "@/lib/format";
 import { DashboardInstrumentSearch } from "./DashboardInstrumentSearch";
@@ -44,10 +52,24 @@ export function DashboardOptionOrderBook() {
   const [orderbook, setOrderbook] = useState<FetchState<DashboardOrderbookResponse>>({ status: "idle" });
   const [confirmAction, setConfirmAction] = useState<"BUY" | "SELL" | null>(null);
   const [confirmQty, setConfirmQty] = useState(1);
+  const [confirmPrice, setConfirmPrice] = useState("");
+  const [confirmProduct, setConfirmProduct] = useState<"MIS" | "NORMAL">("NORMAL");
+  const [previewState, setPreviewState] = useState<{
+    status: "idle" | "loading" | "refreshing" | "ok" | "error";
+    data?: OrderPreviewResponse;
+    error?: string;
+  }>({ status: "idle" });
+  const [placeState, setPlaceState] = useState<{
+    status: "idle" | "placing" | "ok" | "error";
+    data?: PlaceOrderResponse;
+    error?: string;
+  }>({ status: "idle" });
 
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hasValidDataRef = useRef(false);
+  const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewRequestIdRef = useRef(0);
 
   const cancelPending = useCallback(() => {
     if (abortRef.current) {
@@ -56,11 +78,63 @@ export function DashboardOptionOrderBook() {
     abortRef.current = new AbortController();
   }, []);
 
+  const stopPreviewInterval = useCallback(() => {
+    if (previewIntervalRef.current !== null) {
+      clearInterval(previewIntervalRef.current);
+      previewIntervalRef.current = null;
+    }
+  }, []);
+
+  const startPreviewInterval = useCallback(() => {
+    stopPreviewInterval();
+    previewIntervalRef.current = setInterval(() => {
+      setPreviewState((prev) => {
+        if (prev.status === "ok" || prev.status === "error") {
+          return { ...prev, status: "refreshing" };
+        }
+        return prev;
+      });
+    }, 1000);
+  }, [stopPreviewInterval]);
+
+  const doFetchPreview = useCallback(
+    (action: string, qty: number, price: string, product: string) => {
+      if (!selectedInstrument) return;
+      const reqId = ++previewRequestIdRef.current;
+
+      const productType = selectedInstrument.instrument_kind === "option"
+        ? "options"
+        : selectedInstrument.instrument_kind === "future"
+        ? "futures"
+        : "cash";
+
+      getOrderPreview({
+        broker_symbol: selectedInstrument.broker_symbol,
+        exchange_code: selectedInstrument.exchange_code,
+        product_type: productType,
+        action: action,
+        quantity: qty,
+        price: price ? parseFloat(price) : 0,
+        expiry_date: selectedInstrument.expiry_date,
+        right: selectedInstrument.right,
+        strike_price: selectedInstrument.strike_price,
+      }).then((res) => {
+        if (reqId !== previewRequestIdRef.current) return;
+        setPreviewState({ status: "ok", data: res });
+      }).catch((err: Error) => {
+        if (reqId !== previewRequestIdRef.current) return;
+        setPreviewState((prev) => ({ status: "error", error: err.message, data: prev.data }));
+      });
+    },
+    [selectedInstrument],
+  );
+
   const handleSelect = useCallback((instrument: InstrumentSearchResult) => {
     setSelectedInstrument(instrument);
     setOrderbook({ status: "loading" });
     hasValidDataRef.current = false;
     setConfirmQty(1);
+    setConfirmPrice("");
   }, []);
 
   const handleChange = useCallback(() => {
@@ -70,11 +144,20 @@ export function DashboardOptionOrderBook() {
   const openConfirm = useCallback((action: "BUY" | "SELL") => {
     setConfirmAction(action);
     setConfirmQty(1);
+    setConfirmPrice("");
+    setConfirmProduct("NORMAL");
+    setPreviewState({ status: "loading" });
+    setPlaceState({ status: "idle" });
+    setConfirmQty(1);
   }, []);
 
   const closeConfirm = useCallback(() => {
+    stopPreviewInterval();
+    previewRequestIdRef.current++;
     setConfirmAction(null);
-  }, []);
+    setPreviewState({ status: "idle" });
+    setPlaceState({ status: "idle" });
+  }, [stopPreviewInterval]);
 
   const orderbookSubscriptions: SubscriptionRequest[] = selectedInstrument
     ? [
@@ -127,6 +210,56 @@ export function DashboardOptionOrderBook() {
       clearInterval(intervalId);
     };
   }, [selectedInstrument, cancelPending]);
+
+  useEffect(() => {
+    if (!confirmAction || !selectedInstrument) return;
+
+    if (previewState.status === "loading") {
+      doFetchPreview(confirmAction, confirmQty, confirmPrice, confirmProduct);
+      startPreviewInterval();
+    } else if (previewState.status === "refreshing") {
+      doFetchPreview(confirmAction, confirmQty, confirmPrice, confirmProduct);
+    }
+  }, [
+    confirmAction,
+    confirmQty,
+    confirmPrice,
+    confirmProduct,
+    previewState.status,
+    selectedInstrument,
+    doFetchPreview,
+    startPreviewInterval,
+  ]);
+
+  const handlePlaceOrder = useCallback(() => {
+    if (!selectedInstrument || !confirmAction) return;
+
+    setPlaceState({ status: "placing" });
+
+    const productType = selectedInstrument.instrument_kind === "option"
+      ? "options"
+      : selectedInstrument.instrument_kind === "future"
+      ? "futures"
+      : "cash";
+
+    const price = confirmPrice ? parseFloat(confirmPrice) : 0;
+
+    placeOrder({
+      broker_symbol: selectedInstrument.broker_symbol,
+      exchange_code: selectedInstrument.exchange_code,
+      product_type: productType,
+      action: confirmAction,
+      quantity: confirmQty,
+      price: price,
+      expiry_date: selectedInstrument.expiry_date,
+      right: selectedInstrument.right,
+      strike_price: selectedInstrument.strike_price,
+    }).then((res) => {
+      setPlaceState({ status: "ok", data: res });
+    }).catch((err: Error) => {
+      setPlaceState({ status: "error", error: err.message });
+    });
+  }, [selectedInstrument, confirmAction, confirmQty, confirmPrice]);
 
   const orderbookData = orderbook.status === "ok" ? orderbook.data : null;
   const liveTick = useLiveQuote(orderbookData?.instrument?.display_symbol ?? null);
@@ -360,9 +493,9 @@ export function DashboardOptionOrderBook() {
       onSelect={handleSelect}
     />
 
-    {confirmAction && orderbookData && selectedInstrument && (
+    {confirmAction && selectedInstrument && (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-12"
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
@@ -374,48 +507,73 @@ export function DashboardOptionOrderBook() {
         }}
       >
         <div className="w-full max-w-sm rounded-lg border bg-background p-5 shadow-lg">
-          <h3
-            id="confirm-title"
-            className={`text-sm font-semibold ${
-              confirmAction === "BUY" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-            }`}
-          >
-            Confirm {confirmAction}
-          </h3>
-
-          <div className="mt-3 space-y-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Contract</span>
-              <span className="font-medium text-foreground">
-                {instrumentLabel(selectedInstrument)}
-              </span>
+          <div className="flex items-center justify-between">
+            <h3
+              id="confirm-title"
+              className={`text-sm font-semibold ${
+                confirmAction === "BUY" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+              }`}
+            >
+              {confirmAction}
+            </h3>
+            <div className="flex items-center gap-2">
+              {previewState.status === "loading" && (
+                <span className="text-[10px] text-muted-foreground/60">Loading preview...</span>
+              )}
+              {previewState.status === "refreshing" && (
+                <span className="text-[10px] text-muted-foreground/60">Refreshing...</span>
+              )}
+              <button
+                onClick={closeConfirm}
+                className="text-muted-foreground/50 hover:text-foreground"
+                aria-label="Close"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="2" y1="2" x2="12" y2="12" />
+                  <line x1="12" y1="2" x2="2" y2="12" />
+                </svg>
+              </button>
             </div>
-            <div className="flex justify-between">
+          </div>
+
+          {/* Instrument info */}
+          <div className="mt-3 rounded-md border bg-muted/20 px-3 py-2 text-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-muted-foreground">Contract</span>
+              <span className="font-medium text-foreground">{instrumentLabel(selectedInstrument)}</span>
+            </div>
+            <div className="flex items-center justify-between">
               <span className="text-muted-foreground">LTP</span>
               <span className="font-medium tabular-nums text-foreground">
                 {effectiveLtp != null ? formatNumber(effectiveLtp) : "\u2014"}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Bid / Ask</span>
-              <span className="font-medium tabular-nums text-foreground">
-                {effectiveBidPrice != null ? formatNumber(effectiveBidPrice) : "\u2014"} /{" "}
-                {effectiveAskPrice != null ? formatNumber(effectiveAskPrice) : "\u2014"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Spread</span>
-              <span className="font-medium tabular-nums text-foreground">
-                {effectiveBidPrice != null && effectiveAskPrice != null
-                  ? formatNumber(effectiveAskPrice - effectiveBidPrice)
-                  : "\u2014"}
-              </span>
-            </div>
+          </div>
 
-            <div className="pt-1">
-              <label htmlFor="confirm-qty" className="mb-1 block text-[10px] font-medium text-muted-foreground">
-                Quantity (lots)
-              </label>
+          {/* Price input */}
+          <div className="mt-3">
+            <label htmlFor="confirm-price" className="mb-1 block text-[10px] font-medium text-muted-foreground">
+              Price
+            </label>
+            <Input
+              id="confirm-price"
+              type="number"
+              step="any"
+              min={0}
+              value={confirmPrice}
+              onChange={(e) => setConfirmPrice(e.target.value)}
+              placeholder={effectiveLtp != null ? String(effectiveLtp) : "0"}
+              className="h-8 text-xs tabular-nums"
+              autoFocus
+            />
+          </div>
+
+          {/* Quantity input with lot size info */}
+          <div className="mt-3">
+            <label htmlFor="confirm-qty" className="mb-1 block text-[10px] font-medium text-muted-foreground">
+              Quantity (lots)
+            </label>
+            <div className="flex items-center gap-2">
               <Input
                 id="confirm-qty"
                 type="number"
@@ -423,12 +581,145 @@ export function DashboardOptionOrderBook() {
                 max={9999}
                 value={confirmQty}
                 onChange={(e) => setConfirmQty(Math.max(1, Math.min(9999, Number(e.target.value) || 1)))}
-                className="h-8 text-xs tabular-nums"
-                autoFocus
+                className="h-8 flex-1 text-xs tabular-nums"
               />
+              {selectedInstrument.lot_size && selectedInstrument.lot_size > 1 && (
+                <span className="whitespace-nowrap text-[10px] text-muted-foreground/60">
+                  {selectedInstrument.lot_size} lot{selectedInstrument.lot_size > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
           </div>
 
+          {/* Margin preview section */}
+          <div className="mt-3 rounded-md border px-3 py-2 text-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground">Margin Preview</span>
+              {previewState.status === "ok" && (
+                <span className="text-[9px] text-green-600 dark:text-green-400">Live</span>
+              )}
+              {previewState.status === "error" && (
+                <span className="text-[9px] text-red-500">Error</span>
+              )}
+            </div>
+            {previewState.status === "loading" && (
+              <div className="py-2 text-center text-[10px] text-muted-foreground/50">
+                Loading margin...
+              </div>
+            )}
+            {previewState.status === "ok" && previewState.data && (
+              <>
+                {previewState.data.preview.margin.margin_status === "not_calculated" && (
+                  <div className="text-[10px] text-muted-foreground/60">
+                    Margin not calculated (cash product or zero price).
+                  </div>
+                )}
+                {previewState.data.preview.margin.margin_status === "error" && (
+                  <div className="text-[10px] text-red-500">
+                    {previewState.data.preview.margin.error ?? "Margin calculation failed"}
+                  </div>
+                )}
+                {previewState.data.preview.margin.margin_status === "success" && (
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground/70">Total Margin</span>
+                      <span className="font-medium tabular-nums text-foreground">
+                        {previewState.data.preview.margin.total_margin != null
+                          ? formatNumber(previewState.data.preview.margin.total_margin)
+                          : "\u2014"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground/70">Order Value</span>
+                      <span className="font-medium tabular-nums text-foreground">
+                        {previewState.data.preview.margin.order_value != null
+                          ? formatNumber(previewState.data.preview.margin.order_value)
+                          : "\u2014"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground/70">Span Margin</span>
+                      <span className="font-medium tabular-nums text-foreground">
+                        {previewState.data.preview.margin.span_margin != null
+                          ? formatNumber(previewState.data.preview.margin.span_margin)
+                          : "\u2014"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground/70">Non-Span Margin</span>
+                      <span className="font-medium tabular-nums text-foreground">
+                        {previewState.data.preview.margin.non_span_margin != null
+                          ? formatNumber(previewState.data.preview.margin.non_span_margin)
+                          : "\u2014"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground/70">Trade Margin</span>
+                      <span className="font-medium tabular-nums text-foreground">
+                        {previewState.data.preview.margin.trade_margin != null
+                          ? formatNumber(previewState.data.preview.margin.trade_margin)
+                          : "\u2014"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            {previewState.status === "error" && (
+              <div className="text-[10px] text-red-500">{previewState.error}</div>
+            )}
+          </div>
+
+          {/* Funds section */}
+          <div className="mt-2 rounded-md border px-3 py-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-medium text-muted-foreground">Available Funds</span>
+            </div>
+            {previewState.status === "ok" && previewState.data?.preview.funds.fund_status === "success" && (
+              <>
+                <div className="mt-1 flex justify-between">
+                  <span className="text-muted-foreground/70">Balance</span>
+                  <span className="font-medium tabular-nums text-foreground">
+                    {previewState.data.preview.funds.unallocated_balance != null
+                      ? formatNumber(previewState.data.preview.funds.unallocated_balance)
+                      : "\u2014"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground/70">Blocked</span>
+                  <span className="font-medium tabular-nums text-foreground">
+                    {previewState.data.preview.funds.blocked_by_trade != null
+                      ? formatNumber(previewState.data.preview.funds.blocked_by_trade)
+                      : "\u2014"}
+                  </span>
+                </div>
+              </>
+            )}
+            {previewState.status === "ok" && previewState.data?.preview.funds.fund_status === "error" && (
+              <div className="mt-1 text-[10px] text-red-500">{previewState.data.preview.funds.error}</div>
+            )}
+            {previewState.status === "loading" && (
+              <div className="py-1 text-center text-[10px] text-muted-foreground/50">
+                Loading funds...
+              </div>
+            )}
+          </div>
+
+          {/* Place order error/success */}
+          {placeState.status === "error" && (
+            <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400">
+              {placeState.error}
+            </div>
+          )}
+          {placeState.status === "ok" && placeState.data && (
+            <div className="mt-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-400">
+              {placeState.data.status === "success"
+                ? `Order placed: ${placeState.data.order_id}`
+                : placeState.data.message ?? "Order placed"}
+            </div>
+          )}
+
+          {/* Action buttons */}
           <div className="mt-4 flex gap-2">
             <Button variant="outline" size="sm" className="flex-1" onClick={closeConfirm} ref={cancelRef}>
               Cancel
@@ -440,14 +731,28 @@ export function DashboardOptionOrderBook() {
                   ? "bg-green-600 hover:bg-green-700"
                   : "bg-red-600 hover:bg-red-700"
               }`}
-              onClick={() => {
-                closeConfirm();
-              }}
-              aria-label={`Confirm ${confirmAction}`}
+              disabled={
+                placeState.status === "placing" ||
+                placeState.status === "ok" ||
+                !confirmPrice ||
+                parseFloat(confirmPrice) <= 0
+              }
+              onClick={handlePlaceOrder}
+              aria-label={`Place ${confirmAction} order`}
             >
-              {confirmAction} {confirmQty}
+              {placeState.status === "placing"
+                ? "Placing..."
+                : placeState.status === "ok"
+                ? "Placed"
+                : `${confirmAction} ${confirmQty}`}
             </Button>
           </div>
+
+          {selectedInstrument.lot_size && selectedInstrument.lot_size > 1 && (
+            <p className="mt-2 text-[9px] text-muted-foreground/40">
+              Total qty: {confirmQty} &times; {selectedInstrument.lot_size} = {confirmQty * selectedInstrument.lot_size}
+            </p>
+          )}
         </div>
       </div>
     )}

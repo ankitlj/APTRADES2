@@ -249,6 +249,7 @@ class InstrumentSearchService:
                 "strike_price": raw_strike,
                 "display_strike": str(int(display_strike)) if display_strike is not None and display_strike == display_strike.to_integral_value() else str(display_strike) if display_strike is not None else None,
                 "right": right_str,
+                "lot_size": r.lot_size,
                 "label": " ".join(label_parts),
                 "sublabel": sublabel,
                 "badges": badges,

@@ -921,6 +921,7 @@ export interface InstrumentSearchResult {
   strike_price: string | null;
   display_strike: string | null;
   right: string | null;
+  lot_size: number | null;
   label: string;
   sublabel: string;
   badges: string[];
@@ -992,4 +993,103 @@ export function getMarketDataStatus() {
 
 export function getMarketDataSnapshot() {
   return requestJson<MarketDataSnapshotResponse>("/api/market-data/snapshot");
+}
+
+export interface OrderPreviewInstrument {
+  display_symbol: string;
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  token: string | null;
+  contract_code: string;
+  lot_size: number;
+  tick_size: string | null;
+  expiry_date: string | null;
+  right: string;
+  strike_price: string;
+}
+
+export interface OrderPreviewMargin {
+  margin_status: string;
+  span_margin?: number | null;
+  non_span_margin?: number | null;
+  order_value?: number | null;
+  order_margin?: number | null;
+  trade_margin?: number | null;
+  block_trade_margin?: number | null;
+  total_margin?: number | null;
+  error?: string;
+}
+
+export interface OrderPreviewFunds {
+  fund_status: string;
+  allocated?: number | null;
+  blocked_by_trade?: number | null;
+  unallocated_balance?: number | null;
+  error?: string;
+}
+
+export interface OrderPreviewData {
+  product_type: string;
+  action: string;
+  quantity: number;
+  price: number;
+  lots: number;
+  total_quantity: number;
+  margin: OrderPreviewMargin;
+  funds: OrderPreviewFunds;
+}
+
+export interface OrderPreviewResponse {
+  status: string;
+  instrument: OrderPreviewInstrument;
+  preview: OrderPreviewData;
+  timestamp: string;
+  error?: string;
+}
+
+export function getOrderPreview(params: {
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  action: string;
+  quantity: number;
+  price: number;
+  expiry_date?: string | null;
+  right?: string | null;
+  strike_price?: string | null;
+}) {
+  return requestJson<OrderPreviewResponse>("/api/dashboard/order-preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
+}
+
+export interface PlaceOrderResponse {
+  status: string;
+  order_id?: string;
+  message?: string;
+  timestamp?: string;
+  error?: string;
+}
+
+export function placeOrder(params: {
+  broker_symbol: string;
+  exchange_code: string;
+  product_type: string;
+  action: string;
+  quantity: number;
+  price: number;
+  order_type?: string;
+  validity?: string;
+  expiry_date?: string | null;
+  right?: string | null;
+  strike_price?: string | null;
+}) {
+  return requestJson<PlaceOrderResponse>("/api/dashboard/place-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(params),
+  });
 }
