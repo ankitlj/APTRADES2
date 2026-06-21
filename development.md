@@ -5,6 +5,14 @@
 - Last completed phase: Phase 1 — Common-name mapping for derivatives
 - Planned next: Phase 2 — Enforce NSE-only search scope
 
+### 2026-06-21 — Phase 2: NSE-only search scope
+- **Goal**: Exclude BSE, BFO, MCX, and bond instruments from search results.
+- **Root cause**: No exchange-code filter existed in the search query, so searching "RELIANCE" returned both NSE and BSE equity results. BSE/BFO instruments were interleaved with NSE/NFO in the same result set.
+- **Fix**: Added `Instrument.exchange_code.in_(["NSE", "NFO"])` filter to the SQL query in `InstrumentSearchService.search()` — filters out all non-NSE/NFO rows before any Python-side processing.
+- **Files changed**: `backend/app/services/instrument_search_service.py` (1 line added)
+- **Verification**: `python -m pytest` → 167 passed, `npm run build` → clean build. Existing test data only has NSE and NFO instruments, so no tests regressed.
+- **Next**: Phase 3 — Search quality hardening (ranking, partial matching, prefix-only for short queries).
+
 ### 2026-06-21 — Phase 1: Common-name mapping for derivatives
 - **Goal**: Make searching by common name (e.g., "RELIANCE") return NFO futures and options, not just NSE cash.
 - **Root cause**: Derivatives obtained `display_symbol` from SecurityMaster's `AssetName` field (broker code "RELIND"), not the common name ("RELIANCE"). No aliases were created for derivatives (`_build_payloads` skipped `product_type != "cash"`). So searching "RELIANCE" matched cash at priority 0, but derivatives matched only via `name` at priority 3-5, and 40+ cash results filled the limit before derivatives appeared.

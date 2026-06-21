@@ -154,6 +154,8 @@ class InstrumentSearchService:
                 )
             )
 
+            base = base.filter(Instrument.exchange_code.in_(["NSE", "NFO"]))
+
             rows = base.all()
 
         classified: list[tuple[Instrument, str]] = []
