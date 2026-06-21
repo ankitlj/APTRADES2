@@ -501,14 +501,28 @@ export interface OIProfileResponse {
 
 const API_BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
 
+function extractErrorMessage(payload: unknown): string | undefined {
+  if (typeof payload !== "object" || payload === null) return undefined;
+  const record = payload as Record<string, unknown>;
+  const error = record.error;
+  if (typeof error === "string") return error;
+  if (typeof error === "object" && error !== null) {
+    const msg = (error as Record<string, unknown>).message;
+    if (typeof msg === "string") return msg;
+  }
+  const message = record.message;
+  if (typeof message === "string") return message;
+  return undefined;
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, init);
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
     try {
-      const payload = (await response.json()) as { error?: string; message?: string; status?: string };
-      message = payload.error ?? payload.message ?? message;
+      const payload = (await response.json()) as Record<string, unknown>;
+      message = extractErrorMessage(payload) ?? message;
     } catch {
       // Preserve generic HTTP status text when the response is not JSON.
     }
