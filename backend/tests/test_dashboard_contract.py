@@ -1298,3 +1298,116 @@ def test_orderbook_endpoint_futures_returns_quote(tmp_path):
     assert payload["bid_price"] == 23499.0
     assert payload["ask_price"] == 23501.0
     assert payload["product_type"] == "futures"
+
+
+def test_order_preview_endpoint_rejects_empty_body(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'op_reject.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.post("/api/dashboard/order-preview", content_type="application/json", data="{}")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "error"
+
+
+def test_order_preview_endpoint_cash_returns_resolved(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'op_cash.sqlite'}"
+    _seed_dashboard_data(database_url)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_funds",
+        return_value={"allocated_equity": 500000.0, "unallocated_balance": "200000"},
+    ):
+        response = client.post(
+            "/api/dashboard/order-preview",
+            content_type="application/json",
+            data='{"broker_symbol":"STABAN","exchange_code":"NSE","product_type":"cash","action":"buy","quantity":"10","price":"850"}',
+        )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["instrument"]["broker_symbol"] == "STABAN"
+    assert payload["instrument"]["display_symbol"] == "SBIN"
+    assert payload["preview"]["product_type"] == "cash"
+    assert payload["preview"]["action"] == "buy"
+    assert payload["preview"]["quantity"] == 10
+    assert payload["preview"]["margin"]["margin_status"] == "not_calculated"
+
+
+def test_order_preview_endpoint_future_returns_margin(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'op_fut.sqlite'}"
+    _seed_dashboard_data(database_url)
+    expiry = date.today() + timedelta(days=14)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_funds",
+        return_value={"allocated_fno": 1000000.0, "block_by_trade_fno": 0.0, "unallocated_balance": "500000"},
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_margin_calculator",
+        return_value={"span_margin_required": "150000", "order_value": "1750000"},
+    ):
+        response = client.post(
+            "/api/dashboard/order-preview",
+            content_type="application/json",
+            data=f'{{"broker_symbol":"NIFTY","exchange_code":"NFO","product_type":"futures","action":"buy","quantity":"75","price":"23500","expiry_date":"{expiry.isoformat()}"}}',
+        )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["instrument"]["broker_symbol"] == "NIFTY"
+    assert payload["preview"]["product_type"] == "futures"
+    assert payload["preview"]["margin"]["margin_status"] == "ok"
+    assert payload["preview"]["margin"]["span_margin"] == 150000.0
+    assert payload["preview"]["funds"]["fund_status"] == "ok"
+    assert payload["preview"]["funds"]["allocated"] == 1000000.0
+
+
+def test_order_preview_endpoint_option_returns_margin(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'op_opt.sqlite'}"
+    _seed_dashboard_data(database_url)
+    _seed_nifty_option(database_url)
+    expiry = date.today() + timedelta(days=14)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_funds",
+        return_value={"allocated_fno": 1000000.0, "block_by_trade_fno": 0.0, "unallocated_balance": "500000"},
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_margin_calculator",
+        return_value={"span_margin_required": "75000", "order_value": "125000"},
+    ):
+        response = client.post(
+            "/api/dashboard/order-preview",
+            content_type="application/json",
+            data=f'{{"broker_symbol":"NIFTY","exchange_code":"NFO","product_type":"options","action":"sell","quantity":"150","price":"50","expiry_date":"{expiry.isoformat()}","right":"call","strike_price":"23500"}}',
+        )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["preview"]["product_type"] == "options"
+    assert payload["preview"]["margin"]["margin_status"] == "ok"
+    assert payload["preview"]["margin"]["span_margin"] == 75000.0
+
+
+def test_order_preview_endpoint_margin_calc_error_returns_error_status(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'op_err.sqlite'}"
+    _seed_dashboard_data(database_url)
+    expiry = date.today() + timedelta(days=14)
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_margin_calculator",
+        side_effect=Exception("Breeze rejected"),
+    ):
+        response = client.post(
+            "/api/dashboard/order-preview",
+            content_type="application/json",
+            data=f'{{"broker_symbol":"NIFTY","exchange_code":"NFO","product_type":"futures","action":"buy","quantity":"75","price":"23500","expiry_date":"{expiry.isoformat()}"}}',
+        )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["preview"]["margin"]["margin_status"] == "error"
+    assert "Breeze rejected" in payload["preview"]["margin"]["error"]

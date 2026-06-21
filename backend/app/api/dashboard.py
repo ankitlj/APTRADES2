@@ -107,3 +107,24 @@ def dashboard_option_orderbook() -> tuple[object, int]:
     except DashboardServiceError as error:
         return jsonify({"status": "error", "error": str(error)}), 400
     return jsonify(payload), 200
+
+
+@dashboard_bp.post("/dashboard/order-preview")
+def dashboard_order_preview() -> tuple[object, int]:
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "error": "Request body must be JSON."}), 400
+    payload = _dashboard_service().get_order_preview(data)
+    return jsonify(payload), 200
+
+
+@dashboard_bp.post("/dashboard/place-order")
+def dashboard_place_order() -> tuple[object, int]:
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "error": "Request body must be JSON."}), 400
+    try:
+        payload = _dashboard_service().place_order(data)
+    except DashboardServiceError as error:
+        return jsonify({"status": "error", "error": str(error)}), 400
+    return jsonify(payload), 200

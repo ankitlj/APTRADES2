@@ -260,6 +260,39 @@ class BreezeGateway:
             raise BreezeGatewayError(response.get("Error") or "Breeze option-chain response missing Success field")
         return success
 
+    def get_margin_calculator(self, positions: list[dict[str, str]], exchange_code: str) -> Any:
+        payload: dict[str, Any] = {
+            "list_of_positions": positions,
+            "exchange_code": exchange_code,
+        }
+        response = self._request("POST", "/margincalculator", payload, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze margin calculator response missing Success field")
+        return success
+
+    def get_funds(self) -> Any:
+        response = self._request("GET", "/funds", {}, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze funds response missing Success field")
+        return success
+
+    def get_margin_details(self, exchange_code: str) -> Any:
+        payload = {"exchange_code": exchange_code}
+        response = self._request("GET", "/margin", payload, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze margin response missing Success field")
+        return success
+
+    def place_order(self, payload: dict[str, str]) -> Any:
+        response = self._request("POST", "/order", payload, requires_auth=True)
+        success = response.get("Success")
+        if success is None:
+            raise BreezeGatewayError(response.get("Error") or "Breeze order placement response missing Success field")
+        return success
+
     def _request(
         self,
         method: str,

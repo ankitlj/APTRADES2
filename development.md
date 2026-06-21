@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Instrument search/mapping fix pass — complete
-- Last completed phase: Phase 4 — Final regression + report
-- Planned next: Deploy to Railway, trigger master-contract import, verify RELIANCE search returns futures/options
+- Current phase: Order Modal / Margin Preview Pass — Part 1 complete
+- Last completed phase: Part 1 — Backend order preview/margin endpoint
+- Planned next: Part 2 — Frontend modal redesign + live refresh
 
 ### 2026-06-21 — Phase 1: Common-name mapping for derivatives
 - **Goal**: Make searching by common name (e.g., "RELIANCE") return NFO futures and options, not just NSE cash.
@@ -148,6 +148,40 @@
 - Phase 23 note: Live deployed testing against Railway + Vercel with valid Breeze session. Found 7 real issues: 5 consistent timeouts (chart, orders, trades, cache-stats, breeze-status, symbols-search), 2 intermittent (positions, dashboard latency). Important correction: Phase 22 tested deprecated routes (/api/option-chain/bynifty, /api/orderbook, /api/tradebook) — frontend uses different endpoints (/api/option-chain, /api/orders, /api/trades). Vercel routing clean (all 11 routes HTTP 200). See PHASE23_FINDINGS.md for full evidence.
 - Fix sequence: 6 parallel fixes completed in prior pass (15ef402 through 2785f97). Then a combined Dashboard Latency Fix Pass addressing remaining 18-28s dashboard latency.
 - Deployment status: Railway and Vercel deployed; Breeze session likely valid; 124 backend tests pass; frontend builds 1853 modules
+
+### 2026-06-21 — Order Modal / Margin Preview Pass — PART 0: Diagnosis + Contract Map
+- **Goal**: Wire Breeze margin/order-preview data into the dashboard order flow, then redesign the Buy/Sell modal to use backend properly.
+- **Part 0 — Diagnosis** (no code changes):
+  - **1. Current buy/sell modal flow** (`DashboardOptionOrderBook.tsx:363-453`):
+    - BUY/SELL buttons at lines 334-353 call `openConfirm(action)` which sets `confirmAction` state.
+    - Modal at lines 363-453 renders inline (no shared modal component) with:
+      - Instrument label, LTP, bid/ask, spread display
+      - Quantity input (labeled "Quantity (lots)" — hardcoded)
+      - Cancel / Confirm buttons
+      - Confirm button does NOTHING (just calls `closeConfirm()`) — no order placement exists.
+    - Modal receives: `selectedInstrument` (search result), `effectiveLtp` (from orderbook data or live tick), `orderbookData` (from backend).
+    - Modal does NOT receive: margin preview, available funds, lot size info, product selector, price input.
+  - **2. Backend APIs involved**:
+    - `/api/dashboard/orderbook` — Gets quote/LTP for a selected instrument (GET with broker_symbol, exchange_code, product_type, optional expiry/strike/right).
+    - `/api/orders` — GET order list only (no POST for order placement).
+    - No margin preview endpoint exists anywhere.
+    - No order placement endpoint exists.
+  - **3. Breeze margin preview** — NOT wired anywhere. No code references to `margincalculator`, `get_funds`, or `preview_order`.
+  - **4. MIS/NORMAL** — NOT present anywhere in codebase. No references to MIS, NRML, or product categories besides the contract types (cash/futures/options).
+  - **5. Lot size**: Available in `Instrument` model (`models.py:30`), passed through `ResolvedInstrument.lot_size` (`symbol_resolver.py:44`), available in `QuoteService` response (`quote_service.py:127`). But NOT used in the order modal.
+  - **6. Required Breeze API calls**:
+    - **Margin preview**: `POST /margincalculator` — takes `list_of_positions` with `stock_code`, `exchange_code`, `product`, `action`, `quantity`, `price`, `expiry_date`, `right`, `strike_price`. Returns `span_margin_required`, `order_value`, etc. (Official Breeze docs confirmed.)
+    - **Funds**: `GET /funds` — returns `allocated_fno`, `allocated_equity`, `block_by_trade_fno`, `unallocated_balance`.
+    - **Margins**: `GET /margin` — returns `cash_limit`, `amount_allocated`, `block_by_trade`.
+    - **Order placement**: `POST /order` — takes `stock_code`, `exchange_code`, `product`, `action`, `order_type` ("limit"), `quantity`, `price`, `validity`, plus optional `expiry_date`, `right`, `strike_price`. Returns `order_id`, `message`.
+    - **Regulatory constraint**: "Placement, modification, or cancelation of Margin and Option Plus orders via the Breeze API is prohibited." — MIS orders cannot be placed via API. Only NORMAL (NRML) orders allowed.
+  - **7. Fields required from frontend to backend for margin preview**:
+    - `stock_code` (broker_symbol), `exchange_code`, `product` ("futures"/"options"/"cash"), `action` ("buy"/"sell"), `quantity`, `price`, `expiry_date`, `right`, `strike_price`, `product_category` ("MIS"/"NORMAL" — for display only, actual margin calc uses Breeze API directly).
+  - **8. Minimal file set to change**:
+    - **Backend**: `breeze_gateway.py` (add `get_margin_calculator`, `get_funds`, `get_margin`, `place_order`), `dashboard.py` (add preview + place routes), `dashboard_service.py` (add preview/place methods), `orders.py` (extend with place order — OR create new endpoint).
+    - **Frontend**: `DashboardOptionOrderBook.tsx` (replace inline modal with proper preview/refresh/place flow), `api.ts` (add preview + place API calls).
+    - **Tests**: `test_dashboard_contract.py` (add preview/place contract tests).
+- **Next**: Part 1 — Backend order preview/margin endpoint.
 
 ## Environment
 - Backend: Flask 3 skeleton
