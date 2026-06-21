@@ -116,11 +116,7 @@ export function OrderbookPage() {
 
   return (
     <PageLayout>
-      <PageHeader
-        kicker="Broker orders"
-        title="Orderbook"
-        description="Review live Breeze orders, filter by state, and export the current book."
-      />
+      <PageHeader title="Orderbook" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">

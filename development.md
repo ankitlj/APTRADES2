@@ -2542,3 +2542,35 @@ Websocket:
 
 #### Remaining risks
 - The orderbook empty state now shows `No instrument selected` in the table body (line 330) and the search placeholder `Search instrument...` — both are sufficient prompts. No functionality loss.
+
+## 2026-06-21 — Phase 2: Operational page copy cleanup
+
+#### Root cause
+- Each operational page had redundant kicker labels (`BROKER ORDERS`, `BROKER TRADES`, etc.) and descriptive subtitle text that added clutter for experienced users.
+- PositionsPage had a `Paused` status badge in the header that duplicates the websocket status indicator.
+- ActionCentrePage had a "Semi-auto workflow" helper card with explanatory text that is not needed once the user understands the workflow.
+
+#### Fix (frontend-only)
+- Removed `kicker` and `description` props from `PageHeader` on all 5 pages: OrderbookPage, TradebookPage, PositionsPage, ActionCentrePage, LogsPage.
+- Removed the `actions` prop (Live/Paused badge) from PositionsPage `PageHeader`.
+- Removed unused `Badge` import from PositionsPage.
+- Removed the "Semi-auto workflow" `Card` block and its `Card`, `CardContent` imports from ActionCentrePage.
+- Page header now renders title only (clean minimal header).
+
+#### Verification
+- `npm run build` → 1861 modules, 507.67 kB JS, clean build.
+- All 5 pages render with clean title-only headers.
+- ActionCentrePage no longer shows the workflow explanation card.
+- PositionsPage no longer shows the Live/Paused badge.
+- No backend changes. No console errors expected.
+
+#### Files changed
+- `frontend/src/pages/OrderbookPage.tsx`
+- `frontend/src/pages/TradebookPage.tsx`
+- `frontend/src/pages/PositionsPage.tsx`
+- `frontend/src/pages/ActionCentrePage.tsx`
+- `frontend/src/pages/LogsPage.tsx`
+
+#### Remaining risks
+- PositionsPage `isLive` variable (line 157) is still computed but only used by the `quoteMessage` string. The websocket status is still shown in the quote message below filters. No loss of status visibility.
+- The `Badge` component is still used elsewhere; removal from PositionsPage import is safe.

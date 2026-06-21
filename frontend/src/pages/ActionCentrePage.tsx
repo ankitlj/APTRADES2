@@ -9,7 +9,6 @@ import {
   type ActionCentreResponse,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { BuySellBadge } from "@/components/ui/buy-sell-badge";
 import { DataTableShell } from "@/components/ui/data-table-shell";
 import { PageLayout } from "@/components/ui/page-layout";
@@ -79,21 +78,7 @@ export function ActionCentrePage() {
 
   return (
     <PageLayout>
-      <PageHeader
-        kicker="Broker actions"
-        title="Action Centre"
-        description="Review queued broker actions, approve live requests, or reject them with full audit rows."
-      />
-
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-sm font-semibold">Semi-auto workflow</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Pending rows are sourced from live broker orders. Approve sends the linked Breeze action.
-            Reject keeps the audit trail without touching the broker.
-          </p>
-        </CardContent>
-      </Card>
+      <PageHeader title="Action Centre" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-1">

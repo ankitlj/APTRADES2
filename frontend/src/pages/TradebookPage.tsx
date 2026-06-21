@@ -79,11 +79,7 @@ export function TradebookPage() {
 
   return (
     <PageLayout>
-      <PageHeader
-        kicker="Broker trades"
-        title="Tradebook"
-        description="Track normalized Breeze trades, apply quick filters, and export the visible book."
-      />
+      <PageHeader title="Tradebook" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">

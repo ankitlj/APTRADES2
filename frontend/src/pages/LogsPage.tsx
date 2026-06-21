@@ -67,11 +67,7 @@ export function LogsPage() {
 
   return (
     <PageLayout>
-      <PageHeader
-        kicker="Operational logs"
-        title="Logs"
-        description="Inspect API traffic, app events, and a live monospace tail without leaving the dashboard shell."
-      />
+      <PageHeader title="Logs" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">

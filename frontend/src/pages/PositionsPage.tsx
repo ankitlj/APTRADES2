@@ -5,7 +5,6 @@ import { getPositions, type PositionRecord, type PositionsResponse } from "@/lib
 import { useLiveMarketData, useLiveSubscribe } from "@/hooks/useLiveMarketData";
 import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
 import { formatNumber, pnlColor, tone } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTableShell } from "@/components/ui/data-table-shell";
@@ -158,14 +157,7 @@ export function PositionsPage() {
 
   return (
     <PageLayout>
-      <PageHeader
-        kicker="Broker positions"
-        title="Positions"
-        description="Track live Breeze positions with quote-enriched P&L and export the current view."
-        actions={
-          <Badge variant={isLive ? "default" : "secondary"}>{isLive ? "Live" : "Paused"}</Badge>
-        }
-      />
+      <PageHeader title="Positions" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="outline" size="sm" onClick={() => setSettingsOpen((current) => !current)}>
