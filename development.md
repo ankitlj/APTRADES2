@@ -1,9 +1,9 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Order Modal / Margin Preview Pass — Part 1 complete
-- Last completed phase: Part 1 — Backend order preview/margin endpoint
-- Planned next: Part 2 — Frontend modal redesign + live refresh
+- Current phase: Order Modal / Margin Preview Pass — complete (5 parts)
+- Last completed phase: Part 5 — Final regression
+- Planned next: Deploy to Railway, verify order preview + placement end-to-end
 
 ### 2026-06-21 — Phase 1: Common-name mapping for derivatives
 - **Goal**: Make searching by common name (e.g., "RELIANCE") return NFO futures and options, not just NSE cash.
@@ -2802,3 +2802,24 @@ Websocket:
 
 #### Remaining risks
 - The fix uses plain `<div>` instead of `CardHeader` for these three headers. This is intentional — `CardHeader`'s grid layout is unsuitable for title+badge rows. No other widgets use this same pattern, so no risk of inconsistency.
+
+### 2026-06-21 — Order Modal / Margin Preview Pass (Parts 0–5)
+- **Goal**: Wire Breeze margin/order-preview data into the dashboard order flow, then redesign the Buy/Sell modal to use backend properly.
+- **Motivation**: The original modal showed LTP/bid/ask/spread/qty but had no price input, no product selector, no margin/funds preview, and the Confirm button was a no-op. Every piece of data needed for a real trade was missing.
+- **5-part approach**:
+  - **Part 0**: Diagnosis — established missing API endpoint, no MIS/NORMAL handling, lot_size unused, confirm button no-op. Recorded in this file.
+  - **Part 1**: Backend — `BreezeGateway.get_margin_calculator/get_funds/get_margin_details/place_order`, `DashboardService.get_order_preview/place_order`, `POST /dashboard/order-preview` and `/dashboard/place-order` routes. 5 new contract tests.
+  - **Part 2**: Frontend — redesigned modal with price input, quantity (lots) + lot_size display, 1s auto-refresh, margin/funds panels, race-condition guard via request counter, clean interval lifecycle.
+  - **Part 3**: Pre-submit validation — `validateOrder()` (price > 0, qty >= 1, total qty cap), amber validation error display, cleared on param change.
+  - **Part 4**: Lot-size correctness — quantity now multiplied by `lot_size` before sending to Breeze (1 lot = 50 shares for NIFTY). `total_margin` = span + non-span.
+  - **Part 5**: Final regression — all 172 backend tests pass, frontend builds clean (1861 modules, 512 kB JS).
+- **Files changed**:
+  - `backend/app/services/breeze_gateway.py` — 4 new methods
+  - `backend/app/services/dashboard_service.py` — 2 new methods + lot_size/total_margin fixes
+  - `backend/app/api/dashboard.py` — 2 new routes
+  - `backend/app/services/instrument_search_service.py` — added `lot_size` to search results
+  - `backend/tests/test_dashboard_contract.py` — 5 new preview tests
+  - `frontend/src/lib/api.ts` — new types + API client functions
+  - `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` — full modal redesign
+- **Verification**: `pytest` → 172 passed (167 existing + 5 new), `npm run build` → 1861 modules, clean.
+- **Next**: Deploy to Railway, verify order preview + placement end-to-end with live Breeze credentials.
