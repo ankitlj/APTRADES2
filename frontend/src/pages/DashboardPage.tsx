@@ -14,7 +14,7 @@ import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
 import { DashboardOptionOrderBook } from "@/components/dashboard/DashboardOptionOrderBook";
 import { formatNumber, formatCurrency, formatPercent, pnlColor } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { DataState } from "@/components/ui/data-state";
 import { MetricCard } from "@/components/ui/metric-card";
 import { PageLayout } from "@/components/ui/page-layout";
@@ -247,10 +247,10 @@ export function DashboardPage() {
       </div>
 
       <Card className="min-h-[306px] overflow-hidden">
-        <CardHeader className="flex-row items-center gap-2 border-b px-4 py-2">
+        <div className="flex items-center justify-between gap-2 border-b px-4 py-2">
           <CardTitle className="text-sm">Active Positions</CardTitle>
           <Badge variant="secondary">{positions.length}</Badge>
-        </CardHeader>
+        </div>
         <PositionsTable positions={positions} status={summaryState.data?.positions_status} />
       </Card>
 
@@ -258,13 +258,13 @@ export function DashboardPage() {
         <DashboardOptionOrderBook />
 
         <Card>
-          <CardHeader className="flex-row items-center justify-between border-b px-4 py-2">
+          <div className="flex items-center justify-between border-b px-4 py-2">
             <CardTitle className="flex items-center gap-2 text-sm">
               <Bell className="h-4 w-4" />
               Alerts
             </CardTitle>
             <Badge variant="secondary">{alerts.length} Active</Badge>
-          </CardHeader>
+          </div>
           <CardContent className={alertsState.error ? "p-4" : "p-0"}>
             {alertsState.loading ? (
               <DataState state="loading" compact />

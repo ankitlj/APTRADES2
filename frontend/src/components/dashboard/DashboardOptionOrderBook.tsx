@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useLiveQuote, useLiveSubscribe } from "@/hooks/useLiveMarketData";
 import { getDashboardOrderbook, type DashboardOrderbookResponse, type InstrumentSearchResult } from "@/lib/api";
@@ -181,7 +181,7 @@ export function DashboardOptionOrderBook() {
   return (
     <>
     <Card className="overflow-hidden">
-      <CardHeader className="flex-row items-center justify-between gap-3 border-b px-4 py-2">
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-2">
         <CardTitle className="text-sm">Order Book</CardTitle>
         <div className="flex items-center gap-2">
           {hasSelection && (
@@ -194,7 +194,7 @@ export function DashboardOptionOrderBook() {
           )}
           {statusBadge()}
         </div>
-      </CardHeader>
+      </div>
 
       <CardContent className="space-y-3 p-4">
         <div>

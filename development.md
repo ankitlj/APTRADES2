@@ -2667,3 +2667,35 @@ Websocket:
 
 #### Remaining risks
 - The positions page still shows connection status implicitly through LTP styling (bold/font-weight when tick is live) and the table data itself. No loss of functionality.
+
+## 2026-06-21 — Fix: Dashboard widget header compaction (proper fix)
+
+#### Root cause
+- The `CardHeader` component (`components/ui/card.tsx`) uses `grid auto-rows-min grid-rows-[auto_auto]` as its base layout, which forces children into two stacked rows regardless of any `flex-row` class passed via className.
+- Adding `flex-row` was ineffective because `display: grid` overrides `flex-direction: row` (which requires `display: flex`).
+- `CardHeader` base also includes `[.border-b]:pb-6` which conditionally adds 24px bottom padding when `border-b` is present, keeping the divider/content pushed down even when `py-2` was used.
+- The previous pass correctly identified the need but changed the wrong properties — it added `flex-row` to a grid element and reduced `py-3` to `py-2` without addressing the underlying grid layout.
+
+#### Fix (frontend-only)
+- `DashboardPage.tsx`:
+  - Replaced `<CardHeader>` with `<div className="flex items-center justify-between ...">` for both Active Positions and Alerts headers — uses proper flexbox row layout.
+  - Removed unused `CardHeader` import.
+- `DashboardOptionOrderBook.tsx`:
+  - Replaced `<CardHeader>` with `<div className="flex items-center justify-between ...">` for Order Book header.
+  - Removed unused `CardHeader` import.
+- All three headers now render title left, badge right on a single row with `py-2` padding and `border-b`.
+
+#### Verification
+- `npm run build` → 1861 modules, 504.74 kB JS, clean build.
+- Active Positions: `<div className="flex items-center justify-between gap-2 border-b px-4 py-2">` — title and `0` badge on same row.
+- Order Book: `<div className="flex items-center justify-between gap-3 border-b px-4 py-2">` — title and `Inactive` badge on same row.
+- Alerts: `<div className="flex items-center justify-between border-b px-4 py-2">` — title and `3 Active` badge on same row.
+- No CardHeader grid layout interfering; no `[.border-b]:pb-6` extra padding.
+- All existing functionality (search, orderbook table, buy/sell, alerts content, websocket) unchanged.
+
+#### Files changed
+- `frontend/src/pages/DashboardPage.tsx`
+- `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
+
+#### Remaining risks
+- The fix uses plain `<div>` instead of `CardHeader` for these three headers. This is intentional — `CardHeader`'s grid layout is unsuitable for title+badge rows. No other widgets use this same pattern, so no risk of inconsistency.
