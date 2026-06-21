@@ -378,6 +378,22 @@ class MasterContractService:
             key = (instrument_payload["exchange_code"], instrument_payload["contract_code"])
             instruments_by_key[key] = instrument_payload
 
+        broker_to_common: dict[str, str] = {}
+        for row in rows:
+            ec = row.get("EC", "").upper().strip()
+            sg = row.get("SG", "").upper().strip()
+            if ec == "NSE" and sg == "EQUITY":
+                sc = row.get("SC", "").upper().strip()
+                ns = (row.get("NS") or row.get("SI") or sc).strip()
+                if sc and ns:
+                    broker_to_common[sc] = ns
+
+        for payload in instruments_by_key.values():
+            if payload["product_type"] in ("futures", "options"):
+                broker = payload["broker_symbol"]
+                if broker in broker_to_common and payload["display_symbol"] == broker:
+                    payload["display_symbol"] = broker_to_common[broker]
+
         for row in rows:
             instrument_payload = self._instrument_payload(row)
             if instrument_payload["product_type"] != "cash":
@@ -397,6 +413,24 @@ class MasterContractService:
                     "alias_type": "display" if normalized != instrument_payload["broker_symbol"] else "broker_symbol",
                     "source": instrument_payload["source"],
                 }
+
+        for broker_symbol, common_name in broker_to_common.items():
+            normalized_common = self._normalize_alias(common_name)
+            if not normalized_common:
+                continue
+            for payload in instruments_by_key.values():
+                if payload["product_type"] in ("futures", "options") and payload["broker_symbol"] == broker_symbol:
+                    alias_key = (payload["exchange_code"], normalized_common)
+                    if alias_key not in aliases_by_key:
+                        aliases_by_key[alias_key] = {
+                            "exchange_code": payload["exchange_code"],
+                            "contract_code": payload["contract_code"],
+                            "alias": common_name,
+                            "normalized_alias": normalized_common,
+                            "alias_scope": payload["exchange_code"],
+                            "alias_type": "display",
+                            "source": payload["source"],
+                        }
 
         return list(instruments_by_key.values()), list(aliases_by_key.values())
 

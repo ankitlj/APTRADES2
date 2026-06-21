@@ -1,9 +1,20 @@
 # APTRADES v2 Development Log
 
 ## Current Status
-- Current phase: Step 3 — Dashboard chart hover fix
-- Last completed phase: Step 3 — Fix pass complete
-- Planned next: Step 4 — Dashboard layout swap
+- Current phase: Phase 2 — NSE-only search scope
+- Last completed phase: Phase 1 — Common-name mapping for derivatives
+- Planned next: Phase 2 — Enforce NSE-only search scope
+
+### 2026-06-21 — Phase 1: Common-name mapping for derivatives
+- **Goal**: Make searching by common name (e.g., "RELIANCE") return NFO futures and options, not just NSE cash.
+- **Root cause**: Derivatives obtained `display_symbol` from SecurityMaster's `AssetName` field (broker code "RELIND"), not the common name ("RELIANCE"). No aliases were created for derivatives (`_build_payloads` skipped `product_type != "cash"`). So searching "RELIANCE" matched cash at priority 0, but derivatives matched only via `name` at priority 3-5, and 40+ cash results filled the limit before derivatives appeared.
+- **Fix**: Three changes to `_build_payloads` in `master_contract_service.py`:
+  1. Build a `broker_to_common` mapping from NSE equity CSV rows (`SC → NS` columns).
+  2. Override `display_symbol` for derivatives whose current display_symbol equals their broker_code (e.g., `"RELIND"` → `"RELIANCE"`), so they get exact-match priority 0 during search.
+  3. Insert common-name aliases (`"RELIANCE"`) for all derivatives of each mapped broker symbol, so alias-based search finds them too.
+- **Files changed**: `backend/app/services/master_contract_service.py` (lines 381-433 added)
+- **Verification**: `python -m pytest` → 167 passed (all tests), `npm run build` → clean build (1861 modules). No existing tests regressed because test data manually seeds correct display_symbols on derivatives.
+- **Next**: Phase 2 — Enforce NSE equity/futures/options search scope (filter out BSE/MCX/bonds).
 
 ### 2026-06-18 - Step 3: Dashboard chart hover fix
 
