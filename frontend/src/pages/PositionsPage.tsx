@@ -89,7 +89,7 @@ export function PositionsPage() {
     void load();
   }, []);
 
-  const { ticks, connectionState } = useLiveMarketData();
+  const { ticks } = useLiveMarketData();
 
   const subscriptions = useMemo<SubscriptionRequest[]>(
     () =>
@@ -140,20 +140,6 @@ export function PositionsPage() {
     }
     return Array.from(mapped.entries()).map(([key, items]) => ({ key, label: key, items }));
   }, [groupBy, positions]);
-
-  const liveFeedMessage =
-    connectionState === "live"
-      ? "Streaming live LTP and P&L over the Breeze websocket."
-      : connectionState === "connecting"
-        ? "Connecting to the live websocket feed; showing REST values until ticks arrive."
-        : "Live websocket feed is unavailable; showing REST quote values.";
-  const quoteMessage =
-    state.data?.status === "not_configured"
-      ? "Breeze positions are not configured yet."
-      : state.data?.quote_status === "partial"
-        ? `Some rows are using raw Breeze position values because quote enrichment failed. ${liveFeedMessage}`
-        : `Live quote enrichment is active. ${liveFeedMessage}`;
-  const isLive = state.data?.status === "ok";
 
   return (
     <PageLayout>
@@ -220,8 +206,6 @@ export function PositionsPage() {
           <StatCard key={item.label} label={item.label} value={item.value} tone={item.toneValue} icon={item.icon} />
         ))}
       </div>
-
-      <p className="text-xs text-muted-foreground">{quoteMessage}</p>
 
       <DataTableShell
         title="Active Positions"

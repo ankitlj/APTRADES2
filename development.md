@@ -2642,3 +2642,28 @@ Websocket:
 #### Remaining risks
 - `Total Margin` value is currently the same as `Margin Used` (both 0.0) because the backend does not expose a separate total-margin metric. The label is named clearly so users understand it shows the total margin figure. When backend adds a real total-margin field, this frontend injection should be replaced with the actual submetric.
 - The order book footnote (`Full market depth is unavailable from Breeze...`) remains visible below the bid/ask table — it still applies to the top-of-book limitation.
+
+## 2026-06-21 — Phase 2: Positions page message cleanup
+
+#### Root cause
+- A `quoteMessage` paragraph rendered between the stats cards and the positions table containing websocket/enrichment status text (`Live quote enrichment is active.`, `Live websocket feed is unavailable; showing REST quote values.`, etc.) that provides no actionable information to the user.
+
+#### Fix (frontend-only)
+- `PositionsPage.tsx`:
+  - Removed the `<p>` element rendering `quoteMessage`.
+  - Removed `liveFeedMessage` and `quoteMessage` variable definitions (and their dependency on `connectionState`).
+  - Removed `connectionState` from `useLiveMarketData` destructuring.
+  - Removed unused `isLive` variable.
+  - Live quote enrichment logic (`applyLiveTick`, websocket subscriptions) remains fully intact.
+
+#### Verification
+- `npm run build` → 1861 modules, 504.72 kB JS, clean build.
+- Positions page no longer shows the status message block between stats and table.
+- Websocket subscriptions, live tick enrichment, and all other page functionality unchanged.
+- No backend changes. No console errors expected.
+
+#### Files changed
+- `frontend/src/pages/PositionsPage.tsx`
+
+#### Remaining risks
+- The positions page still shows connection status implicitly through LTP styling (bold/font-weight when tick is live) and the table data itself. No loss of functionality.
