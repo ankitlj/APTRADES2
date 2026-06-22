@@ -85,28 +85,20 @@ export function DashboardOptionOrderBook() {
     }
   }, []);
 
-  const startPreviewInterval = useCallback(() => {
-    stopPreviewInterval();
-    previewIntervalRef.current = setInterval(() => {
-      setPreviewState((prev) => {
-        if (prev.status === "ok" || prev.status === "error") {
-          return { ...prev, status: "refreshing" };
-        }
-        return prev;
-      });
-    }, 1000);
-  }, [stopPreviewInterval]);
-
   const doFetchPreview = useCallback(
     (action: string, qty: number, price: string, product: string) => {
       if (!selectedInstrument) return;
-      const reqId = ++previewRequestIdRef.current;
 
       const productType = selectedInstrument.instrument_kind === "option"
         ? "options"
         : selectedInstrument.instrument_kind === "future"
         ? "futures"
         : "cash";
+
+      // Skip useless calls with zero price for futures/options
+      if (productType !== "cash" && (!price || parseFloat(price) <= 0)) return;
+
+      const reqId = ++previewRequestIdRef.current;
 
       getOrderPreview({
         broker_symbol: selectedInstrument.broker_symbol,
@@ -121,12 +113,21 @@ export function DashboardOptionOrderBook() {
       }).then((res) => {
         if (reqId !== previewRequestIdRef.current) return;
         setPreviewState({ status: "ok", data: res });
+        stopPreviewInterval();
+        previewIntervalRef.current = setInterval(() => {
+          setPreviewState((prev) => {
+            if (prev.status === "ok" || prev.status === "error") {
+              return { ...prev, status: "refreshing" };
+            }
+            return prev;
+          });
+        }, 1000);
       }).catch((err: Error) => {
         if (reqId !== previewRequestIdRef.current) return;
         setPreviewState((prev) => ({ status: "error", error: err.message, data: prev.data }));
       });
     },
-    [selectedInstrument],
+    [selectedInstrument, stopPreviewInterval],
   );
 
   const handleSelect = useCallback((instrument: InstrumentSearchResult) => {
@@ -144,12 +145,13 @@ export function DashboardOptionOrderBook() {
   const openConfirm = useCallback((action: "BUY" | "SELL") => {
     setConfirmAction(action);
     setConfirmQty(1);
-    setConfirmPrice("");
+    const currentLtp = orderbook.status === "ok" && orderbook.data ? orderbook.data.ltp : null;
+    const initialPrice = currentLtp != null && currentLtp > 0 ? String(currentLtp) : "";
+    setConfirmPrice(initialPrice);
     setConfirmProduct("NORMAL");
-    setPreviewState({ status: "loading" });
+    setPreviewState({ status: initialPrice ? "loading" : "idle" });
     setPlaceState({ status: "idle" });
-    setConfirmQty(1);
-  }, []);
+  }, [orderbook]);
 
   const closeConfirm = useCallback(() => {
     stopPreviewInterval();
@@ -216,7 +218,6 @@ export function DashboardOptionOrderBook() {
 
     if (previewState.status === "loading") {
       doFetchPreview(confirmAction, confirmQty, confirmPrice, confirmProduct);
-      startPreviewInterval();
     } else if (previewState.status === "refreshing") {
       doFetchPreview(confirmAction, confirmQty, confirmPrice, confirmProduct);
     }
@@ -228,8 +229,29 @@ export function DashboardOptionOrderBook() {
     previewState.status,
     selectedInstrument,
     doFetchPreview,
-    startPreviewInterval,
   ]);
+
+  // Auto-start preview when user enters a valid price while in idle state
+  const prevIdleTriggerRef = useRef(false);
+  useEffect(() => {
+    if (!confirmAction || !selectedInstrument) return;
+    if (previewState.status !== "idle") {
+      prevIdleTriggerRef.current = false;
+      return;
+    }
+
+    const productType = selectedInstrument.instrument_kind === "option"
+      ? "options"
+      : selectedInstrument.instrument_kind === "future"
+      ? "futures"
+      : "cash";
+    const hasValidPrice = productType === "cash" || (confirmPrice && parseFloat(confirmPrice) > 0);
+
+    if (hasValidPrice && !prevIdleTriggerRef.current) {
+      prevIdleTriggerRef.current = true;
+      setPreviewState({ status: "loading" });
+    }
+  }, [confirmPrice, confirmAction, selectedInstrument, previewState.status]);
 
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -634,11 +656,18 @@ export function DashboardOptionOrderBook() {
                 Loading margin...
               </div>
             )}
+            {previewState.status === "idle" && (
+              <div className="py-2 text-center text-[10px] text-muted-foreground/50">
+                Enter a price to preview margin
+              </div>
+            )}
             {previewState.status === "ok" && previewState.data && (
               <>
                 {previewState.data.preview.margin.margin_status === "not_calculated" && (
                   <div className="text-[10px] text-muted-foreground/60">
-                    Margin not calculated (cash product or zero price).
+                    {previewState.data.preview.product_type === "cash"
+                      ? "Margin preview not available for cash products. Available funds shown below."
+                      : "Enter a valid price to preview margin."}
                   </div>
                 )}
                 {previewState.data.preview.margin.margin_status === "error" && (

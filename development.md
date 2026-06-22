@@ -2839,3 +2839,19 @@ Websocket:
 - **Files changed**: `frontend/src/components/dashboard/DashboardOptionOrderBox.tsx` (3 locations, 4 insertions/3 deletions)
 - **Verification**: `pytest` → 51/51 dashboard contract tests passed, `npm run build` → 1861 modules, clean.
 - **Remaining risk**: The "Internal server error." symptom on production may persist if it's caused by orderbook polling on Railway cold-start, not by the preview endpoint. Monitor after deploy.
+
+### 2026-06-22 — Modal price prefill + preview flow fix
+- **Goal**: Fix Buy/Sell modal flickering "Margin not calculated (cash product or zero price)." on open, and clean up preview behavior for cash/futures/options.
+- **Root cause** (3 issues):
+  1. `openConfirm` always set `confirmPrice = ""` even when `effectiveLtp` was available from orderbook data. First preview call always sent `price: 0` → backend returned `margin_status: "not_calculated"` → UI showed misleading "Margin not calculated" message every refresh.
+  2. Preview 1-second refresh loop started unconditionally on modal open, re-fetching with `price=0` repeatedly and causing the "not calculated" message to blink every second.
+  3. Cash margin message was ambiguous ("cash product or zero price") — didn't tell user whether it was normal for cash vs a problem.
+- **Fixes**:
+  1. `openConfirm` now reads LTP from `orderbook.data.ltp` on open. If LTP > 0, pre-fills `confirmPrice` and starts preview immediately. If no LTP, sets `previewState = "idle"` (shows "Enter a price to preview margin").
+  2. `doFetchPreview` gates the API call — skips for futures/options when price is empty or <= 0. Refresh interval is now started inside `.then()` of first successful fetch, not in the useEffect — prevents useless zero-price polling.
+  3. `not_calculated` message now distinguishes cash ("Margin preview not available for cash products") from missing price ("Enter a valid price to preview margin") using `preview.product_type`.
+  4. Added idle render state: "Enter a price to preview margin" when modal opens without valid price.
+- **Files changed**: `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` (openConfirm, doFetchPreview, preview useEffect, margin render message, idle state render, removed unused startPreviewInterval)
+- **Backend**: No changes. Current behavior is correct for all 3 product types.
+- **Verification**: 8/8 API-level tests pass — cash preview (200, margin=not_calculated, funds=ok), futures preview (200, margin=ok), options preview (200, margin=ok), zero-price futures/options/cash (all 200, no crash), funds timeout degrades gracefully (200, fund_status=error). 51/51 backend tests pass. Frontend build clean.
+- **Remaining risk**: None identified for this flow.
