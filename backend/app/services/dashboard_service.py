@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from flask import current_app
@@ -402,6 +402,9 @@ class DashboardService:
         except Exception as error:
             raise DashboardServiceError(f"Failed to resolve instrument: {error}") from error
 
+        breeze_expiry = ""
+        if isinstance(resolved.expiry_date, date):
+            breeze_expiry = f"{resolved.expiry_date.isoformat()}T06:00:00.000Z"
         breeze_instrument = BreezeInstrument(
             display_symbol=resolved.display_symbol,
             stock_code=resolved.broker_symbol,
@@ -409,7 +412,7 @@ class DashboardService:
             product_type=normalized_product,
             right=resolved.right,
             strike_price=resolved.strike_price,
-            expiry_date=f"{resolved.expiry_date.isoformat()}T06:00:00.000Z" if resolved.expiry_date else "",
+            expiry_date=breeze_expiry,
         )
 
         try:
@@ -753,107 +756,110 @@ class DashboardService:
         except Exception as error:
             return {"status": "error", "error": f"Failed to resolve instrument: {error}"}
 
-        lot_size = resolved.lot_size or 1
-        quantity_lots = max(1, int(float(quantity_str)))
-        quantity = quantity_lots * lot_size
-        price = float(price_str) if price_str else 0.0
+        try:
+            lot_size = resolved.lot_size or 1
+            quantity_lots = max(1, int(float(quantity_str)))
+            quantity = quantity_lots * lot_size
+            price = float(price_str) if price_str else 0.0
 
-        breeze_product = product_type
-        if product_type == "futures":
-            breeze_product = "futures"
-        elif product_type == "options":
-            breeze_product = "options"
+            breeze_product = product_type
+            if product_type == "futures":
+                breeze_product = "futures"
+            elif product_type == "options":
+                breeze_product = "options"
 
-        breeze_expiry = ""
-        if resolved.expiry_date:
-            breeze_expiry = resolved.expiry_date.strftime("%d-%b-%Y")
+            breeze_expiry = ""
+            if resolved.expiry_date and isinstance(resolved.expiry_date, date):
+                breeze_expiry = resolved.expiry_date.strftime("%d-%b-%Y")
 
-        breeze_right = resolved.right
-        breeze_strike = resolved.strike_price
+            breeze_right = resolved.right
+            breeze_strike = resolved.strike_price
 
-        margin_result: dict[str, Any] = {"margin_status": "not_calculated"}
-        fund_result: dict[str, Any] = {}
+            margin_result: dict[str, Any] = {"margin_status": "not_calculated"}
+            fund_result: dict[str, Any] = {}
 
-        if product_type in ("futures", "options") and price > 0:
-            try:
-                calc_position = {
-                    "strike_price": breeze_strike,
-                    "quantity": str(quantity),
-                    "right": breeze_right.capitalize() if breeze_right != "others" else "Others",
-                    "product": breeze_product,
+            if product_type in ("futures", "options") and price > 0:
+                try:
+                    calc_position = {
+                        "strike_price": breeze_strike,
+                        "quantity": str(quantity),
+                        "right": breeze_right.capitalize() if breeze_right != "others" else "Others",
+                        "product": breeze_product,
+                        "action": action,
+                        "price": str(price),
+                        "expiry_date": breeze_expiry,
+                        "stock_code": resolved.broker_symbol,
+                        "cover_order_flow": "N",
+                        "fresh_order_type": "N",
+                        "cover_limit_rate": "0",
+                        "cover_sltp_price": "0",
+                        "fresh_limit_rate": "0",
+                        "open_quantity": "0",
+                    }
+                    calc_resp = self.gateway.get_margin_calculator([calc_position], exchange_code)
+                    span_margin = self._to_float(calc_resp.get("span_margin_required"))
+                    non_span_margin = self._to_float(calc_resp.get("non_span_margin_required"))
+                    margin_result = {
+                        "margin_status": "ok",
+                        "span_margin": span_margin,
+                        "non_span_margin": non_span_margin,
+                        "order_value": self._to_float(calc_resp.get("order_value")),
+                        "order_margin": self._to_float(calc_resp.get("order_margin")),
+                        "trade_margin": self._to_float(calc_resp.get("trade_margin")),
+                        "block_trade_margin": self._to_float(calc_resp.get("block_trade_margin")),
+                        "total_margin": (span_margin or 0) + (non_span_margin or 0),
+                    }
+                except Exception as error:
+                    margin_result = {"margin_status": "error", "error": str(error)}
+
+            if exchange_code in ("NSE", "NFO"):
+                try:
+                    fund_resp = self.gateway.get_funds()
+                    if exchange_code == "NFO":
+                        allocated = self._to_float(fund_resp.get("allocated_fno"))
+                        blocked = self._to_float(fund_resp.get("block_by_trade_fno"))
+                    else:
+                        allocated = self._to_float(fund_resp.get("allocated_equity"))
+                        blocked = self._to_float(fund_resp.get("block_by_trade_equity"))
+                    unallocated = self._to_float(fund_resp.get("unallocated_balance"))
+                    fund_result = {
+                        "fund_status": "ok",
+                        "allocated": allocated,
+                        "blocked_by_trade": blocked,
+                        "unallocated_balance": unallocated,
+                    }
+                except Exception as error:
+                    fund_result = {"fund_status": "error", "error": str(error)}
+
+            return {
+                "status": "ok",
+                "instrument": {
+                    "display_symbol": resolved.display_symbol,
+                    "broker_symbol": resolved.broker_symbol,
+                    "exchange_code": resolved.exchange_code,
+                    "product_type": resolved.product_type,
+                    "token": resolved.token,
+                    "contract_code": resolved.contract_code,
+                    "lot_size": lot_size,
+                    "tick_size": resolved.tick_size,
+                    "expiry_date": resolved.expiry_date.isoformat() if isinstance(resolved.expiry_date, date) else None,
+                    "right": resolved.right,
+                    "strike_price": resolved.strike_price,
+                },
+                "preview": {
+                    "product_type": product_type,
                     "action": action,
-                    "price": str(price),
-                    "expiry_date": breeze_expiry,
-                    "stock_code": resolved.broker_symbol,
-                    "cover_order_flow": "N",
-                    "fresh_order_type": "N",
-                    "cover_limit_rate": "0",
-                    "cover_sltp_price": "0",
-                    "fresh_limit_rate": "0",
-                    "open_quantity": "0",
-                }
-                calc_resp = self.gateway.get_margin_calculator([calc_position], exchange_code)
-                span_margin = self._to_float(calc_resp.get("span_margin_required"))
-                non_span_margin = self._to_float(calc_resp.get("non_span_margin_required"))
-                margin_result = {
-                    "margin_status": "ok",
-                    "span_margin": span_margin,
-                    "non_span_margin": non_span_margin,
-                    "order_value": self._to_float(calc_resp.get("order_value")),
-                    "order_margin": self._to_float(calc_resp.get("order_margin")),
-                    "trade_margin": self._to_float(calc_resp.get("trade_margin")),
-                    "block_trade_margin": self._to_float(calc_resp.get("block_trade_margin")),
-                    "total_margin": (span_margin or 0) + (non_span_margin or 0),
-                }
-            except Exception as error:
-                margin_result = {"margin_status": "error", "error": str(error)}
-
-        if exchange_code in ("NSE", "NFO"):
-            try:
-                fund_resp = self.gateway.get_funds()
-                if exchange_code == "NFO":
-                    allocated = self._to_float(fund_resp.get("allocated_fno"))
-                    blocked = self._to_float(fund_resp.get("block_by_trade_fno"))
-                else:
-                    allocated = self._to_float(fund_resp.get("allocated_equity"))
-                    blocked = self._to_float(fund_resp.get("block_by_trade_equity"))
-                unallocated = self._to_float(fund_resp.get("unallocated_balance"))
-                fund_result = {
-                    "fund_status": "ok",
-                    "allocated": allocated,
-                    "blocked_by_trade": blocked,
-                    "unallocated_balance": unallocated,
-                }
-            except Exception as error:
-                fund_result = {"fund_status": "error", "error": str(error)}
-
-        return {
-            "status": "ok",
-            "instrument": {
-                "display_symbol": resolved.display_symbol,
-                "broker_symbol": resolved.broker_symbol,
-                "exchange_code": resolved.exchange_code,
-                "product_type": resolved.product_type,
-                "token": resolved.token,
-                "contract_code": resolved.contract_code,
-                "lot_size": lot_size,
-                "tick_size": resolved.tick_size,
-                "expiry_date": resolved.expiry_date.isoformat() if resolved.expiry_date else None,
-                "right": resolved.right,
-                "strike_price": resolved.strike_price,
-            },
-            "preview": {
-                "product_type": product_type,
-                "action": action,
-                "quantity": quantity,
-                "price": price,
-                "lots": max(1, quantity // lot_size) if lot_size else quantity,
-                "total_quantity": quantity,
-                "margin": margin_result,
-                "funds": fund_result,
-            },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+                    "quantity": quantity,
+                    "price": price,
+                    "lots": max(1, quantity // lot_size) if lot_size else quantity,
+                    "total_quantity": quantity,
+                    "margin": margin_result,
+                    "funds": fund_result,
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        except Exception as error:
+            return {"status": "error", "error": f"Preview build failed: {error}"}
 
     def place_order(self, params: dict[str, Any]) -> dict[str, Any]:
         broker_symbol = params.get("broker_symbol", "").strip().upper()
@@ -892,31 +898,31 @@ class DashboardService:
         except Exception as error:
             raise DashboardServiceError(f"Failed to resolve instrument: {error}")
 
-        lot_size = resolved.lot_size or 1
-        quantity_lots = max(1, int(float(quantity)))
-        quantity_actual = quantity_lots * lot_size
-
-        breeze_payload: dict[str, str] = {
-            "stock_code": resolved.broker_symbol,
-            "exchange_code": resolved.exchange_code,
-            "product": product_type,
-            "action": action,
-            "order_type": order_type,
-            "quantity": str(quantity_actual),
-            "price": str(price),
-            "validity": validity,
-            "stoploss": "",
-            "disclosed_quantity": "0",
-            "user_remark": "dashboard",
-        }
-
-        if product_type in ("futures", "options") and resolved.expiry_date:
-            breeze_payload["expiry_date"] = resolved.expiry_date.strftime("%Y-%m-%d") + "T06:00:00.000Z"
-        if product_type == "options":
-            breeze_payload["right"] = resolved.right
-            breeze_payload["strike_price"] = resolved.strike_price
-
         try:
+            lot_size = resolved.lot_size or 1
+            quantity_lots = max(1, int(float(quantity)))
+            quantity_actual = quantity_lots * lot_size
+
+            breeze_payload: dict[str, str] = {
+                "stock_code": resolved.broker_symbol,
+                "exchange_code": resolved.exchange_code,
+                "product": product_type,
+                "action": action,
+                "order_type": order_type,
+                "quantity": str(quantity_actual),
+                "price": str(price),
+                "validity": validity,
+                "stoploss": "",
+                "disclosed_quantity": "0",
+                "user_remark": "dashboard",
+            }
+
+            if product_type in ("futures", "options") and isinstance(resolved.expiry_date, date):
+                breeze_payload["expiry_date"] = resolved.expiry_date.strftime("%Y-%m-%d") + "T06:00:00.000Z"
+            if product_type == "options":
+                breeze_payload["right"] = resolved.right
+                breeze_payload["strike_price"] = resolved.strike_price
+
             result = self.gateway.place_order(breeze_payload)
         except Exception as error:
             raise DashboardServiceError(f"Order placement failed: {error}")
