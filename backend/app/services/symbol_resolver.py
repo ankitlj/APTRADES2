@@ -213,10 +213,16 @@ class SymbolResolver:
             )
 
         if product_type == "options":
-            expected_right = (right or "others").lower()
+            raw_right = (right or "others").lower()
+            if raw_right in ("ce", "call"):
+                right_filter = func.lower(Instrument.option_right).in_(["call", "ce"])
+            elif raw_right in ("pe", "put"):
+                right_filter = func.lower(Instrument.option_right).in_(["put", "pe"])
+            else:
+                right_filter = func.lower(Instrument.option_right) == raw_right
             expected_strike = strike_price or "0"
             statement = statement.where(
-                Instrument.option_right == expected_right,
+                right_filter,
                 Instrument.strike_price == expected_strike,
             ).order_by(
                 Instrument.expiry_date.is_(None),
