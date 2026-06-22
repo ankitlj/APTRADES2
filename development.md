@@ -2824,6 +2824,14 @@ Websocket:
 - **Verification**: `pytest` → 172 passed (167 existing + 5 new), `npm run build` → 1861 modules, clean.
 - **Next**: Deploy to Railway, verify order preview + placement end-to-end with live Breeze credentials.
 
+### 2026-06-22 — Fix 2: Null-unsafe param extraction causing HTTP 500 in order-preview
+- **Root cause**: `params.get("right", "others").strip().lower()` crashes when frontend sends `"right": null` — `.get()` returns `None` (default only applies if key is MISSING), then `.strip()` throws `AttributeError`. This happens BEFORE both try/except blocks, escaping directly to Flask error handler → HTTP 500.
+- **Same class in same file**: `place_order()` had the identical pattern on `right`, `order_type`, and `validity`.
+- **Fix**: Changed `params.get("right", "others").strip().lower()` → `str(params.get("right") or "others").strip().lower()` — `None or "others"` yields `"others"` safely. Applied same `str(... or default).strip()` pattern to `order_type` and `validity` in `place_order`.
+- **Files changed**: `backend/app/services/dashboard_service.py` (4 locations: lines 733, 871, 872, 874)
+- **Verification**: 5 API-level tests all pass — cash preview (200), futures preview (200), options with `right: null` (200 structured error, NO 500), multiple null fields (200 structured error), place-order with null right/order_type/validity (400 structured error, NO 500). Existing 51/51 dashboard contract tests pass. Frontend build clean.
+- **Remaining risk**: None for this class. The null `.strip()` crash is fully eliminated from order-preview and place-order paths. Previous "Internal server error." observations on production should resolve with this fix.
+
 ### 2026-06-22 — Order modal: 'success' vs 'ok' status mismatch
 - **Goal**: Fix order modal margin/funds/blocks never rendering and "Internal server error." appearing.
 - **Root cause**: `DashboardOptionOrderBox.tsx` checked `=== "success"` at 3 locations, but the backend always returns `"ok"` for `margin_status`, `fund_status`, and place-order `status`. This caused margin numbers and funds blocks to silently never display.

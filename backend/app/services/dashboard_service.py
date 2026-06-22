@@ -730,7 +730,7 @@ class DashboardService:
         quantity_str = params.get("quantity", "1")
         price_str = params.get("price", "0")
         expiry_date_str = params.get("expiry_date", "")
-        right = params.get("right", "others").strip().lower()
+        right = str(params.get("right") or "others").strip().lower()
         strike_price = params.get("strike_price", "0")
 
         if not broker_symbol or not exchange_code or product_type not in ("cash", "futures", "options"):
@@ -868,10 +868,10 @@ class DashboardService:
         action = params.get("action", "buy").strip().lower()
         quantity = params.get("quantity", "1")
         price = params.get("price", "0")
-        order_type = params.get("order_type", "limit").strip().lower()
-        validity = params.get("validity", "day").strip().lower()
+        order_type = str(params.get("order_type") or "limit").strip().lower()
+        validity = str(params.get("validity") or "day").strip().lower()
         expiry_date_str = params.get("expiry_date", "")
-        right = params.get("right", "others").strip().lower()
+        right = str(params.get("right") or "others").strip().lower()
         strike_price = params.get("strike_price", "0")
 
         if not broker_symbol or not exchange_code:
