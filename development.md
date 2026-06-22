@@ -2823,3 +2823,11 @@ Websocket:
   - `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx` — full modal redesign
 - **Verification**: `pytest` → 172 passed (167 existing + 5 new), `npm run build` → 1861 modules, clean.
 - **Next**: Deploy to Railway, verify order preview + placement end-to-end with live Breeze credentials.
+
+### 2026-06-22 — Order modal: 'success' vs 'ok' status mismatch
+- **Goal**: Fix order modal margin/funds/blocks never rendering and "Internal server error." appearing.
+- **Root cause**: `DashboardOptionOrderBox.tsx` checked `=== "success"` at 3 locations, but the backend always returns `"ok"` for `margin_status`, `fund_status`, and place-order `status`. This caused margin numbers and funds blocks to silently never display.
+- **Diagnosis also proved**: `get_order_preview()` has no uncaught exception path — all 7 edge cases (cash/futures/options/margin-error/funds-error/empty-body/unresolvable-symbol) return HTTP 200 with structured payload. The Flask 500 error handler does NOT fire for this route. "Internal server error" observed on production is likely from a different API (orderbook cold-start) or deployment lag.
+- **Files changed**: `frontend/src/components/dashboard/DashboardOptionOrderBox.tsx` (3 locations, 4 insertions/3 deletions)
+- **Verification**: `pytest` → 51/51 dashboard contract tests passed, `npm run build` → 1861 modules, clean.
+- **Remaining risk**: The "Internal server error." symptom on production may persist if it's caused by orderbook polling on Railway cold-start, not by the preview endpoint. Monitor after deploy.
