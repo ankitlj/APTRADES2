@@ -646,7 +646,7 @@ export function DashboardOptionOrderBook() {
                     {previewState.data.preview.margin.error ?? "Margin calculation failed"}
                   </div>
                 )}
-                {previewState.data.preview.margin.margin_status === "success" && (
+                {(previewState.data.preview.margin.margin_status === "success" || previewState.data.preview.margin.margin_status === "ok") && (
                   <div className="space-y-1">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground/70">Total Margin</span>
@@ -702,7 +702,8 @@ export function DashboardOptionOrderBook() {
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-medium text-muted-foreground">Available Funds</span>
             </div>
-            {previewState.status === "ok" && previewState.data?.preview.funds.fund_status === "success" && (
+            {previewState.status === "ok" && previewState.data?.preview.funds.fund_status === "ok" && (
+
               <>
                 <div className="mt-1 flex justify-between">
                   <span className="text-muted-foreground/70">Balance</span>
@@ -747,7 +748,7 @@ export function DashboardOptionOrderBook() {
           )}
           {placeState.status === "ok" && placeState.data && (
             <div className="mt-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700 dark:border-green-900/50 dark:bg-green-950/20 dark:text-green-400">
-              {placeState.data.status === "success"
+              {(placeState.data.status === "success" || placeState.data.status === "ok")
                 ? `Order placed: ${placeState.data.order_id}`
                 : placeState.data.message ?? "Order placed"}
             </div>
