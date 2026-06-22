@@ -1411,3 +1411,126 @@ def test_order_preview_endpoint_margin_calc_error_returns_error_status(tmp_path)
     assert payload["status"] == "ok"
     assert payload["preview"]["margin"]["margin_status"] == "error"
     assert "Breeze rejected" in payload["preview"]["margin"]["error"]
+
+
+def _capturing_margin_calculator(store):
+    """Return a mock side-effect that captures the payload and returns a dummy response."""
+    def inner(positions, exchange_code):
+        store.append({"list_of_positions": positions, "exchange_code": exchange_code})
+        return {"span_margin_required": "150000", "order_value": "1750000"}
+    return inner
+
+
+def test_order_preview_future_payload_normalization(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'op_fut_norm.sqlite'}"
+    _seed_dashboard_data(database_url)
+    expiry = date.today() + timedelta(days=14)
+    captured = []
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_funds",
+        return_value={"allocated_fno": 1000000.0},
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_margin_calculator",
+        side_effect=_capturing_margin_calculator(captured),
+    ):
+        response = client.post(
+            "/api/dashboard/order-preview",
+            content_type="application/json",
+            data=f'{{"broker_symbol":"NIFTY","exchange_code":"NFO","product_type":"futures","action":"buy","quantity":"75","price":"23500","expiry_date":"{expiry.isoformat()}"}}',
+        )
+    assert response.status_code == 200
+    assert len(captured) == 1
+    pos = captured[0]["list_of_positions"][0]
+    assert pos["right"] == "others", f"Expected 'others', got {pos['right']!r}"
+    assert pos["product"] == "futures"
+    assert pos["action"] == "buy"
+    assert pos["strike_price"] == "0"
+    assert pos["price"] == "23500", f"Expected '23500', got {pos['price']!r}"
+    assert pos["quantity"] == "3750"
+    assert pos["stock_code"] == "NIFTY"
+    # Verify the response structure is still valid
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["preview"]["margin"]["margin_status"] == "ok"
+
+
+def test_order_preview_option_call_payload_normalization(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'op_opt_call.sqlite'}"
+    _seed_dashboard_data(database_url)
+    _seed_nifty_option(database_url)
+    expiry = date.today() + timedelta(days=14)
+    captured = []
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_funds",
+        return_value={"allocated_fno": 1000000.0},
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_margin_calculator",
+        side_effect=_capturing_margin_calculator(captured),
+    ):
+        response = client.post(
+            "/api/dashboard/order-preview",
+            content_type="application/json",
+            data=f'{{"broker_symbol":"NIFTY","exchange_code":"NFO","product_type":"options","action":"sell","quantity":"150","price":"50","expiry_date":"{expiry.isoformat()}","right":"call","strike_price":"23500"}}',
+        )
+    assert response.status_code == 200
+    assert len(captured) == 1
+    pos = captured[0]["list_of_positions"][0]
+    assert pos["right"] == "call", f"Expected 'call', got {pos['right']!r}"
+    assert pos["product"] == "options"
+    assert pos["action"] == "sell"
+    assert pos["strike_price"] == "23500"
+    assert pos["price"] == "50", f"Expected '50', got {pos['price']!r}"
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["preview"]["margin"]["margin_status"] == "ok"
+
+
+def test_order_preview_option_put_payload_normalization(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'op_opt_put.sqlite'}"
+    _seed_dashboard_data(database_url)
+    expiry = date.today() + timedelta(days=14)
+    # Seed a PUT option directly (no CE option in this DB)
+    from app.db import create_session_factory
+    from app.models import Instrument
+    sf = create_session_factory(database_url)
+    with sf() as s:
+        put_opt = Instrument(
+            exchange_code="NFO", broker_symbol="NIFTY",
+            contract_code=f"NIFTY~PE~{expiry.isoformat()}~23500",
+            display_symbol="NIFTY", name="NIFTY 23500 PE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="12346", lot_size=50, tick_size="0.05",
+            expiry_date=expiry, option_right="put", strike_price="23500",
+            source="security_master", is_active=True,
+        )
+        s.add(put_opt)
+        s.commit()
+    captured = []
+    with _client_with_db(database_url) as client, patch(
+        "app.services.breeze_gateway.BreezeGateway.is_configured", return_value=True,
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_funds",
+        return_value={"allocated_fno": 1000000.0},
+    ), patch(
+        "app.services.breeze_gateway.BreezeGateway.get_margin_calculator",
+        side_effect=_capturing_margin_calculator(captured),
+    ):
+        response = client.post(
+            "/api/dashboard/order-preview",
+            content_type="application/json",
+            data=f'{{"broker_symbol":"NIFTY","exchange_code":"NFO","product_type":"options","action":"buy","quantity":"150","price":"55","expiry_date":"{expiry.isoformat()}","right":"put","strike_price":"23500"}}',
+        )
+    assert response.status_code == 200
+    assert len(captured) == 1
+    pos = captured[0]["list_of_positions"][0]
+    assert pos["right"] == "put", f"Expected 'put', got {pos['right']!r}"
+    assert pos["product"] == "options"
+    assert pos["action"] == "buy"
+    assert pos["strike_price"] == "23500"
+    payload = response.get_json()
+    assert payload["status"] == "ok"
+    assert payload["preview"]["margin"]["margin_status"] == "ok"

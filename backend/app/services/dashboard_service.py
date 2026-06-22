@@ -783,10 +783,10 @@ class DashboardService:
                     calc_position = {
                         "strike_price": breeze_strike,
                         "quantity": str(quantity),
-                        "right": breeze_right.capitalize() if breeze_right != "others" else "Others",
+                        "right": "others" if breeze_right in ("others", None, "") else ("call" if breeze_right.lower() in ("ce", "call") else ("put" if breeze_right.lower() in ("pe", "put") else breeze_right.lower())),
                         "product": breeze_product,
                         "action": action,
-                        "price": str(price),
+                        "price": f"{price:g}",
                         "expiry_date": breeze_expiry,
                         "stock_code": resolved.broker_symbol,
                         "cover_order_flow": "N",
