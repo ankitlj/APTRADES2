@@ -1707,3 +1707,227 @@ def test_order_preview_option_put_payload_normalization(tmp_path):
     payload = response.get_json()
     assert payload["status"] == "ok"
     assert payload["preview"]["margin"]["margin_status"] == "ok"
+
+
+def _seed_reliance_multistrikes(database_url: str) -> None:
+    """Add extra RELIANCE option strikes to the seed data for ordering tests."""
+    from app.db import create_session_factory, ensure_tables
+    ensure_tables(database_url)
+    _seed_search_test_data(database_url)
+    session_factory = create_session_factory(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    with session_factory() as session:
+        extras = [
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~CE~{future_expiry.isoformat()}~140000",
+                display_symbol="RELIANCE", name="RELIANCE 1400 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="80010", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="140000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~CE~{future_expiry.isoformat()}~160000",
+                display_symbol="RELIANCE", name="RELIANCE 1600 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="80011", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="160000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~CE~{future_expiry.isoformat()}~170000",
+                display_symbol="RELIANCE", name="RELIANCE 1700 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="80012", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="170000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~PE~{future_expiry.isoformat()}~140000",
+                display_symbol="RELIANCE", name="RELIANCE 1400 PE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="80013", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="put", strike_price="140000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~PE~{future_expiry.isoformat()}~150000",
+                display_symbol="RELIANCE", name="RELIANCE 1500 PE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="80014", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="put", strike_price="150000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~PE~{future_expiry.isoformat()}~160000",
+                display_symbol="RELIANCE", name="RELIANCE 1600 PE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="80015", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="put", strike_price="160000",
+                source="security_master", is_active=True,
+            ),
+            # Add an older active expiry for expiry-ordering tests
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~CE~{(future_expiry - timedelta(days=30)).isoformat()}~150000",
+                display_symbol="RELIANCE", name="RELIANCE 1500 CE OLD",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="80016", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry - timedelta(days=30),
+                option_right="call", strike_price="150000",
+                source="security_master", is_active=True,
+            ),
+        ]
+        session.add_all(extras)
+        session.commit()
+
+
+def test_search_reliance_fno_future_near_top(tmp_path):
+    """Broad RELIANCE F&O query: future appears before options."""
+    database_url = f"sqlite:///{tmp_path / 's_rel_broad.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) > 0
+    kinds = [r["instrument_kind"] for r in payload["results"]]
+    future_idx = kinds.index("future") if "future" in kinds else -1
+    first_option_idx = next((i for i, k in enumerate(kinds) if k == "option"), -1)
+    assert future_idx >= 0, "No future in RELIANCE results"
+    assert first_option_idx >= 0, "No options in RELIANCE results"
+    assert future_idx < first_option_idx, (
+        f"Future (idx={future_idx}) should appear before first option (idx={first_option_idx}): {kinds}"
+    )
+    # Verify family constraint: all results are RELIANCE
+    for r in payload["results"]:
+        assert r["display_symbol"] == "RELIANCE", f"Non-RELIANCE in results: {r}"
+    # Verify ATM proximity: first option strikes should be near median (1400-1500 range)
+    option_rows = [r for r in payload["results"] if r["instrument_kind"] == "option"]
+    if len(option_rows) >= 4:
+        first_strike = abs(int(option_rows[0]["strike_price"] or 0))
+        median_strike = sum(abs(int(r["strike_price"] or 0)) for r in option_rows) // len(option_rows)
+        assert abs(first_strike - median_strike) <= 20000, (
+            f"First option strike {first_strike} too far from median {median_strike}"
+        )
+
+
+def test_search_reliance_fut_prioritizes_futures(tmp_path):
+    """RELIANCE FUT query: futures dominate, options minimized."""
+    database_url = f"sqlite:///{tmp_path / 's_rel_fut.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE+FUT&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    kinds = [r["instrument_kind"] for r in payload["results"]]
+    assert "future" in kinds, "No futures found"
+    first_future = kinds.index("future")
+    first_non_future = next((i for i, k in enumerate(kinds) if k != "future"), len(kinds))
+    assert first_future == 0, f"Future should be first, got: {kinds}"
+    # If options appear, they should all be after futures
+    option_indices = [i for i, k in enumerate(kinds) if k == "option"]
+    if option_indices:
+        last_future = len(kinds) - 1 - next(i for i, k in enumerate(reversed(kinds)) if k == "future")
+        assert all(oi > last_future for oi in option_indices), (
+            f"Options before futures end: {kinds}"
+        )
+    # No more than 3 options
+    assert kinds.count("option") <= 3, f"Too many options for future intent: {kinds}"
+
+
+def test_search_reliance_ce_prioritizes_ce(tmp_path):
+    """RELIANCE CE query: CE options dominate, no PE before first CE."""
+    database_url = f"sqlite:///{tmp_path / 's_rel_ce.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE+CE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    results = payload["results"]
+    assert len(results) > 0
+    rights = [r.get("right") for r in results if r["instrument_kind"] == "option"]
+    # First option should be CE
+    first_option_right = next((r for r in rights if r is not None), None)
+    assert first_option_right == "CE", f"First option should be CE, got: {rights}"
+    # At least one option should be CE
+    assert any(r == "CE" for r in rights), f"No CE options found in results: {rights}"
+
+
+def test_search_reliance_pe_prioritizes_pe(tmp_path):
+    """RELIANCE PE query: PE options dominate, no CE before first PE."""
+    database_url = f"sqlite:///{tmp_path / 's_rel_pe.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE+PE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    results = payload["results"]
+    assert len(results) > 0
+    rights = [r.get("right") for r in results if r["instrument_kind"] == "option"]
+    first_option_right = next((r for r in rights if r is not None), None)
+    assert first_option_right == "PE", f"First option should be PE, got: {rights}"
+    # At least one option should be PE
+    assert any(r == "PE" for r in rights), f"No PE options found in results: {rights}"
+
+
+def test_search_reliance_strike_specific_dominates(tmp_path):
+    """RELIANCE 1400 CE query: matching strike should dominate."""
+    database_url = f"sqlite:///{tmp_path / 's_rel_strike.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE+1400+CE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    results = payload["results"]
+    option_rows = [r for r in results if r["instrument_kind"] == "option"]
+    assert len(option_rows) > 0, "No options in RELIANCE 1400 CE results"
+    # At least one CE option at/near 1400 should be present
+    ce_1400 = [r for r in option_rows if r.get("right") == "CE" and r.get("display_strike") == "1400"]
+    assert len(ce_1400) > 0, f"No CE 1400 found: {[(r['display_strike'], r.get('right')) for r in option_rows]}"
+
+
+def test_search_nifty_atm_ordering_improved(tmp_path):
+    """NIFTY F&O broad query: option strikes ordered by ATM proximity, not random."""
+    database_url = f"sqlite:///{tmp_path / 's_nifty_atm.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIFTY&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    option_rows = [r for r in payload["results"] if r["instrument_kind"] == "option"]
+    if len(option_rows) >= 3:
+        strikes = [abs(int(r["strike_price"] or 0)) for r in option_rows]
+        distances = [abs(s - strikes[0]) for s in strikes]
+        # Distances should be non-decreasing (ATM-proximity ordering)
+        for i in range(1, len(distances)):
+            assert distances[i] >= distances[i - 1] * 0.5, (
+                f"Strike order not monotonically ATM: {strikes}, distances={distances}"
+            )
+
+
+def test_search_reliance_nearer_expiry_before_further(tmp_path):
+    """RELIANCE F&O: nearer active expiry options before further expiry."""
+    database_url = f"sqlite:///{tmp_path / 's_rel_expiry.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    option_rows = [r for r in payload["results"] if r["instrument_kind"] == "option"]
+    # At least one option should be from the nearer expiry (14 days), not the older one (44 days)
+    if len(option_rows) >= 3:
+        near_expiry = (date.today() + timedelta(days=14)).isoformat()
+        far_expiry = (date.today() + timedelta(days=14) - timedelta(days=30)).isoformat()  # 44 days
+        near_expiry_count = sum(1 for r in option_rows if r["expiry_date"] == near_expiry)
+        far_expiry_count = sum(1 for r in option_rows if r["expiry_date"] == far_expiry)
+        assert near_expiry_count > 0, "No near-expiry options in results"
+        assert near_expiry_count >= far_expiry_count, (
+            f"Far expiry ({far_expiry_count}) should not dominate near ({near_expiry_count})"
+        )

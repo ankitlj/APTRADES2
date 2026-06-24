@@ -2941,3 +2941,50 @@ Websocket:
   (h) Order placement path (`handlePlaceOrder` at line 272) is completely untouched.
   No pre-existing frontend component tests found.
 - **Remaining risks**: None. The only live polling remaining in this component is the orderbook display (`POLL_INTERVAL_MS = 2500`, line 208), an entirely separate concern. Margin preview auto-refresh was intentionally removed for stability because Breeze margin preview is not usable for this account.
+
+### 2026-06-24 — Part 2: Broker-style ranking + ATM option ordering for backend search
+- **Goal**: Make F&O search results feel intentionally ordered — future near top for broad queries, futures-first for FUT, matching-side options first for CE/PE, ATM-proximity option ordering, active > expired ranking.
+- **Root cause**: `_rank_key` used a fixed `(priority, kind_order, neg_expiry_order)` tuple that ignored `ParsedQuery` entirely. `_apply_option_diversity` picked strikes around the median index (not ATM-proximity). Result mix in `search()` always used the same futures-first interleave regardless of query intent. The DB LIKE query used the full raw query string (including CE/PE/FUT suffixes), so intent-specific queries like "RELIANCE CE" matched zero rows — the suffix prevented any instrument match.
+- **Changes** in `backend/app/services/instrument_search_service.py`:
+  1. `_rank_key` — changed from `(row, query, kind) -> RankEntry` tuple to `(row, query, parsed, kind) -> float` score with:
+     - Text priority (same as before: exact → prefix → contains, weighted 0-10 × 100000)
+     - Intent-aware kind ordering (futures-intent: futures=0/cash=20000/options=40000; options-intent: matching-side=0/non-matching=5000/futures=20000/cash=30000; broad: futures=0/options=10000/cash=20000)
+     - Side-match bonus (+5000 for non-matching-right options when options intent)
+     - Strike proximity for strike-specific queries (distance capped at 5000)
+     - Nearer-expiry preference (+100 per day, capped at 365 days)
+  2. `_apply_option_diversity` — changed from `(ranked, query)` to `(ranked, parsed, canonical_display)`. Within each expiry, computes combined median strike from all CE+PE strikes, then orders by distance-from-median with side separation:
+     - If `parsed.right == "ce"`: CE options in ATM-proximity order, no PE
+     - If `parsed.right == "pe"`: PE options in ATM-proximity order, no CE
+     - If broad: interleaves CE and PE nearest-median first (broker-like CE0/PE0/CE1/PE1/...)
+  3. `search()` DB LIKE pattern changed from `cleaned_query` (full raw string) to `parsed.root` (stripped of CE/PE/FUT) — "RELIANCE CE" now searches for "%RELIANCE%" and applies CE ranking/filtering at the score level
+  4. `search()` result mix: futures-intent → futures first + max 3 options trailing; options-intent → matching options first + max 1 future optional; broad → original 3-future/5-option diversity interleave preserved
+- **Files changed**:
+  - `backend/app/services/instrument_search_service.py` — `_rank_key` (full rewrite), `_apply_option_diversity` (full rewrite), `search()` (3 hook points: root_for_search, diversity call, intent mix)
+  - `backend/tests/test_dashboard_contract.py` — 7 new Part 2 tests
+- **Tests added**:
+  1. `test_search_reliance_fno_future_near_top` — broad RELIANCE F&O: future before options, ATM proximity verified
+  2. `test_search_reliance_fut_prioritizes_futures` — RELIANCE FUT: futures first, options ≤ 3
+  3. `test_search_reliance_ce_prioritizes_ce` — RELIANCE CE: first option is CE
+  4. `test_search_reliance_pe_prioritizes_pe` — RELIANCE PE: first option is PE
+  5. `test_search_reliance_strike_specific_dominates` — RELIANCE 1400 CE: matching CE strike present
+  6. `test_search_nifty_atm_ordering_improved` — NIFTY broad: strike order monotonically ATM (non-decreasing distance from first strike)
+  7. `test_search_reliance_nearer_expiry_before_further` — nearer expiry options dominate far expiry
+- **Verification**: `python -m pytest` → 188 passed (181 existing + 7 new). Full backend suite clean.
+- **Visible frontend improvement**: When a user searches in the orderbook modal:
+  - "RELIANCE" → future at top, then CE/PE options interleaved ATM-closest first
+  - "RELIANCE FUT" → only futures (up to 1), no options dominating
+  - "RELIANCE CE" → CE options first, PE de-prioritized
+  - "RELIANCE PE" → PE options first, CE de-prioritized
+  - "RELIANCE 1400 CE" → matching 1400 CE strike dominantly positioned
+  - NIFTY options now ordered by ATM proximity instead of random order
+  - Nearer-expiry contracts ranked above further-expiry contracts
+- **Remaining risks**:
+  - ATM is derived from median-of-available-strikes, not real-time spot price — ordering is heuristically correct for near-ATM strikes but may differ from broker platforms with live spot data
+  - Side-specific queries ("RELIANCE CE") still include both CE and PE options in the full result set (PE is de-prioritized, not eliminated) — the first page normally shows only CE
+  - No expiry chip parsing for complex queries like "RELIANCE JUN CE" — month hints in query text are not parsed
+  - Very short queries (<3 chars) may not trigger intent parsing well
+- **Part 3 should solve**:
+  - Expiry/month/chip parsing from query text (e.g., "RELIANCE JUN CE" → June expiry preferred)
+  - Strike normalization for queries like "RELIANCE 1400 CE" where 1400 = 140000 in DB — match display strike to user input
+  - "All" tab behavior: query with intent modifiers (CE/PE/FUT) should still work in all-tab
+  - End-to-end frontend integration test with mocked search endpoint

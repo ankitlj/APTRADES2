@@ -179,10 +179,7 @@ def classify_instrument(exchange_code: str, product_type: str | None, option_rig
     return "cash"
 
 
-RankEntry = tuple[int, int, str, str, date | None]
-
-
-def _rank_key(row: Instrument, query: str, kind: str) -> RankEntry:
+def _rank_key(row: Instrument, query: str, parsed: ParsedQuery, kind: str) -> float:
     upper_symbol = (row.broker_symbol or "").upper()
     upper_display = (row.display_symbol or "").upper()
     upper_name = (row.name or "").upper()
@@ -204,13 +201,49 @@ def _rank_key(row: Instrument, query: str, kind: str) -> RankEntry:
     else:
         priority = 10
 
-    kind_order = 0 if kind == "cash" else 1 if kind == "future" else 2
+    score = float(priority) * 100000.0
 
-    neg_expiry_order = 0
-    if row.expiry_date is not None:
-        neg_expiry_order = -(row.expiry_date - date.today()).days if row.expiry_date >= date.today() else 99999
+    if parsed.has_futures_intent:
+        if kind == "future":
+            score += 0.0
+        elif kind == "cash":
+            score += 20000.0
+        else:
+            score += 40000.0
+    elif parsed.has_options_intent:
+        if kind == "option":
+            row_right = (row.option_right or "").lower()
+            row_right_short = "ce" if row_right in ("call", "ce") else ("pe" if row_right in ("put", "pe") else None)
+            if row_right_short == parsed.right:
+                score += 0.0
+            else:
+                score += 5000.0
+        elif kind == "future":
+            score += 20000.0
+        else:
+            score += 30000.0
+    else:
+        if kind == "future":
+            score += 0.0
+        elif kind == "option":
+            score += 10000.0
+        else:
+            score += 20000.0
 
-    return (priority, kind_order, neg_expiry_order, upper_symbol, row.expiry_date)
+    if parsed.strike and kind == "option":
+        row_strike = _parse_strike(row.strike_price)
+        if row_strike is not None:
+            dist = abs(row_strike - Decimal(parsed.strike))
+            score += float(min(dist, Decimal("5000")))
+
+    if kind in ("future", "option") and row.expiry_date is not None:
+        days_to = (row.expiry_date - date.today()).days
+        if days_to < 0:
+            score += 99999.0
+        else:
+            score += float(min(days_to, 365)) * 100.0
+
+    return score
 
 
 class InstrumentSearchService:
@@ -233,7 +266,8 @@ class InstrumentSearchService:
         if tab == "fno" and parsed.root:
             canonical_display = resolve_canonical_display(parsed.root, session_factory)
 
-        pattern = f"%{cleaned_query}%"
+        root_for_search = parsed.root if parsed.root else cleaned_query
+        pattern = f"%{root_for_search}%"
 
         with session_factory() as session:
             base = (
@@ -284,27 +318,33 @@ class InstrumentSearchService:
                 if (item[0].display_symbol or "").upper() == canonical_upper
             ]
 
-        ranked = sorted(classified, key=lambda item: _rank_key(item[0], cleaned_query, item[1]))
+        ranked = sorted(classified, key=lambda item: _rank_key(item[0], cleaned_query, parsed, item[1]))
 
         if not ranked:
             return {"status": "ok", "query": query, "tab": tab, "results": []}
 
-        tops = self._apply_option_diversity(ranked, cleaned_query)
+        tops = self._apply_option_diversity(ranked, parsed, canonical_display)
 
-        # Ensure kind diversity: guarantee at least 3 futures and 5 options
-        # appear in results when available, even if native rank/kind_order
-        # would push them past the limit.
-        diverse: list[tuple[Instrument, str]] = []
-        held_futures: list[tuple[Instrument, str]] = []
-        held_options: list[tuple[Instrument, str]] = []
-        for item in tops:
-            if item[1] == "future" and len(held_futures) < 3:
-                held_futures.append(item)
-            elif item[1] == "option" and len(held_options) < 5:
-                held_options.append(item)
-            else:
-                diverse.append(item)
-        interleaved = held_futures + held_options + diverse
+        if parsed.has_futures_intent:
+            future_items = [item for item in tops if item[1] == "future"]
+            option_items = [item for item in tops if item[1] == "option"][:3]
+            interleaved = future_items + option_items
+        elif parsed.has_options_intent:
+            option_items = [item for item in tops if item[1] == "option"]
+            future_items = [item for item in tops if item[1] == "future"][:1]
+            interleaved = option_items + future_items
+        else:
+            diverse: list[tuple[Instrument, str]] = []
+            held_futures: list[tuple[Instrument, str]] = []
+            held_options: list[tuple[Instrument, str]] = []
+            for item in tops:
+                if item[1] == "future" and len(held_futures) < 3:
+                    held_futures.append(item)
+                elif item[1] == "option" and len(held_options) < 5:
+                    held_options.append(item)
+                else:
+                    diverse.append(item)
+            interleaved = held_futures + held_options + diverse
 
         results = []
         for r, kind in interleaved[:60]:
@@ -377,7 +417,8 @@ class InstrumentSearchService:
     def _apply_option_diversity(
         self,
         ranked: list[tuple[Instrument, str]],
-        query: str,
+        parsed: ParsedQuery,
+        canonical_display: str | None,
     ) -> list[tuple[Instrument, str]]:
         cash_future: list[tuple[Instrument, str]] = []
         options: list[tuple[Instrument, str]] = []
@@ -390,37 +431,69 @@ class InstrumentSearchService:
         if not options:
             return ranked
 
-        option_by_underlying: dict[str, list[tuple[Instrument, str]]] = {}
+        option_by_ul: dict[str, list[tuple[Instrument, str]]] = {}
         for item in options:
-            sym = item[0].broker_symbol.upper()
-            option_by_underlying.setdefault(sym, []).append(item)
+            sym = (item[0].display_symbol or item[0].broker_symbol).upper()
+            option_by_ul.setdefault(sym, []).append(item)
 
-        for sym, opt_list in option_by_underlying.items():
+        for sym, opt_list in option_by_ul.items():
             expiry_groups: dict[str, list[tuple[Instrument, str]]] = {}
             for item in opt_list:
                 exp_key = item[0].expiry_date.isoformat() if item[0].expiry_date else "unknown"
                 expiry_groups.setdefault(exp_key, []).append(item)
 
             sorted_expiries = sorted(expiry_groups.keys())
-            chosen_sym: list[tuple[Instrument, str]] = []
+            side_filter: str | None = None
+            if parsed.has_options_intent and parsed.right:
+                side_filter = parsed.right
+
+            ordered: list[tuple[Instrument, str]] = []
 
             for exp_key in sorted_expiries[:2]:
                 group = expiry_groups[exp_key]
-                strikes_with_kind: list[tuple[tuple[Instrument, str], Decimal]] = []
-                for item in group:
-                    parsed = _parse_strike(item[0].strike_price)
-                    if parsed is not None:
-                        strikes_with_kind.append((item, abs(parsed)))
-                strikes_with_kind.sort(key=lambda x: x[1])
-                central_idx = len(strikes_with_kind) // 2
-                start = max(0, central_idx - 2)
-                end = min(len(strikes_with_kind), central_idx + 3)
-                chosen_sym.extend(strikes_with_kind[i][0] for i in range(start, end))
 
-            option_by_underlying[sym] = chosen_sym
+                all_strikes: list[Decimal] = []
+                for item in group:
+                    ps = _parse_strike(item[0].strike_price)
+                    if ps is not None:
+                        all_strikes.append(ps)
+                if not all_strikes:
+                    continue
+                all_strikes.sort()
+                median_strike = all_strikes[len(all_strikes) // 2]
+
+                ce_by_dist: list[tuple[tuple[Instrument, str], Decimal]] = []
+                pe_by_dist: list[tuple[tuple[Instrument, str], Decimal]] = []
+                for item in group:
+                    ps = _parse_strike(item[0].strike_price)
+                    if ps is None:
+                        continue
+                    dist = abs(ps - median_strike)
+                    row_right = (item[0].option_right or "").lower()
+                    if row_right in ("call", "ce"):
+                        ce_by_dist.append((item, dist))
+                    elif row_right in ("put", "pe"):
+                        pe_by_dist.append((item, dist))
+
+                ce_by_dist.sort(key=lambda x: x[1])
+                pe_by_dist.sort(key=lambda x: x[1])
+
+                if side_filter == "ce":
+                    ordered.extend(item for item, _ in ce_by_dist)
+                elif side_filter == "pe":
+                    ordered.extend(item for item, _ in pe_by_dist)
+                else:
+                    max_len = max(len(ce_by_dist), len(pe_by_dist))
+                    for i in range(max_len):
+                        if i < len(ce_by_dist):
+                            ordered.append(ce_by_dist[i][0])
+                        if i < len(pe_by_dist):
+                            ordered.append(pe_by_dist[i][0])
+
+            option_by_ul[sym] = ordered
 
         result: list[tuple[Instrument, str]] = list(cash_future)
-        for sym_items in option_by_underlying.values():
+        for sym_items in option_by_ul.values():
             result.extend(sym_items)
 
         seen = set()
