@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -14,9 +13,6 @@ import requests
 
 class BreezeGatewayError(Exception):
     pass
-
-
-logger = logging.getLogger(__name__)
 
 
 # Phase 18 Tier 1: one process-wide gateway reused across requests so the
@@ -270,14 +266,11 @@ class BreezeGateway:
             "exchange_code": exchange_code,
         }
         response = self._request("POST", "/margincalculator", payload, requires_auth=True)
-        logger.info(
+        print(
             "breeze_margin_calculator_raw_response "
-            "exchange_code=%s "
-            "request_payload=%s "
-            "response=%s",
-            exchange_code,
-            json.dumps(payload, default=str),
-            json.dumps(response, default=str),
+            f"exchange_code={exchange_code} "
+            f"request_payload={json.dumps(payload, default=str)} "
+            f"response={json.dumps(response, default=str)}"
         )
         success = response.get("Success")
         if success is None:

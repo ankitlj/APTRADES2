@@ -5,16 +5,17 @@
 - Last completed phase: Phase 2 — Fix Breeze margin preview payload for futures/options
 - Planned next: Deploy to Railway, verify order preview + placement end-to-end
 
-### 2026-06-22 — Diagnostic Logging: Margin Preview Live Payload Capture
+### 2026-06-24 — Diagnostic Logging: Margin Preview Live Payload Capture (v2 — print)
 - **Goal**: Capture the exact payload sent to Breeze `/margincalculator` and the raw Breeze response/error on the dashboard order-preview path, to diagnose why `Resource not available` persists for RELIANCE futures.
-- **No fix attempted** — this is a pure diagnostic pass. Zero behavioral changes.
-- **Log events added**:
-  1. `dashboard_margin_preview_request` — logged in `dashboard_service.py:get_order_preview()` immediately before `self.gateway.get_margin_calculator()`. Captures `broker_symbol`, `resolved_broker_symbol`, `exchange_code`, `product_type`, and the full `calc_position_payload` dict as JSON.
-  2. `breeze_margin_calculator_raw_response` — logged in `breeze_gateway.py:get_margin_calculator()` after Breeze responds. Captures `exchange_code`, `request_payload` (full dict with `list_of_positions` + `exchange_code`), and the complete raw `response` dict from Breeze.
-- **Files changed**: 
-  - `backend/app/services/dashboard_service.py` — added `import json`, `import logging`, `logger = logging.getLogger(__name__)`, and `logger.info(...)` before the margin-calculator call.
-  - `backend/app/services/breeze_gateway.py` — added `import logging`, `logger = logging.getLogger(__name__)`, and `logger.info(...)` inside `get_margin_calculator()` after `_request()` returns but before `Success` extraction.
-- **Log format**: All logs use structured key=value pairs and a grep-friendly event name prefix. No secrets logged.
+- **No fix attempted** — this is a pure diagnostic pass. Zero behavioral changes except for diagnostics.
+- **Initial approach (v1)**: Used `logger.info(...)` with Python logging. Failed because no `logging.basicConfig()` existed — `logger.info()` messages were silently dropped by default WARNING level.
+- **Fix (v2)**: Replaced `logger.info(...)` with `print(...)` — writes to stdout, captured by Railway logs unconditionally.
+- **Diagnostic print events added**:
+  1. `dashboard_margin_preview_request` — printed in `dashboard_service.py:get_order_preview()` immediately before `self.gateway.get_margin_calculator()`. Captures `broker_symbol`, `resolved_broker_symbol`, `exchange_code`, `product_type`, and full `calc_position_payload` as JSON.
+  2. `breeze_margin_calculator_raw_response` — printed in `breeze_gateway.py:get_margin_calculator()` after Breeze responds. Captures `exchange_code`, `request_payload` (full `list_of_positions` + `exchange_code`), and complete raw Breeze `response` dict.
+- **Files changed**:
+  - `backend/app/services/dashboard_service.py` — added `print(...)` before margin-calculator call. Removed `import logging` and `logger` (no longer needed).
+  - `backend/app/services/breeze_gateway.py` — added `print(...)` inside `get_margin_calculator()` after `_request()`. Removed `import logging` and `logger`.
 - **Verification**: `python -m pytest tests/test_dashboard_contract.py` → 54 passed, `python -m pytest tests/test_breeze_gateway.py` → 9 passed. Zero regressions.
 - **Next**: Deploy to Railway, open BUY modal for a RELIANCE future, click once, then search Railway logs for:
   - `dashboard_margin_preview_request` — confirms the resolved `broker_symbol` and all `calc_position` fields.

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -16,8 +15,6 @@ from .master_contract_service import MasterContractService
 from .positions_service import PositionsService, PositionsServiceError
 from .quote_service import QuoteRequest, QuoteService, QuoteServiceError
 from .symbol_resolver import ResolvedInstrument, SymbolResolver
-
-logger = logging.getLogger(__name__)
 
 _CHART_CACHE_TTL = 300  # 5 minutes — daily candles change slowly
 _CHART_CACHE_KEY_PREFIX = "_DASHBOARD_CHART_CACHE_"
@@ -800,16 +797,13 @@ class DashboardService:
                         "fresh_limit_rate": "0",
                         "open_quantity": "0",
                     }
-                    logger.info(
+                    print(
                         "dashboard_margin_preview_request "
-                        "broker_symbol=%s resolved_broker_symbol=%s "
-                        "exchange_code=%s product_type=%s "
-                        "calc_position_payload=%s",
-                        broker_symbol,
-                        resolved.broker_symbol,
-                        exchange_code,
-                        product_type,
-                        json.dumps(calc_position, default=str),
+                        f"broker_symbol={broker_symbol} "
+                        f"resolved_broker_symbol={resolved.broker_symbol} "
+                        f"exchange_code={exchange_code} "
+                        f"product_type={product_type} "
+                        f"calc_position_payload={json.dumps(calc_position, default=str)}"
                     )
                     calc_resp = self.gateway.get_margin_calculator([calc_position], exchange_code)
                     span_margin = self._to_float(calc_resp.get("span_margin_required"))
