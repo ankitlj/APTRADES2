@@ -68,7 +68,7 @@ export function DashboardOptionOrderBook() {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hasValidDataRef = useRef(false);
-  const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewRequestIdRef = useRef(0);
   const marginPreviewUnavailableRef = useRef(false);
 
@@ -79,10 +79,10 @@ export function DashboardOptionOrderBook() {
     abortRef.current = new AbortController();
   }, []);
 
-  const stopPreviewInterval = useCallback(() => {
-    if (previewIntervalRef.current !== null) {
-      clearInterval(previewIntervalRef.current);
-      previewIntervalRef.current = null;
+  const stopPreviewTimer = useCallback(() => {
+    if (previewTimerRef.current !== null) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
     }
   }, []);
 
@@ -113,19 +113,26 @@ export function DashboardOptionOrderBook() {
         strike_price: selectedInstrument.strike_price,
       }).then((res) => {
         if (reqId !== previewRequestIdRef.current) return;
-        // Stop polling when Breeze margin is unavailable for this account
-        if (
-          res.preview?.margin?.margin_status === "error" &&
-          res.preview?.margin?.error?.includes("Resource not available")
-        ) {
+
+        console.log("ORDER_PREVIEW_MARGIN", res.preview?.margin);
+
+        const marginStatus = String(res.preview?.margin?.margin_status || "").toLowerCase();
+        const marginError = String(res.preview?.margin?.error || "").toLowerCase();
+
+        if (marginStatus === "error" && marginError.includes("resource not available")) {
           marginPreviewUnavailableRef.current = true;
-          stopPreviewInterval();
+          stopPreviewTimer();
+          console.log("ORDER_PREVIEW_POLL_STOP", { reason: "resource_not_available" });
           setPreviewState({ status: "ok", data: res });
           return;
         }
+
         setPreviewState({ status: "ok", data: res });
-        stopPreviewInterval();
-        previewIntervalRef.current = setInterval(() => {
+        stopPreviewTimer();
+
+        console.log("ORDER_PREVIEW_POLL_SCHEDULED");
+        previewTimerRef.current = setTimeout(() => {
+          console.log("ORDER_PREVIEW_POLL_FIRE");
           setPreviewState((prev) => {
             if (prev.status === "ok" || prev.status === "error") {
               return { ...prev, status: "refreshing" };
@@ -135,14 +142,19 @@ export function DashboardOptionOrderBook() {
         }, 1000);
       }).catch((err: Error) => {
         if (reqId !== previewRequestIdRef.current) return;
-        if (err.message.includes("Resource not available")) {
+
+        console.log("ORDER_PREVIEW_MARGIN_ERROR", err.message);
+
+        const errMsg = String(err.message || "").toLowerCase();
+        if (errMsg.includes("resource not available")) {
           marginPreviewUnavailableRef.current = true;
-          stopPreviewInterval();
+          stopPreviewTimer();
+          console.log("ORDER_PREVIEW_POLL_STOP", { reason: "resource_not_available_catch" });
         }
         setPreviewState((prev) => ({ status: "error", error: err.message, data: prev.data }));
       });
     },
-    [selectedInstrument, stopPreviewInterval],
+    [selectedInstrument, stopPreviewTimer],
   );
 
   const handleSelect = useCallback((instrument: InstrumentSearchResult) => {
@@ -171,13 +183,22 @@ export function DashboardOptionOrderBook() {
   }, [orderbook]);
 
   const closeConfirm = useCallback(() => {
-    stopPreviewInterval();
+    stopPreviewTimer();
     previewRequestIdRef.current++;
     marginPreviewUnavailableRef.current = false;
     setConfirmAction(null);
     setPreviewState({ status: "idle" });
     setPlaceState({ status: "idle" });
-  }, [stopPreviewInterval]);
+  }, [stopPreviewTimer]);
+
+  // Cleanup preview timer on unmount
+  useEffect(() => {
+    return () => {
+      if (previewTimerRef.current !== null) {
+        clearTimeout(previewTimerRef.current);
+      }
+    };
+  }, []);
 
   const orderbookSubscriptions: SubscriptionRequest[] = selectedInstrument
     ? [

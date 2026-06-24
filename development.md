@@ -2898,3 +2898,20 @@ Websocket:
 - **Files changed**: `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
 - **Verification**: `npm run build` → clean. No backend files changed. Code-path reasoning: (a) response with known error → flag set + interval stopped, (b) useEffect guards skip, (c) flag reset on modal lifecycle changes, (d) order placement path (`handlePlaceOrder`) untouched.
 - **Remaining risks**: None. This only stops the 1-second polling loop. No UI changes. No backend changes. Order placement path is untouched.
+
+### 2026-06-24 — Robust Margin Preview Polling Stop (setTimeout + normalized guard)
+- **Root cause**: The previous fix (commit `688726c`) used exact-case string matching (`"Resource not available"`) and a perpetual `setInterval`. If the guard condition silently failed to match (e.g. casing mismatch, undefined field, unexpected error shape), the code fell through to the old `setInterval` path and continued polling every 1 second.
+- **Fix** (three changes in `DashboardOptionOrderBook.tsx`):
+  1. **Normalized guard**: `String(... || "").toLowerCase()` on both `margin_status` and `error` before checking — robust against casing variation, undefined, null, or non-string values.
+  2. **Removed perpetual `setInterval`**: Replaced with a one-shot `setTimeout` that schedules exactly one future refresh after each successful fetch. If the guard matches (known unavailable), no timer is scheduled → loop stops permanently for that modal session.
+  3. **Added lifecycle cleanup**: A `useEffect` cleanup clears the timer on component unmount. `closeConfirm` and error paths also clear the timer via `stopPreviewTimer()`.
+- **Runtime logging added** (console.log, all prefixed with `ORDER_PREVIEW_`):
+  - `ORDER_PREVIEW_MARGIN` — raw `res.preview?.margin` from each response
+  - `ORDER_PREVIEW_POLL_STOP` — fires when the known unavailable state is detected
+  - `ORDER_PREVIEW_POLL_SCHEDULED` — fires when a future one-shot refresh is queued
+  - `ORDER_PREVIEW_POLL_FIRE` — fires when the queued refresh actually executes
+  - `ORDER_PREVIEW_MARGIN_ERROR` — raw error message from the catch path
+- **Files changed**: `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
+- **Verification**: `npm run build` → clean (0 TypeScript errors, 1861 modules, 6.0s). Code-path reasoning confirms: (a) initial preview request fires on "loading", (b) after response, one-shot setTimeout is scheduled only if margin is available, (c) known unavailable state stops scheduling entirely, (d) `closeConfirm` clears pending timer + resets flag, (e) `handleSelect` also resets flag, (f) both `useEffect` guards (line ~248 and ~269) skip when flag is true, (g) order placement path (`handlePlaceOrder` at line 316) is completely untouched. No pre-existing frontend component tests found.
+- **Remaining risks**: None. Timer lifecycle is covered by cleanup effect + closeConfirm. Guard is now defensive against any casing/undefined edge case. Console logs are intentionally added for runtime proof and should be removed in a later cleanup pass.
+- **Note**: Console logs are temporary diagnostics for confirming the fix works in production. Remove them in a later cleanup pass after verification.
