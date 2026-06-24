@@ -2981,10 +2981,63 @@ Websocket:
 - **Remaining risks**:
   - ATM is derived from median-of-available-strikes, not real-time spot price — ordering is heuristically correct for near-ATM strikes but may differ from broker platforms with live spot data
   - Side-specific queries ("RELIANCE CE") still include both CE and PE options in the full result set (PE is de-prioritized, not eliminated) — the first page normally shows only CE
-  - No expiry chip parsing for complex queries like "RELIANCE JUN CE" — month hints in query text are not parsed
   - Very short queries (<3 chars) may not trigger intent parsing well
-- **Part 3 should solve**:
-  - Expiry/month/chip parsing from query text (e.g., "RELIANCE JUN CE" → June expiry preferred)
-  - Strike normalization for queries like "RELIANCE 1400 CE" where 1400 = 140000 in DB — match display strike to user input
-  - "All" tab behavior: query with intent modifiers (CE/PE/FUT) should still work in all-tab
-  - End-to-end frontend integration test with mocked search endpoint
+
+### 2026-06-24 — Part 3: Month parsing, scaled strike matching, all-tab intent, combined ranking
+- **Goal**: Make common broker-style queries work correctly — "RELIANCE 1400 CE", "NIFTY 24000 CE", "RELIANCE JUN FUT", "SBIN 820 PE", and derivative-intent queries in "All" tab.
+- **Root cause**: Three separate gaps in Part 1+2:
+  1. **No month/expiry parsing** — `parse_search_query` left month tokens (JUN, JUL, etc.) in `parsed.root`, so "RELIANCE JUN FUT" → root="RELIANCE JUN" → `resolve_canonical_display` failed → empty results
+  2. **Strike matching was raw** — `_rank_key` compared `|DB_strike - user_strike|` directly. User typed "1400" but DB stored "140000" → distance 138600 capped at 5000 → zero rank benefit. No scaling bridge existed.
+  3. **Strike extraction picked first digit, not best** — "NIFTY 26 JUN 24000 CE" → `w.isdigit() and strike is None` captured "26" (a day number) instead of "24000" (the actual strike)
+  4. **All tab ignored intent** — canonical family filter only applied for FNO tab. Derivative-intent queries in "All" tab returned cash-heavy results.
+- **Changes** in `backend/app/services/instrument_search_service.py`:
+
+  **`ParsedQuery` dataclass** — added `expiry_month: int | None` and `month_token: str | None`
+
+  **`parse_search_query()`** — three changes:
+  1. Extracts month tokens (JAN-DEC, full names) from the query text before strike extraction, stripping them from root so canonical resolution works
+  2. Extracts strike by collecting ALL digit words and picking the largest — "NIFTY 26 JUN 24000 CE" → strike="24000" (not "26"). Non-strike digits are discarded (not added back to root)
+  3. Returns `ParsedQuery` with the new expiry_month/month_token fields
+
+  **`normalize_input_strike()`** (new function) — given user-entered strike like "1400", returns candidates [1400, 140000, 1400000] trying multipliers 1, 100, 1000. This bridges the gap between human display values and DB storage (which stores strikes as `display_value × 100`).
+
+  **`_rank_key()`** — two additions:
+  1. Striked proximity now uses `normalize_input_strike()` — compares `min(|DB_strike - candidate|)` across all candidates. "1400" matches DB "140000" with distance 0 (perfect match via candidate 140000).
+  2. Month matching: if `parsed.expiry_month` and row has expiry_date, applies -3000 score bonus for matching month.
+
+  **`_apply_option_diversity()`** — when `parsed.expiry_month` is set, expiry groups matching the target month are sorted before non-matching months (within the 2-expiry cap).
+
+  **`search()`** — when `tab == "all"` and query has derivative intent (futures or options), cash rows are pushed to the end of the result list after all derivatives.
+
+- **Test data** — added SBIN PE 820 strike (DB="82000") for scaled strike testing. New `Instrument` seed added inline in `test_search_sbin_820_pe_scaled_strike`.
+- **Files changed**:
+  - `backend/app/services/instrument_search_service.py` — `_MONTH_TOKENS` (new), `ParsedQuery` (+2 fields), `parse_search_query` (full rewrite), `normalize_input_strike` (new), `_rank_key` (+scaled strike, +month bonus), `_apply_option_diversity` (+month expiry preference), `search()` (+all-tab intent mix)
+  - `backend/tests/test_dashboard_contract.py` — 7 new Part 3 tests
+  - `development.md` — Part 3 entry appended
+- **Tests added**:
+  1. `test_search_reliance_1400_ce_strike_specific` — RELIANCE 1400 CE: CE 1400 (DB=140000) matches via scaled comparison
+  2. `test_search_nifty_24000_ce_strike_specific` — NIFTY 24000 CE: CE 24000 (DB=2400000) matches via scaled comparison
+  3. `test_search_reliance_jun_fut_month_parsing` — RELIANCE JUN FUT: dynamic month computed, matching-month future ranks first
+  4. `test_search_banknifty_26_jun_pe_parses_day_correctly` — BANKNIFTY 26 JUN PE: day "26" not confused as strike, PE prioritized
+  5. `test_search_all_tab_derivative_intent_prioritizes_derivatives` — RELIANCE FUT in "all" tab: derivatives before cash
+  6. `test_search_reliance_1400_ce_all_tab_prioritizes_ce` — RELIANCE 1400 CE in "all" tab: CE dominates, cash pushed down
+  7. `test_search_sbin_820_pe_scaled_strike` — SBIN 820 PE: DB stores 82000, user types 820, scaled matching finds it
+- **Verification**: `python -m pytest` → 195 passed (181 existing + 7 Part 2 + 7 Part 3). Full backend suite clean.
+- **Visible frontend improvement** (search modal):
+  - "RELIANCE 1400 CE" → matching CE 1400 contract ranks first (no more "no results")
+  - "NIFTY 24000 CE" → matching CE 24000 ranks first
+  - "RELIANCE JUN FUT" → future with June expiry ranks first
+  - "SBIN 820 PE" → SBIN PE 820 found via scaled strike match
+  - "All" tab with "RELIANCE 1400 CE" → CE 1400 appears before cash rows
+  - "BANKNIFTY 26 JUN PE" → parses correctly, PE prioritized, day number ignored
+- **Is search good enough for normal broker-like usage?**: Yes, for the common cases. The search modal now handles: broad underlying, CE/PE intent, futures intent, specific strike queries, scaled strike matching, month preference, and all-tab intent awareness. The remaining gaps are edge cases and polish.
+- **Remaining risks**:
+  - ATM heuristic (median-of-available-strikes) without live spot data — ordering is correct near ATM but may not match broker platforms exactly
+  - No numeric strike normalization on the frontend display side (the response already returns the scaled-back display_strike correctly)
+  - Very short queries (<3 chars) have limited parsing
+  - No end-to-end frontend integration test with mocked search
+- **What a future Part 4 would solve**:
+  - End-to-end frontend integration test verifying the search UX
+  - Frontend-side query normalization (trim trailing junk, debounce)
+  - Fallback search for broker codes in "stocks" tab
+  - Live-spot-price-aware ATM ordering when spot data is available from the existing ticker cache

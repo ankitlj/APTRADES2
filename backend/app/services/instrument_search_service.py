@@ -11,6 +11,21 @@ from sqlalchemy import func, or_, select
 from ..db import create_session_factory
 from ..models import Instrument, InstrumentAlias
 
+_MONTH_TOKENS: dict[str, int] = {
+    "JAN": 1, "JANUARY": 1,
+    "FEB": 2, "FEBRUARY": 2,
+    "MAR": 3, "MARCH": 3,
+    "APR": 4, "APRIL": 4,
+    "MAY": 5,
+    "JUN": 6, "JUNE": 6,
+    "JUL": 7, "JULY": 7,
+    "AUG": 8, "AUGUST": 8,
+    "SEP": 9, "SEPTEMBER": 9,
+    "OCT": 10, "OCTOBER": 10,
+    "NOV": 11, "NOVEMBER": 11,
+    "DEC": 12, "DECEMBER": 12,
+}
+
 
 _INSTRUMENT_ALIAS_MAP: dict[str, str] = {
     "NIFTY 50": "NIFTY",
@@ -42,6 +57,8 @@ class ParsedQuery:
     has_options_intent: bool
     right: str | None
     strike: str | None
+    expiry_month: int | None
+    month_token: str | None
 
 
 def parse_search_query(raw: str) -> ParsedQuery:
@@ -63,15 +80,35 @@ def parse_search_query(raw: str) -> ParsedQuery:
             right = token.strip().lower()
             break
 
+    expiry_month: int | None = None
+    month_token: str | None = None
+    if text:
+        words = text.split()
+        remaining: list[str] = []
+        for w in words:
+            if w in _MONTH_TOKENS and month_token is None:
+                expiry_month = _MONTH_TOKENS[w]
+                month_token = w
+            else:
+                remaining.append(w)
+        text = " ".join(remaining).strip()
+
     strike: str | None = None
-    words = text.split()
-    remaining: list[str] = []
-    for w in words:
-        if w.isdigit() and strike is None:
-            strike = w
-        else:
-            remaining.append(w)
-    text = " ".join(remaining).strip()
+    if text:
+        words = text.split()
+        remaining = []
+        digit_words: list[str] = []
+        for w in words:
+            if w.isdigit():
+                digit_words.append(w)
+            else:
+                remaining.append(w)
+        if digit_words:
+            digit_words.sort(key=lambda x: int(x), reverse=True)
+            strike = digit_words[0]
+        text = " ".join(remaining).strip()
+    else:
+        text = ""
 
     return ParsedQuery(
         root=text,
@@ -80,6 +117,8 @@ def parse_search_query(raw: str) -> ParsedQuery:
         has_options_intent=right is not None,
         right=right,
         strike=strike,
+        expiry_month=expiry_month,
+        month_token=month_token,
     )
 
 
@@ -163,6 +202,16 @@ def _parse_strike(value: object) -> Decimal | None:
         return None
 
 
+def normalize_input_strike(user_strike: str) -> list[Decimal]:
+    val = Decimal(user_strike)
+    candidates = [val]
+    if val < 100000:
+        candidates.append(val * 100)
+    if val < 10000:
+        candidates.append(val * 1000)
+    return candidates
+
+
 def classify_instrument(exchange_code: str, product_type: str | None, option_right: str | None, expiry_date: date | None) -> str:
     exchange = (exchange_code or "").strip().upper()
     product = (product_type or "").strip().lower()
@@ -233,8 +282,13 @@ def _rank_key(row: Instrument, query: str, parsed: ParsedQuery, kind: str) -> fl
     if parsed.strike and kind == "option":
         row_strike = _parse_strike(row.strike_price)
         if row_strike is not None:
-            dist = abs(row_strike - Decimal(parsed.strike))
-            score += float(min(dist, Decimal("5000")))
+            candidates = normalize_input_strike(parsed.strike)
+            best_dist = min(abs(row_strike - c) for c in candidates)
+            score += float(min(best_dist, Decimal("5000")))
+
+    if parsed.expiry_month is not None and kind in ("future", "option") and row.expiry_date is not None:
+        if row.expiry_date.month == parsed.expiry_month:
+            score -= 3000.0
 
     if kind in ("future", "option") and row.expiry_date is not None:
         days_to = (row.expiry_date - date.today()).days
@@ -346,6 +400,11 @@ class InstrumentSearchService:
                     diverse.append(item)
             interleaved = held_futures + held_options + diverse
 
+        if tab == "all" and (parsed.has_futures_intent or parsed.has_options_intent):
+            cash_items = [item for item in interleaved if item[1] == "cash"]
+            non_cash_items = [item for item in interleaved if item[1] != "cash"]
+            interleaved = non_cash_items + cash_items
+
         results = []
         for r, kind in interleaved[:60]:
             raw_strike = r.strike_price
@@ -443,6 +502,21 @@ class InstrumentSearchService:
                 expiry_groups.setdefault(exp_key, []).append(item)
 
             sorted_expiries = sorted(expiry_groups.keys())
+            if parsed.expiry_month is not None:
+                target_month = parsed.expiry_month
+                month_match: list[str] = []
+                others: list[str] = []
+                for k in sorted_expiries:
+                    try:
+                        exp_date = date.fromisoformat(k)
+                        if exp_date.month == target_month:
+                            month_match.append(k)
+                        else:
+                            others.append(k)
+                    except (ValueError, TypeError):
+                        others.append(k)
+                sorted_expiries = month_match + others
+
             side_filter: str | None = None
             if parsed.has_options_intent and parsed.right:
                 side_filter = parsed.right

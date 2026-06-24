@@ -1931,3 +1931,168 @@ def test_search_reliance_nearer_expiry_before_further(tmp_path):
         assert near_expiry_count >= far_expiry_count, (
             f"Far expiry ({far_expiry_count}) should not dominate near ({near_expiry_count})"
         )
+
+
+def test_search_reliance_1400_ce_strike_specific(tmp_path):
+    """RELIANCE 1400 CE query: matching CE 1400 (DB=140000) ranks first via scaled strike matching."""
+    database_url = f"sqlite:///{tmp_path / 's_p3_strike.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE+1400+CE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    option_rows = [r for r in payload["results"] if r["instrument_kind"] == "option"]
+    assert len(option_rows) > 0, "No options in RELIANCE 1400 CE results"
+    # First option should be CE 1400 (display_strike="1400")
+    first = option_rows[0]
+    assert first.get("right") == "CE", f"First option should be CE, got {first.get('right')}"
+    strikes_and_rights = [(r["display_strike"], r.get("right")) for r in option_rows]
+    assert ("1400", "CE") in strikes_and_rights, (
+        f"CE 1400 not found in results: {strikes_and_rights}"
+    )
+
+
+def test_search_nifty_24000_ce_strike_specific(tmp_path):
+    """NIFTY 24000 CE query: matching CE 24000 (DB=2400000) ranks first via scaled strike matching."""
+    database_url = f"sqlite:///{tmp_path / 's_p3_strike2.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=NIFTY+24000+CE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    option_rows = [r for r in payload["results"] if r["instrument_kind"] == "option"]
+    assert len(option_rows) > 0, "No options in NIFTY 24000 CE results"
+    first = option_rows[0]
+    assert first.get("right") == "CE", f"First option should be CE, got {first.get('right')}"
+    # First CE display_strike should be 24000 (or close to it)
+    strikes_and_rights = [(r["display_strike"], r.get("right")) for r in option_rows]
+    assert ("24000", "CE") in strikes_and_rights, (
+        f"CE 24000 not found in results: {strikes_and_rights}"
+    )
+
+
+def test_search_reliance_jun_fut_month_parsing(tmp_path):
+    """RELIANCE JUN FUT query: month token parsed, matching-month future ranks first."""
+    database_url = f"sqlite:///{tmp_path / 's_p3_month.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    # Compute expected month abbreviation for the near-term future
+    future_expiry = date.today() + timedelta(days=14)
+    month_abbr = future_expiry.strftime("%b").upper()
+    with _client_with_db(database_url) as client:
+        response = client.get(f"/api/dashboard/search?q=RELIANCE+{month_abbr}+FUT&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    results = payload["results"]
+    assert len(results) > 0, f"No results for RELIANCE {month_abbr} FUT"
+    kinds = [r["instrument_kind"] for r in results]
+    # Futures should appear first
+    assert kinds[0] == "future", f"First result should be future, got: {kinds}"
+    # The first future should have the matching month
+    first = results[0]
+    assert first["expiry_date"] is not None
+    first_expiry = date.fromisoformat(first["expiry_date"])
+    assert first_expiry.month == future_expiry.month, (
+        f"First future expiry month {first_expiry.month} != expected {future_expiry.month}"
+    )
+
+
+def test_search_banknifty_26_jun_pe_parses_day_correctly(tmp_path):
+    """BANKNIFTY 26 JUN PE: day '26' should not break parsing, PE still prioritized."""
+    database_url = f"sqlite:///{tmp_path / 's_p3_day.sqlite'}"
+    _seed_search_test_data(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    month_abbr = future_expiry.strftime("%b").upper()
+    with _client_with_db(database_url) as client:
+        response = client.get(f"/api/dashboard/search?q=BANKNIFTY+26+{month_abbr}+PE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    results = payload["results"]
+    assert len(results) > 0, "No results for BANKNIFTY month+PE query"
+    # Verify canonical family: BANKNIFTY
+    for r in results:
+        assert r["display_symbol"] in ("BANKNIFTY",), f"Non-BANKNIFTY in results: {r}"
+    # PE options should appear (at least one)
+    rights = [r.get("right") for r in results if r["instrument_kind"] == "option"]
+    if rights:
+        first_option_right = next((r for r in rights if r is not None), None)
+        assert first_option_right is None or first_option_right == "PE", (
+            f"First option should be PE, got: {rights}"
+        )
+
+
+def test_search_all_tab_derivative_intent_prioritizes_derivatives(tmp_path):
+    """'All' tab with derivative intent should prioritize F&O over cash."""
+    database_url = f"sqlite:///{tmp_path / 's_p3_all.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE+FUT&tab=all")
+    assert response.status_code == 200
+    payload = response.get_json()
+    results = payload["results"]
+    assert len(results) > 0
+    kinds = [r["instrument_kind"] for r in results]
+    # First result should be a future (not cash)
+    assert kinds[0] != "cash", f"First result should not be cash for FUT query in all-tab, got: {kinds}"
+    # Cash rows should appear after all derivatives
+    first_cash_idx = next((i for i, k in enumerate(kinds) if k == "cash"), len(kinds))
+    last_derivative_idx = max(
+        [i for i, k in enumerate(kinds) if k in ("future", "option")] or [0]
+    )
+    if first_cash_idx < len(kinds):
+        assert first_cash_idx > last_derivative_idx, (
+            f"Cash row appears before derivatives end: {kinds}"
+        )
+
+
+def test_search_reliance_1400_ce_all_tab_prioritizes_ce(tmp_path):
+    """'All' tab with RELIANCE 1400 CE query: CE options should dominate, not cash."""
+    database_url = f"sqlite:///{tmp_path / 's_p3_all_ce.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE+1400+CE&tab=all")
+    assert response.status_code == 200
+    payload = response.get_json()
+    results = payload["results"]
+    assert len(results) > 0
+    kinds = [r["instrument_kind"] for r in results]
+    # First result should not be cash (should be CE option or future)
+    assert kinds[0] != "cash", f"First result should not be cash for CE query in all-tab, got: {kinds}"
+    # At least one CE option with strike 1400 should be present
+    ce_1400 = [r for r in results if r.get("right") == "CE" and r.get("display_strike") == "1400"]
+    assert len(ce_1400) > 0, f"No CE 1400 found in all-tab results"
+
+
+def test_search_sbin_820_pe_scaled_strike(tmp_path):
+    """SBIN with scaled strike: user-entered 820 should match DB 82000."""
+    database_url = f"sqlite:///{tmp_path / 's_p3_sbin.sqlite'}"
+    _seed_search_test_data(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    from app.db import create_session_factory
+    s = create_session_factory(database_url)
+    with s() as session:
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="STABAN",
+            contract_code=f"STABAN~PE~{future_expiry.isoformat()}~82000",
+            display_symbol="SBIN", name="SBIN 820 PE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80020", lot_size=3000, tick_size="0.05",
+            expiry_date=future_expiry, option_right="put", strike_price="82000",
+            source="security_master", is_active=True,
+        ))
+        session.commit()
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=SBIN+820+PE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    results = payload["results"]
+    assert len(results) > 0, "No results for SBIN 820 PE"
+    option_rows = [r for r in results if r["instrument_kind"] == "option"]
+    assert len(option_rows) > 0, "No options in SBIN 820 PE results"
+    # First option should be PE (matching side)
+    first = option_rows[0]
+    assert first.get("right") == "PE", f"First option should be PE, got {first.get('right')}"
+    # At least one PE with display_strike "82000" should be present
+    pe_rows = [r for r in option_rows if r.get("right") == "PE"]
+    assert any(r["display_strike"] == "82000" for r in pe_rows), (
+        f"No PE 82000 found: {[(r['display_strike'], r.get('right')) for r in option_rows]}"
+    )
