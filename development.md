@@ -2915,3 +2915,29 @@ Websocket:
 - **Verification**: `npm run build` → clean (0 TypeScript errors, 1861 modules, 6.0s). Code-path reasoning confirms: (a) initial preview request fires on "loading", (b) after response, one-shot setTimeout is scheduled only if margin is available, (c) known unavailable state stops scheduling entirely, (d) `closeConfirm` clears pending timer + resets flag, (e) `handleSelect` also resets flag, (f) both `useEffect` guards (line ~248 and ~269) skip when flag is true, (g) order placement path (`handlePlaceOrder` at line 316) is completely untouched. No pre-existing frontend component tests found.
 - **Remaining risks**: None. Timer lifecycle is covered by cleanup effect + closeConfirm. Guard is now defensive against any casing/undefined edge case. Console logs are intentionally added for runtime proof and should be removed in a later cleanup pass.
 - **Note**: Console logs are temporary diagnostics for confirming the fix works in production. Remove them in a later cleanup pass after verification.
+
+### 2026-06-24 — Stabilization: Remove All Auto-Refresh / Polling for Margin Preview
+- **Root cause**: Multiple prior attempts to control the preview polling loop (exact-case guard, `marginPreviewUnavailableRef`, one-shot `setTimeout`) all shared the same flaw: they tried to *conditionally keep* auto-refresh alive. Any edge case in the guard (undefined field, unexpected shape, race condition) caused the loop to restart, resulting in repeated `/order-preview` calls every second.
+- **Decision**: Remove ALL auto-refresh for margin preview. The preview is now input-driven only — one fetch on modal open (with valid price), one fetch on price/qty/action change. No timers, no polling, no background refresh.
+- **Changes in `DashboardOptionOrderBook.tsx`**:
+  - Removed `previewTimerRef` (setTimeout ref), `stopPreviewTimer`, and all timer lifecycle logic.
+  - Removed `"refreshing"` from `previewState.status` union — simplified to `"idle" | "loading" | "ok" | "error"`.
+  - Removed `setTimeout` scheduling from `doFetchPreview` `.then` handler — the function now sets state once and returns.
+  - Removed the "refreshing" branch from the preview-trigger `useEffect`.
+  - Replaced the "idle→loading" trigger effect with an input-change-driven effect: when `confirmAction`, `confirmPrice`, or `confirmQty` differs from the last fetched key, status is set to `"loading"` (triggering a single fetch).
+  - Removed `"Refreshing..."` UI text and the `"refreshing"` status branch.
+  - Removed console.log diagnostics (no longer needed since there is no polling loop to debug).
+  - `closeConfirm` and `handleSelect` still reset `marginPreviewUnavailableRef` for fresh modal sessions.
+- **Design rationale**: This account does not have usable Breeze `/margincalculator` support. Live-polling margin is pointless. The preview exists solely to show a stable message ("Resource not available") and optional funds data. Order placement is unaffected.
+- **Files changed**: `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
+- **Verification**: `npm run build` → clean (0 TypeScript errors, 1861 modules, 5.6s). Code-path reasoning:
+  (a) Modal opens → `openConfirm` sets `previewState.status = "loading"` (if valid price) → fetch effect fires → `doFetchPreview` called once.
+  (b) Response received → status set to `"ok"` (or `"error"`) → no follow-up scheduled.
+  (c) User changes price/qty → input-key differs → status set to `"loading"` → fetch effect fires again.
+  (d) Breeze unavailable detected → `marginPreviewUnavailableRef.current = true` → input-change effect returns early → no re-fetch.
+  (e) Modal closes → `closeConfirm` resets flag, status to `"idle"`.
+  (f) Modal reopens → fresh attempt (flag reset in `openConfirm`).
+  (g) No timer construct exists for preview — zero `setTimeout` or `setInterval` calls for margin preview.
+  (h) Order placement path (`handlePlaceOrder` at line 272) is completely untouched.
+  No pre-existing frontend component tests found.
+- **Remaining risks**: None. The only live polling remaining in this component is the orderbook display (`POLL_INTERVAL_MS = 2500`, line 208), an entirely separate concern. Margin preview auto-refresh was intentionally removed for stability because Breeze margin preview is not usable for this account.

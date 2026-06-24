@@ -55,7 +55,7 @@ export function DashboardOptionOrderBook() {
   const [confirmPrice, setConfirmPrice] = useState("");
   const [confirmProduct, setConfirmProduct] = useState<"MIS" | "NORMAL">("NORMAL");
   const [previewState, setPreviewState] = useState<{
-    status: "idle" | "loading" | "refreshing" | "ok" | "error";
+    status: "idle" | "loading" | "ok" | "error";
     data?: OrderPreviewResponse;
     error?: string;
   }>({ status: "idle" });
@@ -68,7 +68,6 @@ export function DashboardOptionOrderBook() {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const hasValidDataRef = useRef(false);
-  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewRequestIdRef = useRef(0);
   const marginPreviewUnavailableRef = useRef(false);
 
@@ -77,13 +76,6 @@ export function DashboardOptionOrderBook() {
       abortRef.current.abort();
     }
     abortRef.current = new AbortController();
-  }, []);
-
-  const stopPreviewTimer = useCallback(() => {
-    if (previewTimerRef.current !== null) {
-      clearTimeout(previewTimerRef.current);
-      previewTimerRef.current = null;
-    }
   }, []);
 
   const doFetchPreview = useCallback(
@@ -96,7 +88,6 @@ export function DashboardOptionOrderBook() {
         ? "futures"
         : "cash";
 
-      // Skip useless calls with zero price for futures/options
       if (productType !== "cash" && (!price || parseFloat(price) <= 0)) return;
 
       const reqId = ++previewRequestIdRef.current;
@@ -114,47 +105,26 @@ export function DashboardOptionOrderBook() {
       }).then((res) => {
         if (reqId !== previewRequestIdRef.current) return;
 
-        console.log("ORDER_PREVIEW_MARGIN", res.preview?.margin);
-
         const marginStatus = String(res.preview?.margin?.margin_status || "").toLowerCase();
         const marginError = String(res.preview?.margin?.error || "").toLowerCase();
 
         if (marginStatus === "error" && marginError.includes("resource not available")) {
           marginPreviewUnavailableRef.current = true;
-          stopPreviewTimer();
-          console.log("ORDER_PREVIEW_POLL_STOP", { reason: "resource_not_available" });
           setPreviewState({ status: "ok", data: res });
           return;
         }
 
         setPreviewState({ status: "ok", data: res });
-        stopPreviewTimer();
-
-        console.log("ORDER_PREVIEW_POLL_SCHEDULED");
-        previewTimerRef.current = setTimeout(() => {
-          console.log("ORDER_PREVIEW_POLL_FIRE");
-          setPreviewState((prev) => {
-            if (prev.status === "ok" || prev.status === "error") {
-              return { ...prev, status: "refreshing" };
-            }
-            return prev;
-          });
-        }, 1000);
       }).catch((err: Error) => {
         if (reqId !== previewRequestIdRef.current) return;
-
-        console.log("ORDER_PREVIEW_MARGIN_ERROR", err.message);
-
         const errMsg = String(err.message || "").toLowerCase();
         if (errMsg.includes("resource not available")) {
           marginPreviewUnavailableRef.current = true;
-          stopPreviewTimer();
-          console.log("ORDER_PREVIEW_POLL_STOP", { reason: "resource_not_available_catch" });
         }
         setPreviewState((prev) => ({ status: "error", error: err.message, data: prev.data }));
       });
     },
-    [selectedInstrument, stopPreviewTimer],
+    [selectedInstrument],
   );
 
   const handleSelect = useCallback((instrument: InstrumentSearchResult) => {
@@ -183,21 +153,11 @@ export function DashboardOptionOrderBook() {
   }, [orderbook]);
 
   const closeConfirm = useCallback(() => {
-    stopPreviewTimer();
     previewRequestIdRef.current++;
     marginPreviewUnavailableRef.current = false;
     setConfirmAction(null);
     setPreviewState({ status: "idle" });
     setPlaceState({ status: "idle" });
-  }, [stopPreviewTimer]);
-
-  // Cleanup preview timer on unmount
-  useEffect(() => {
-    return () => {
-      if (previewTimerRef.current !== null) {
-        clearTimeout(previewTimerRef.current);
-      }
-    };
   }, []);
 
   const orderbookSubscriptions: SubscriptionRequest[] = selectedInstrument
@@ -252,15 +212,12 @@ export function DashboardOptionOrderBook() {
     };
   }, [selectedInstrument, cancelPending]);
 
+  // Fetch preview when status transitions to "loading" (set by input-change effect below)
   useEffect(() => {
     if (!confirmAction || !selectedInstrument) return;
     if (marginPreviewUnavailableRef.current) return;
-
-    if (previewState.status === "loading") {
-      doFetchPreview(confirmAction, confirmQty, confirmPrice, confirmProduct);
-    } else if (previewState.status === "refreshing") {
-      doFetchPreview(confirmAction, confirmQty, confirmPrice, confirmProduct);
-    }
+    if (previewState.status !== "loading") return;
+    doFetchPreview(confirmAction, confirmQty, confirmPrice, confirmProduct);
   }, [
     confirmAction,
     confirmQty,
@@ -271,15 +228,15 @@ export function DashboardOptionOrderBook() {
     doFetchPreview,
   ]);
 
-  // Auto-start preview when user enters a valid price while in idle state
-  const prevIdleTriggerRef = useRef(false);
+  // Re-fetch preview when user changes price, quantity, or action
+  const lastInputKeyRef = useRef("");
   useEffect(() => {
     if (!confirmAction || !selectedInstrument) return;
     if (marginPreviewUnavailableRef.current) return;
-    if (previewState.status !== "idle") {
-      prevIdleTriggerRef.current = false;
-      return;
-    }
+    if (previewState.status === "loading") return;
+
+    const key = `${confirmAction}|${confirmQty}|${confirmPrice}`;
+    if (key === lastInputKeyRef.current) return;
 
     const productType = selectedInstrument.instrument_kind === "option"
       ? "options"
@@ -287,12 +244,11 @@ export function DashboardOptionOrderBook() {
       ? "futures"
       : "cash";
     const hasValidPrice = productType === "cash" || (confirmPrice && parseFloat(confirmPrice) > 0);
+    if (!hasValidPrice) return;
 
-    if (hasValidPrice && !prevIdleTriggerRef.current) {
-      prevIdleTriggerRef.current = true;
-      setPreviewState({ status: "loading" });
-    }
-  }, [confirmPrice, confirmAction, selectedInstrument, previewState.status]);
+    lastInputKeyRef.current = key;
+    setPreviewState({ status: "loading" });
+  }, [confirmAction, confirmPrice, confirmQty, selectedInstrument, previewState.status]);
 
   const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -609,9 +565,6 @@ export function DashboardOptionOrderBook() {
             <div className="flex items-center gap-2">
               {previewState.status === "loading" && (
                 <span className="text-[10px] text-muted-foreground/60">Loading preview...</span>
-              )}
-              {previewState.status === "refreshing" && (
-                <span className="text-[10px] text-muted-foreground/60">Refreshing...</span>
               )}
               <button
                 onClick={closeConfirm}
