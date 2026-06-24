@@ -70,6 +70,7 @@ export function DashboardOptionOrderBook() {
   const hasValidDataRef = useRef(false);
   const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const previewRequestIdRef = useRef(0);
+  const marginPreviewUnavailableRef = useRef(false);
 
   const cancelPending = useCallback(() => {
     if (abortRef.current) {
@@ -112,6 +113,16 @@ export function DashboardOptionOrderBook() {
         strike_price: selectedInstrument.strike_price,
       }).then((res) => {
         if (reqId !== previewRequestIdRef.current) return;
+        // Stop polling when Breeze margin is unavailable for this account
+        if (
+          res.preview?.margin?.margin_status === "error" &&
+          res.preview?.margin?.error?.includes("Resource not available")
+        ) {
+          marginPreviewUnavailableRef.current = true;
+          stopPreviewInterval();
+          setPreviewState({ status: "ok", data: res });
+          return;
+        }
         setPreviewState({ status: "ok", data: res });
         stopPreviewInterval();
         previewIntervalRef.current = setInterval(() => {
@@ -124,6 +135,10 @@ export function DashboardOptionOrderBook() {
         }, 1000);
       }).catch((err: Error) => {
         if (reqId !== previewRequestIdRef.current) return;
+        if (err.message.includes("Resource not available")) {
+          marginPreviewUnavailableRef.current = true;
+          stopPreviewInterval();
+        }
         setPreviewState((prev) => ({ status: "error", error: err.message, data: prev.data }));
       });
     },
@@ -134,6 +149,7 @@ export function DashboardOptionOrderBook() {
     setSelectedInstrument(instrument);
     setOrderbook({ status: "loading" });
     hasValidDataRef.current = false;
+    marginPreviewUnavailableRef.current = false;
     setConfirmQty(1);
     setConfirmPrice("");
   }, []);
@@ -149,6 +165,7 @@ export function DashboardOptionOrderBook() {
     const initialPrice = currentLtp != null && currentLtp > 0 ? String(currentLtp) : "";
     setConfirmPrice(initialPrice);
     setConfirmProduct("NORMAL");
+    marginPreviewUnavailableRef.current = false;
     setPreviewState({ status: initialPrice ? "loading" : "idle" });
     setPlaceState({ status: "idle" });
   }, [orderbook]);
@@ -156,6 +173,7 @@ export function DashboardOptionOrderBook() {
   const closeConfirm = useCallback(() => {
     stopPreviewInterval();
     previewRequestIdRef.current++;
+    marginPreviewUnavailableRef.current = false;
     setConfirmAction(null);
     setPreviewState({ status: "idle" });
     setPlaceState({ status: "idle" });
@@ -215,6 +233,7 @@ export function DashboardOptionOrderBook() {
 
   useEffect(() => {
     if (!confirmAction || !selectedInstrument) return;
+    if (marginPreviewUnavailableRef.current) return;
 
     if (previewState.status === "loading") {
       doFetchPreview(confirmAction, confirmQty, confirmPrice, confirmProduct);
@@ -235,6 +254,7 @@ export function DashboardOptionOrderBook() {
   const prevIdleTriggerRef = useRef(false);
   useEffect(() => {
     if (!confirmAction || !selectedInstrument) return;
+    if (marginPreviewUnavailableRef.current) return;
     if (previewState.status !== "idle") {
       prevIdleTriggerRef.current = false;
       return;

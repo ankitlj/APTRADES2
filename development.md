@@ -2891,3 +2891,10 @@ Websocket:
 - **Backend**: No changes. Current behavior is correct for all 3 product types.
 - **Verification**: 8/8 API-level tests pass — cash preview (200, margin=not_calculated, funds=ok), futures preview (200, margin=ok), options preview (200, margin=ok), zero-price futures/options/cash (all 200, no crash), funds timeout degrades gracefully (200, fund_status=error). 51/51 backend tests pass. Frontend build clean.
 - **Remaining risk**: None identified for this flow.
+
+### 2026-06-24 — Margin Preview Polling Stop (Breeze unavailable loop fix)
+- **Root cause**: Breeze `/margincalculator` returns HTTP 500 with `{"Success": null, "Error": "Resource not available"}` for this API account. The backend catches this error at `dashboard_service.py:821` and returns HTTP 200 with embedded `{margin_status: "error", error: "Resource not available"}`. The frontend's `doFetchPreview()` `.then` handler treated this as a success (HTTP 200), started a 1-second `setInterval`, and called `/api/dashboard/order-preview` repeatedly every second forever, even though margin was permanently unavailable.
+- **Fix**: Added `marginPreviewUnavailableRef` modal-session-level flag in `DashboardOptionOrderBook.tsx`. In `doFetchPreview()`, if the response contains `margin_status === "error"` with `error.includes("Resource not available")`, the flag is set to `true`, `stopPreviewInterval()` is called, and no interval is started. Both `useEffect` guards (`previewState.status` watcher and idle-price trigger) skip when the flag is `true`. Flag resets on `openConfirm`, `closeConfirm`, and `handleSelect` so a new modal session retries once.
+- **Files changed**: `frontend/src/components/dashboard/DashboardOptionOrderBook.tsx`
+- **Verification**: `npm run build` → clean. No backend files changed. Code-path reasoning: (a) response with known error → flag set + interval stopped, (b) useEffect guards skip, (c) flag reset on modal lifecycle changes, (d) order placement path (`handlePlaceOrder`) untouched.
+- **Remaining risks**: None. This only stops the 1-second polling loop. No UI changes. No backend changes. Order placement path is untouched.
