@@ -3041,3 +3041,52 @@ Websocket:
   - Frontend-side query normalization (trim trailing junk, debounce)
   - Fallback search for broker codes in "stocks" tab
   - Live-spot-price-aware ATM ordering when spot data is available from the existing ticker cache
+
+### 2026-06-25 — Part 4: Frontend section ordering respects derivative intent + backend family filter handles broker-coded display_symbol
+- **Goal**: Fix two remaining gaps that made "RELIANCE 1400 CE" and "SBIN 820 PE" feel broken in production despite all backend search tests passing.
+- **Root causes**:
+  1. **Frontend `buildSections` defeats backend intent ordering** — `SECTION_ORDER` was hardcoded to `cash: 0, future: 1, option: 2`. Even when the backend returned options first for derivative-intent queries, the frontend re-grouped by `instrument_kind` and always showed the `"Stocks"` section first. Users saw equities at the top and needed to scroll past them to find the desired CE/PE option.
+  2. **Backend canonical family filter was too strict for production data** — the filter (in `search()`) only accepted F&O rows whose `display_symbol` exactly matched the resolved canonical name. Tests seeded F&O rows with idealized display_symbol values (`"SBIN"`, `"RELIANCE"`), but real production F&O rows from the SecurityMaster may have broker-code display symbols (`"STABAN"`, `"RELIND"`) if the Part 1 master-contract import fix hasn't re-run on existing data. The filter silently dropped these rows on the FNO tab.
+- **Changes**:
+
+  **Frontend** (`frontend/src/components/dashboard/DashboardInstrumentSearch.tsx`):
+  1. Added `hasDerivativeIntent(query)` — returns `true` when the query contains `CE`, `PE`, or `FUT` (case-insensitive, word-boundary-safe)
+  2. Added `DERIVATIVE_SECTION_ORDER` — `{ option: 0, future: 1, cash: 2 }` — used when `hasDerivativeIntent` returns true
+  3. Renamed original `SECTION_ORDER` to `DEFAULT_SECTION_ORDER` (unchanged: `cash: 0, future: 1, option: 2`)
+  4. `buildSections(results, query)` — accepts query string, selects section order based on intent
+  5. `useMemo` dependency updated to `[results, query]` so re-sorting triggers on query change
+
+  **Backend** (`backend/app/services/instrument_search_service.py`):
+  1. Canonical family filter (FNO tab): previously checked only `display_symbol == canonical_upper`
+  2. Now also collects `broker_symbol` values from all `rows` whose `display_symbol` matches the canonical name, then accepts classified F&O rows if either `display_symbol` matches OR `broker_symbol` is in the collected family set
+  3. This allows F&O rows with broker-coded display_symbol (e.g., `display_symbol="STABAN"`) to pass the family filter as long as their `broker_symbol` matches the canonical underlying's broker code
+
+- **Files changed**:
+  - `frontend/src/components/dashboard/DashboardInstrumentSearch.tsx` — `hasDerivativeIntent`, `DERIVATIVE_SECTION_ORDER`, `buildSections` signature/body, `useMemo` dependency
+  - `backend/app/services/instrument_search_service.py` — family filter logic (7 lines added)
+  - `backend/tests/test_dashboard_contract.py` — 2 new Part 4 tests
+  - `development.md` — Part 4 entry appended
+
+- **Tests added**:
+  1. `test_search_reliance_1400_ce_broker_display_symbol` — RELIANCE F&O rows with display_symbol="RELIND" (broker code) still return CE options via FNO tab
+  2. `test_search_sbin_820_pe_broker_display_symbol` — SBIN F&O rows with display_symbol="STABAN" (broker code) still return PE 820 via FNO tab
+
+- **Verification**:
+  - `python -m pytest tests/test_dashboard_contract.py -k search` → 41 passed (39 existing + 2 new)
+  - `npx tsc --noEmit` → zero errors
+  - `npx vite build` → builds clean
+  - Code-path reasoning confirmed:
+    - `hasDerivativeIntent("RELIANCE 1400 CE")` → `true` → sections: Options first, then Futures, then Stocks
+    - `hasDerivativeIntent("SBIN 820 PE")` → `true` → same derivative-first ordering
+    - `hasDerivativeIntent("NIFTY")` → `false` → unchanged default (Stocks first)
+
+- **Visible frontend improvement**:
+  - "RELIANCE 1400 CE" → Options section appears first, CE 1400 near top
+  - "SBIN 820 PE" → Options section appears first, PE options near top
+  - "NIFTY" → unchanged default (Stocks first) — no regression for broad equity queries
+  - FNO tab with broker-coded F&O rows → correctly shows family results instead of empty
+
+- **Remaining risks**:
+  - `hasDerivativeIntent` is a simple regex heuristic — queries like "PRECISION EQUIPMENT" would not trigger it (correct), but queries like "ACER" (no CE/PE/FUT) also don't trigger it (also correct — no derivative intent)
+  - The broker_symbol family linkage depends on the NSE cash row having a consistent broker_symbol — if the cash row is missing or uses a different broker code, the fallback may not help
+  - Still no frontend test file (no `*.test.*` found in frontend) — intent-ordering behavior verified by code-path reasoning only

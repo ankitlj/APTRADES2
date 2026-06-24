@@ -2096,3 +2096,61 @@ def test_search_sbin_820_pe_scaled_strike(tmp_path):
     assert any(r["display_strike"] == "82000" for r in pe_rows), (
         f"No PE 82000 found: {[(r['display_strike'], r.get('right')) for r in option_rows]}"
     )
+
+
+def test_search_reliance_1400_ce_broker_display_symbol(tmp_path):
+    """RELIANCE 1400 CE: F&O rows with display_symbol=RELIND (broker-coded)
+    still pass canonical family filter via broker_symbol linkage."""
+    database_url = f"sqlite:///{tmp_path / 's_p4_rel_broker.sqlite'}"
+    _seed_reliance_multistrikes(database_url)
+    from app.db import create_session_factory
+    sf = create_session_factory(database_url)
+    with sf() as session:
+        for r in session.query(Instrument).filter(
+            Instrument.broker_symbol == "RELIND",
+            Instrument.exchange_code == "NFO",
+        ).all():
+            r.display_symbol = "RELIND"
+        session.commit()
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE+1400+CE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    option_rows = [r for r in payload["results"] if r["instrument_kind"] == "option"]
+    assert len(option_rows) > 0, "No options with broker-coded RELIANCE F&O display_symbol"
+    ce_rows = [r for r in option_rows if r.get("right") == "CE"]
+    assert len(ce_rows) > 0, "No CE options with broker-coded RELIANCE F&O display_symbol"
+
+
+def test_search_sbin_820_pe_broker_display_symbol(tmp_path):
+    """SBIN 820 PE: F&O rows with display_symbol=STABAN (broker-coded)
+    still pass canonical family filter via broker_symbol linkage."""
+    database_url = f"sqlite:///{tmp_path / 's_p4_sbin_broker.sqlite'}"
+    _seed_search_test_data(database_url)
+    future_expiry = date.today() + timedelta(days=14)
+    from app.db import create_session_factory
+    sf = create_session_factory(database_url)
+    with sf() as session:
+        for r in session.query(Instrument).filter(
+            Instrument.broker_symbol == "STABAN",
+            Instrument.exchange_code == "NFO",
+        ).all():
+            r.display_symbol = "STABAN"
+        session.add(Instrument(
+            exchange_code="NFO", broker_symbol="STABAN",
+            contract_code=f"STABAN~PE~{future_expiry.isoformat()}~82000",
+            display_symbol="STABAN", name="SBIN 820 PE",
+            instrument_group="DERIVATIVE", product_type="options",
+            token="80021", lot_size=3000, tick_size="0.05",
+            expiry_date=future_expiry, option_right="put", strike_price="82000",
+            source="security_master", is_active=True,
+        ))
+        session.commit()
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=SBIN+820+PE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    option_rows = [r for r in payload["results"] if r["instrument_kind"] == "option"]
+    assert len(option_rows) > 0, "No options with broker-coded SBIN F&O display_symbol"
+    pe_rows = [r for r in option_rows if r.get("right") == "PE"]
+    assert len(pe_rows) > 0, "No PE options with broker-coded SBIN F&O display_symbol"

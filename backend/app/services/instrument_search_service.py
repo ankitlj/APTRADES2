@@ -367,9 +367,17 @@ class InstrumentSearchService:
 
         if canonical_display and tab == "fno":
             canonical_upper = canonical_display.upper()
+            # Collect broker_symbols of all rows matching the canonical name
+            # so F&O rows with broker-coded display_symbol (e.g. "STABAN" instead of "SBIN")
+            # are still accepted as part of the same family.
+            family_brokers: set[str] = set()
+            for r in rows:
+                if (r.display_symbol or "").upper() == canonical_upper and r.broker_symbol:
+                    family_brokers.add(r.broker_symbol)
             classified = [
                 item for item in classified
                 if (item[0].display_symbol or "").upper() == canonical_upper
+                or (item[0].broker_symbol or "") in family_brokers
             ]
 
         ranked = sorted(classified, key=lambda item: _rank_key(item[0], cleaned_query, parsed, item[1]))

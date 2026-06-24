@@ -26,11 +26,21 @@ const SECTION_LABELS: Record<string, string> = {
   option: "Options",
 };
 
-const SECTION_ORDER: Record<string, number> = {
+const DEFAULT_SECTION_ORDER: Record<string, number> = {
   cash: 0,
   future: 1,
   option: 2,
 };
+
+const DERIVATIVE_SECTION_ORDER: Record<string, number> = {
+  option: 0,
+  future: 1,
+  cash: 2,
+};
+
+function hasDerivativeIntent(query: string): boolean {
+  return /\b(CE|PE|FUT(?:URE)?S?)\b/i.test(query.trim());
+}
 
 function badgeClass(badge: string): string {
   switch (badge) {
@@ -62,14 +72,15 @@ interface SectionedResults {
   globalStartIdx: number;
 }
 
-function buildSections(results: InstrumentSearchResult[]): SectionedResults[] {
+function buildSections(results: InstrumentSearchResult[], query: string): SectionedResults[] {
   const groups: Record<string, InstrumentSearchResult[]> = {};
   for (const r of results) {
     const kind = r.instrument_kind || "cash";
     if (!groups[kind]) groups[kind] = [];
     groups[kind].push(r);
   }
-  const kinds = Object.keys(groups).sort((a, b) => (SECTION_ORDER[a] ?? 99) - (SECTION_ORDER[b] ?? 99));
+  const order = hasDerivativeIntent(query) ? DERIVATIVE_SECTION_ORDER : DEFAULT_SECTION_ORDER;
+  const kinds = Object.keys(groups).sort((a, b) => (order[a] ?? 99) - (order[b] ?? 99));
   const sections: SectionedResults[] = [];
   let offset = 0;
   for (const kind of kinds) {
@@ -93,7 +104,7 @@ export function DashboardInstrumentSearch({ isOpen, onClose, onSelect }: Dashboa
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const sections = useMemo(() => buildSections(results), [results]);
+  const sections = useMemo(() => buildSections(results, query), [results, query]);
   const hasQuery = query.trim().length > 0;
 
   useEffect(() => {
