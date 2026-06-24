@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from ..db import create_session_factory
 from ..models import Instrument, InstrumentAlias
@@ -32,6 +32,104 @@ def normalize_query(text: str) -> str:
     cleaned = re.sub(r"\s+", " ", cleaned)
     mapped = _INSTRUMENT_ALIAS_MAP.get(cleaned)
     return mapped if mapped else cleaned
+
+
+@dataclass
+class ParsedQuery:
+    root: str
+    raw_root: str
+    has_futures_intent: bool
+    has_options_intent: bool
+    right: str | None
+    strike: str | None
+
+
+def parse_search_query(raw: str) -> ParsedQuery:
+    text = raw.strip().upper()
+    raw_root = text
+
+    has_futures = False
+    for suffix in [" FUTURES", " FUTURE", " FUT"]:
+        if text.endswith(suffix):
+            has_futures = True
+            text = text[: -len(suffix)].strip()
+            break
+
+    right: str | None = None
+    for token in [" PE", " CE"]:
+        if token in text:
+            parts = text.rsplit(token, 1)
+            text = parts[0].strip()
+            right = token.strip().lower()
+            break
+
+    strike: str | None = None
+    words = text.split()
+    remaining: list[str] = []
+    for w in words:
+        if w.isdigit() and strike is None:
+            strike = w
+        else:
+            remaining.append(w)
+    text = " ".join(remaining).strip()
+
+    return ParsedQuery(
+        root=text,
+        raw_root=raw_root,
+        has_futures_intent=has_futures,
+        has_options_intent=right is not None,
+        right=right,
+        strike=strike,
+    )
+
+
+def resolve_canonical_display(text: str, session_factory) -> str | None:
+    root_upper = text.upper().strip()
+    if not root_upper:
+        return None
+
+    alias_map_upper = {k.upper(): v for k, v in _INSTRUMENT_ALIAS_MAP.items()}
+    if root_upper in alias_map_upper:
+        return alias_map_upper[root_upper]
+
+    with session_factory() as session:
+        direct = (
+            session.query(Instrument.display_symbol)
+            .filter(
+                func.upper(Instrument.display_symbol) == root_upper,
+                Instrument.exchange_code.in_(["NSE", "NFO"]),
+                Instrument.is_active.is_(True),
+            )
+            .first()
+        )
+        if direct and direct[0]:
+            return direct[0]
+
+        broker = (
+            session.query(Instrument.display_symbol)
+            .filter(
+                func.upper(Instrument.broker_symbol) == root_upper,
+                Instrument.exchange_code.in_(["NSE", "NFO"]),
+                Instrument.is_active.is_(True),
+            )
+            .first()
+        )
+        if broker and broker[0]:
+            return broker[0]
+
+        alias = (
+            session.query(Instrument.display_symbol)
+            .join(InstrumentAlias, InstrumentAlias.instrument_id == Instrument.id)
+            .filter(
+                func.upper(InstrumentAlias.normalized_alias) == root_upper,
+                Instrument.is_active.is_(True),
+            )
+            .first()
+        )
+        if alias and alias[0]:
+            return alias[0]
+
+    return None
 
 
 def normalize_display_strike(raw_strike: Any) -> Decimal | None:
@@ -127,9 +225,15 @@ class InstrumentSearchService:
         if not self.database_url:
             return {"status": "ok", "query": query, "tab": tab, "results": []}
 
-        pattern = f"%{cleaned_query}%"
+        parsed = parse_search_query(query)
         session_factory = create_session_factory(self.database_url)
         today = date.today()
+
+        canonical_display: str | None = None
+        if tab == "fno" and parsed.root:
+            canonical_display = resolve_canonical_display(parsed.root, session_factory)
+
+        pattern = f"%{cleaned_query}%"
 
         with session_factory() as session:
             base = (
@@ -172,6 +276,13 @@ class InstrumentSearchService:
                     continue
 
             classified.append((r, kind))
+
+        if canonical_display and tab == "fno":
+            canonical_upper = canonical_display.upper()
+            classified = [
+                item for item in classified
+                if (item[0].display_symbol or "").upper() == canonical_upper
+            ]
 
         ranked = sorted(classified, key=lambda item: _rank_key(item[0], cleaned_query, item[1]))
 

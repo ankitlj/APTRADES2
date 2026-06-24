@@ -837,9 +837,91 @@ def _seed_search_test_data(database_url: str) -> None:
                 tick_size="0", isin="", series="",
                 source="security_master", is_active=True,
             ),
+            # Realistic RELIANCE: broker code != display symbol
+            Instrument(
+                exchange_code="NSE", broker_symbol="RELIND",
+                contract_code="RELIND", display_symbol="RELIANCE",
+                name="RELIANCE INDUSTRIES LTD", instrument_group="EQUITY",
+                product_type="cash", token="70015", lot_size=1,
+                tick_size="0.05", isin="INE002A01018", series="EQ",
+                source="stock_script_csv", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~F:{future_expiry.strftime('%d-%b-%Y').upper()}",
+                display_symbol="RELIANCE", name="RELIANCE FUTURES",
+                instrument_group="DERIVATIVE", product_type="futures",
+                token="70016", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="others", strike_price="0",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~CE~{future_expiry.isoformat()}~150000",
+                display_symbol="RELIANCE", name="RELIANCE 1500 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70017", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="150000",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="RELIND",
+                contract_code=f"RELIND~PE~{future_expiry.isoformat()}~130000",
+                display_symbol="RELIANCE", name="RELIANCE 1300 PE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70018", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="put", strike_price="130000",
+                source="security_master", is_active=True,
+            ),
+            # Realistic SBIN F&O: broker code = STABAN, display = SBIN
+            Instrument(
+                exchange_code="NFO", broker_symbol="STABAN",
+                contract_code=f"STABAN~F:{future_expiry.strftime('%d-%b-%Y').upper()}",
+                display_symbol="SBIN", name="SBIN FUTURES",
+                instrument_group="DERIVATIVE", product_type="futures",
+                token="70019", lot_size=3000, tick_size="0.05",
+                expiry_date=future_expiry, option_right="others", strike_price="0",
+                source="security_master", is_active=True,
+            ),
+            Instrument(
+                exchange_code="NFO", broker_symbol="STABAN",
+                contract_code=f"STABAN~CE~{future_expiry.isoformat()}~85000",
+                display_symbol="SBIN", name="SBIN 850 CE",
+                instrument_group="DERIVATIVE", product_type="options",
+                token="70020", lot_size=3000, tick_size="0.05",
+                expiry_date=future_expiry, option_right="call", strike_price="85000",
+                source="security_master", is_active=True,
+            ),
+            # Realistic ADANIPORTS F&O: broker code = ADAPOR, display = ADANIPORTS
+            Instrument(
+                exchange_code="NFO", broker_symbol="ADAPOR",
+                contract_code=f"ADAPOR~F:{future_expiry.strftime('%d-%b-%Y').upper()}",
+                display_symbol="ADANIPORTS", name="ADANIPORTS FUTURES",
+                instrument_group="DERIVATIVE", product_type="futures",
+                token="70021", lot_size=500, tick_size="0.05",
+                expiry_date=future_expiry, option_right="others", strike_price="0",
+                source="security_master", is_active=True,
+            ),
         ]
         session.add_all(options)
         session.commit()
+
+        # Add alias for RELIANCE cash so RELIND -> RELIANCE is resolvable via alias
+        with session_factory() as alias_session:
+            rel_cash = alias_session.query(Instrument).filter(
+                Instrument.broker_symbol == "RELIND",
+                Instrument.exchange_code == "NSE",
+            ).first()
+            if rel_cash:
+                alias_session.add(InstrumentAlias(
+                    instrument_id=rel_cash.id,
+                    alias="RELIANCE",
+                    normalized_alias="RELIANCE",
+                    alias_scope="NSE",
+                    alias_type="display",
+                    source="seed_search_test_data",
+                ))
+            alias_session.commit()
 
 
 def test_search_nifty_ranks_nifty_before_banknifty(tmp_path):
@@ -1148,6 +1230,97 @@ def test_search_matches_via_alias(tmp_path):
     payload = response.get_json()
     symbols = [r["broker_symbol"] for r in payload["results"]]
     assert "STABAN" in symbols
+
+
+def test_search_reliance_fno_returns_reliance_family(tmp_path):
+    """Searching RELIANCE in FNO tab returns only RELIANCE-family F&O contracts."""
+    database_url = f"sqlite:///{tmp_path / 's_reliance_fno.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIANCE&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) > 0
+    for r in payload["results"]:
+        assert r["instrument_kind"] in ("future", "option"), f"Unexpected cash in FNO: {r}"
+        assert r["display_symbol"] == "RELIANCE", f"Non-RELIANCE contract in results: {r}"
+    symbols = set(r["broker_symbol"] for r in payload["results"])
+    assert all(s == "RELIND" for s in symbols), f"Expected all RELIND broker_symbol, got {symbols}"
+
+
+def test_search_reliance_broker_code_still_works(tmp_path):
+    """Broker code RELIND resolves to RELIANCE family in FNO tab."""
+    database_url = f"sqlite:///{tmp_path / 's_relind_fno.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIND&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) > 0
+    for r in payload["results"]:
+        assert r["display_symbol"] == "RELIANCE", f"Expected RELIANCE display, got {r}"
+        assert r["broker_symbol"] == "RELIND"
+
+
+def test_search_sbin_fno_returns_sbin_family_only(tmp_path):
+    """Searching SBIN in FNO tab returns only SBIN-family F&O contracts."""
+    database_url = f"sqlite:///{tmp_path / 's_sbin_fno.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=SBIN&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) > 0
+    for r in payload["results"]:
+        assert r["instrument_kind"] in ("future", "option")
+        assert r["display_symbol"] == "SBIN", f"Non-SBIN contract in FNO: {r}"
+    symbols = set(r["broker_symbol"] for r in payload["results"])
+    assert all(s == "STABAN" for s in symbols), f"Expected all STABAN broker_symbol, got {symbols}"
+
+
+def test_search_staban_broker_code_still_works(tmp_path):
+    """Broker code STABAN resolves to SBIN family in FNO tab."""
+    database_url = f"sqlite:///{tmp_path / 's_staban_fno.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=STABAN&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) > 0
+    for r in payload["results"]:
+        assert r["display_symbol"] == "SBIN", f"Expected SBIN display, got {r}"
+
+
+def test_search_adaniports_fno_returns_adaniports_family(tmp_path):
+    """Searching ADANIPORTS in FNO tab returns only ADANIPORTS contracts, not all ADANI*."""
+    database_url = f"sqlite:///{tmp_path / 's_adani_fno.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=ADANIPORTS&tab=fno")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["results"]) > 0
+    for r in payload["results"]:
+        assert r["instrument_kind"] in ("future", "option")
+        assert r["display_symbol"] == "ADANIPORTS", f"Non-ADANIPORTS contract in FNO: {r}"
+    # Should NOT include ADANIENT futures
+    symbols = set(r["broker_symbol"] for r in payload["results"])
+    assert "ADANIENT" not in symbols, f"ADANIENT leaked into ADANIPORTS search: {symbols}"
+
+
+def test_broker_code_search_does_not_break_all_tab(tmp_path):
+    """Canonical filtering only applies to FNO tab; 'all' tab still works broadly."""
+    database_url = f"sqlite:///{tmp_path / 's_broker_all.sqlite'}"
+    _seed_search_test_data(database_url)
+    with _client_with_db(database_url) as client:
+        response = client.get("/api/dashboard/search?q=RELIND&tab=all")
+    assert response.status_code == 200
+    payload = response.get_json()
+    # All-tab should return RELIANCE cash + F&O rows
+    symbols = set(r["broker_symbol"] for r in payload["results"])
+    assert "RELIND" in symbols, f"RELIND not found in all-tab results: {symbols}"
+    kinds = set(r["instrument_kind"] for r in payload["results"])
+    assert "cash" in kinds, "Cash rows should appear in all-tab"
 
 
 def test_orderbook_endpoint_cash_returns_quote(tmp_path):
