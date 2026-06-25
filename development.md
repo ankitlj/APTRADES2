@@ -3090,3 +3090,31 @@ Websocket:
   - `hasDerivativeIntent` is a simple regex heuristic — queries like "PRECISION EQUIPMENT" would not trigger it (correct), but queries like "ACER" (no CE/PE/FUT) also don't trigger it (also correct — no derivative intent)
   - The broker_symbol family linkage depends on the NSE cash row having a consistent broker_symbol — if the cash row is missing or uses a different broker code, the fallback may not help
   - Still no frontend test file (no `*.test.*` found in frontend) — intent-ordering behavior verified by code-path reasoning only
+
+### 2026-06-25 — Part 5: Fix `_apply_option_diversity` discarding strike-specific ranking
+- **Goal**: Fix strike-specific queries like "RELIANCE 1400 CE" that returned near-ATM contracts (e.g., 1500 CE) instead of the requested exact strike.
+- **Root cause**: `_apply_option_diversity()` recomputed option ordering by ATM proximity using `median_strike` of all available strikes, completely ignoring the user's requested strike. `_rank_key()` had correctly boosted the matching strike, but `_apply_option_diversity()` discarded that ranking and reordered by distance from median. For "RELIANCE 1400 CE" with strikes [1300, 1400, 1500, 1600, 1700], median=1500, so CE 1500 ranked first instead of CE 1400.
+- **Changes** in `backend/app/services/instrument_search_service.py`:
+
+  **`_apply_option_diversity()`** — two-line logical change:
+  1. When `parsed.strike` is present, compute `target_strike` from `normalize_input_strike(parsed.strike)` candidates by picking the candidate closest to any actual strike in the expiry group. When `parsed.strike` is absent, fall back to `median_strike` (existing behavior).
+  2. Distance calculation changed from `abs(ps - median_strike)` to `abs(ps - target_strike)`.
+  
+  This makes strike-specific queries sort by proximity to the *requested* strike rather than the median, while broad queries (no `parsed.strike`) continue to use median-based ATM ordering unchanged.
+
+- **Tests strengthened** (4 tests in `backend/tests/test_dashboard_contract.py`):
+  1. `test_search_reliance_1400_ce_strike_specific` — now asserts first option display_strike == "1400" (was: only checked presence)
+  2. `test_search_nifty_24000_ce_strike_specific` — now asserts first option display_strike == "24000" (was: only checked presence)
+  3. `test_search_sbin_820_pe_scaled_strike` — now asserts first option display_strike == "82000" and right == "PE" (was: only checked presence)
+  4. `test_search_reliance_1400_ce_all_tab_prioritizes_ce` — now asserts first option display_strike == "1400" and right == "CE" (was: only checked presence)
+
+- **Verification**: `python -m pytest` → 76 passed (full suite clean).
+- **Visible frontend improvement**:
+  - "RELIANCE 1400 CE" → first option is now CE 1400 (not 1500 CE)
+  - "SBIN 820 PE" → first option is now PE 820 (not nearest ATM)
+  - "NIFTY 24000 CE" → first option is now CE 24000 (was accidentally correct before due to median=24000)
+  - Broad queries like "RELIANCE" → unchanged, still ATM-proximity via median
+
+- **Remaining risks**:
+  - `target_strike` is derived from the best matching `normalize_input_strike` candidate — if the user types a strike that has no close DB match (e.g., "RELIANCE 9999 CE" where no strike near 9999 exists), `target_strike` picks the least-bad candidate, and ordering still works (closest to that candidate first)
+  - Side-filtering behavior (CE-only/PE-only in results) is unchanged — non-matching side options are dropped from diversity output, same as before

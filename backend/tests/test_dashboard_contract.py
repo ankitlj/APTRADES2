@@ -1946,9 +1946,8 @@ def test_search_reliance_1400_ce_strike_specific(tmp_path):
     # First option should be CE 1400 (display_strike="1400")
     first = option_rows[0]
     assert first.get("right") == "CE", f"First option should be CE, got {first.get('right')}"
-    strikes_and_rights = [(r["display_strike"], r.get("right")) for r in option_rows]
-    assert ("1400", "CE") in strikes_and_rights, (
-        f"CE 1400 not found in results: {strikes_and_rights}"
+    assert first.get("display_strike") == "1400", (
+        f"First option should be strike 1400, got display_strike={first.get('display_strike')}"
     )
 
 
@@ -1964,10 +1963,8 @@ def test_search_nifty_24000_ce_strike_specific(tmp_path):
     assert len(option_rows) > 0, "No options in NIFTY 24000 CE results"
     first = option_rows[0]
     assert first.get("right") == "CE", f"First option should be CE, got {first.get('right')}"
-    # First CE display_strike should be 24000 (or close to it)
-    strikes_and_rights = [(r["display_strike"], r.get("right")) for r in option_rows]
-    assert ("24000", "CE") in strikes_and_rights, (
-        f"CE 24000 not found in results: {strikes_and_rights}"
+    assert first.get("display_strike") == "24000", (
+        f"First option should be strike 24000, got display_strike={first.get('display_strike')}"
     )
 
 
@@ -2045,7 +2042,7 @@ def test_search_all_tab_derivative_intent_prioritizes_derivatives(tmp_path):
 
 
 def test_search_reliance_1400_ce_all_tab_prioritizes_ce(tmp_path):
-    """'All' tab with RELIANCE 1400 CE query: CE options should dominate, not cash."""
+    """'All' tab with RELIANCE 1400 CE query: CE 1400 should rank first among options."""
     database_url = f"sqlite:///{tmp_path / 's_p3_all_ce.sqlite'}"
     _seed_reliance_multistrikes(database_url)
     with _client_with_db(database_url) as client:
@@ -2057,13 +2054,20 @@ def test_search_reliance_1400_ce_all_tab_prioritizes_ce(tmp_path):
     kinds = [r["instrument_kind"] for r in results]
     # First result should not be cash (should be CE option or future)
     assert kinds[0] != "cash", f"First result should not be cash for CE query in all-tab, got: {kinds}"
-    # At least one CE option with strike 1400 should be present
-    ce_1400 = [r for r in results if r.get("right") == "CE" and r.get("display_strike") == "1400"]
-    assert len(ce_1400) > 0, f"No CE 1400 found in all-tab results"
+    # First option should be CE with strike 1400
+    option_rows = [r for r in results if r["instrument_kind"] == "option"]
+    assert len(option_rows) > 0, "No options returned in all-tab results"
+    first_option = option_rows[0]
+    assert first_option.get("right") == "CE", (
+        f"First option should be CE, got right={first_option.get('right')}"
+    )
+    assert first_option.get("display_strike") == "1400", (
+        f"First option should be strike 1400, got display_strike={first_option.get('display_strike')}"
+    )
 
 
 def test_search_sbin_820_pe_scaled_strike(tmp_path):
-    """SBIN with scaled strike: user-entered 820 should match DB 82000."""
+    """SBIN with scaled strike: user-entered 820 should match DB 82000 and rank first."""
     database_url = f"sqlite:///{tmp_path / 's_p3_sbin.sqlite'}"
     _seed_search_test_data(database_url)
     future_expiry = date.today() + timedelta(days=14)
@@ -2088,13 +2092,11 @@ def test_search_sbin_820_pe_scaled_strike(tmp_path):
     assert len(results) > 0, "No results for SBIN 820 PE"
     option_rows = [r for r in results if r["instrument_kind"] == "option"]
     assert len(option_rows) > 0, "No options in SBIN 820 PE results"
-    # First option should be PE (matching side)
+    # First option should be PE with display_strike "82000"
     first = option_rows[0]
     assert first.get("right") == "PE", f"First option should be PE, got {first.get('right')}"
-    # At least one PE with display_strike "82000" should be present
-    pe_rows = [r for r in option_rows if r.get("right") == "PE"]
-    assert any(r["display_strike"] == "82000" for r in pe_rows), (
-        f"No PE 82000 found: {[(r['display_strike'], r.get('right')) for r in option_rows]}"
+    assert first.get("display_strike") == "82000", (
+        f"First option should be strike 82000, got display_strike={first.get('display_strike')}"
     )
 
 

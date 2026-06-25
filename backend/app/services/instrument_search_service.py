@@ -542,7 +542,11 @@ class InstrumentSearchService:
                 if not all_strikes:
                     continue
                 all_strikes.sort()
-                median_strike = all_strikes[len(all_strikes) // 2]
+                if parsed.strike is not None:
+                    candidates = normalize_input_strike(parsed.strike)
+                    target_strike = min(candidates, key=lambda c: min(abs(c - s) for s in all_strikes))
+                else:
+                    target_strike = all_strikes[len(all_strikes) // 2]
 
                 ce_by_dist: list[tuple[tuple[Instrument, str], Decimal]] = []
                 pe_by_dist: list[tuple[tuple[Instrument, str], Decimal]] = []
@@ -550,7 +554,7 @@ class InstrumentSearchService:
                     ps = _parse_strike(item[0].strike_price)
                     if ps is None:
                         continue
-                    dist = abs(ps - median_strike)
+                    dist = abs(ps - target_strike)
                     row_right = (item[0].option_right or "").lower()
                     if row_right in ("call", "ce"):
                         ce_by_dist.append((item, dist))
