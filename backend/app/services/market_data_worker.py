@@ -124,6 +124,8 @@ class MarketDataWorker:
 
         # stock_token -> Subscription (the broker key we receive ticks on)
         self._subscriptions: dict[str, Subscription] = {}
+        # stock_token -> reference count (how many active subscribers need it)
+        self._subscription_ref_counts: dict[str, int] = {}
         # display_symbol -> last normalized tick (in-memory snapshot fallback)
         self._last_ticks: dict[str, dict[str, Any]] = {}
 
@@ -262,9 +264,11 @@ class MarketDataWorker:
                 continue
             with self._lock:
                 if subscription.stock_token in self._subscriptions:
+                    self._subscription_ref_counts[subscription.stock_token] += 1
                     accepted.append(subscription.stock_token)
                     continue
                 self._subscriptions[subscription.stock_token] = subscription
+                self._subscription_ref_counts[subscription.stock_token] = 1
             logger.info(
                 "market-data subscribe: %s -> stock_token=%s display_symbol=%s broker_symbol=%s",
                 item.get("display_symbol") or item.get("symbol") or "?",
@@ -282,15 +286,24 @@ class MarketDataWorker:
 
     def unsubscribe(self, items: list[dict[str, Any]]) -> dict[str, Any]:
         removed: list[str] = []
+        unsub_feeds: list[Subscription] = []
         for item in items:
             subscription = self._to_subscription(item)
             if subscription is None:
                 continue
             with self._lock:
-                existing = self._subscriptions.pop(subscription.stock_token, None)
-            if existing is None:
-                continue
+                existing = self._subscriptions.get(subscription.stock_token)
+                if existing is None:
+                    continue
+                current_count = self._subscription_ref_counts.get(subscription.stock_token, 0)
+                if current_count <= 1:
+                    self._subscriptions.pop(subscription.stock_token, None)
+                    self._subscription_ref_counts.pop(subscription.stock_token, None)
+                    unsub_feeds.append(existing)
+                else:
+                    self._subscription_ref_counts[subscription.stock_token] = current_count - 1
             removed.append(subscription.stock_token)
+        for subscription in unsub_feeds:
             self._feed_unsubscribe(subscription)
         return {"removed": removed, "count": len(self._subscriptions)}
 

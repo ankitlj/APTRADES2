@@ -446,3 +446,156 @@ def test_status_exposes_emit_error_counters() -> None:
     status = worker.status()
     assert status["emit_error_count"] == 1
     assert status["last_emit_error_at"] is not None
+
+
+def test_subscribe_same_token_twice_increments_ref_count(tmp_path) -> None:
+    """Two subscribe calls for the same token: Breeze subscribe called once,
+    ref count increments."""
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+    item = {
+        "display_symbol": "NIFTY",
+        "broker_symbol": "NIFTY",
+        "exchange_code": "NFO",
+        "product_type": "futures",
+        "token": "62329",
+    }
+    r1 = worker.subscribe([item])
+    r2 = worker.subscribe([item])
+
+    assert r1["count"] == 1
+    assert r2["count"] == 1
+    # Breeze subscribe should have been called exactly once
+    assert breeze.subscribed.count("4.1!62329") == 1
+    assert len(breeze.subscribed) == 1
+    # Ref count should be 2 (two callers)
+    assert worker._subscription_ref_counts.get("4.1!62329") == 2
+
+
+def test_unsubscribe_while_another_keeps_token(tmp_path) -> None:
+    """One unsubscribe while another subscriber still exists:
+    Breeze unsubscribe NOT called, token remains active."""
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+    item = {
+        "display_symbol": "NIFTY",
+        "broker_symbol": "NIFTY",
+        "exchange_code": "NFO",
+        "product_type": "futures",
+        "token": "62329",
+    }
+    worker.subscribe([item])  # caller 1: ref=1
+    worker.subscribe([item])  # caller 2: ref=2
+
+    result = worker.unsubscribe([item])  # caller 2 leaves: ref=1
+
+    assert "4.1!62329" in result["removed"]
+    assert result["count"] == 1  # token still active
+    # Breeze unsubscribe should NOT have been called
+    assert "4.1!62329" not in breeze.unsubscribed
+    assert worker._subscription_ref_counts.get("4.1!62329") == 1
+    # Token still in subscriptions dict
+    assert "4.1!62329" in worker._subscriptions
+
+
+def test_last_unsubscribe_tears_down_token(tmp_path) -> None:
+    """Final unsubscribe: Breeze unsubscribe called once, token removed."""
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+    item = {
+        "display_symbol": "NIFTY",
+        "broker_symbol": "NIFTY",
+        "exchange_code": "NFO",
+        "product_type": "futures",
+        "token": "62329",
+    }
+    worker.subscribe([item])  # caller 1: ref=1
+    worker.subscribe([item])  # caller 2: ref=2
+
+    # Both callers unsubscribe
+    worker.unsubscribe([item])  # caller 2: ref=1
+    result = worker.unsubscribe([item])  # caller 1: ref=0
+
+    assert "4.1!62329" in result["removed"]
+    assert result["count"] == 0  # token removed
+    # Breeze unsubscribe should have been called exactly once
+    assert breeze.unsubscribed.count("4.1!62329") == 1
+    assert "4.1!62329" not in worker._subscriptions
+    assert worker._subscription_ref_counts.get("4.1!62329") is None
+
+
+def test_mixed_unrelated_tokens_unaffected_by_ref_count(tmp_path) -> None:
+    """Unrelated token subscriptions must not be affected by ref-counting
+    of a different token."""
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+    item_nifty = {
+        "display_symbol": "NIFTY",
+        "broker_symbol": "NIFTY",
+        "exchange_code": "NFO",
+        "product_type": "futures",
+        "token": "62329",
+    }
+    item_banknifty = {
+        "display_symbol": "BANKNIFTY",
+        "broker_symbol": "CNXBAN",
+        "exchange_code": "NFO",
+        "product_type": "futures",
+        "token": "62326",
+    }
+    # Both tokens subscribed once each
+    worker.subscribe([item_nifty])
+    worker.subscribe([item_banknifty])
+
+    assert worker._subscription_ref_counts.get("4.1!62329") == 1
+    assert worker._subscription_ref_counts.get("4.1!62326") == 1
+
+    # Unsubscribe banknifty — nifty must remain
+    result = worker.unsubscribe([item_banknifty])
+
+    assert "4.1!62326" in result["removed"]
+    assert result["count"] == 1  # only nifty left
+    assert "4.1!62326" in breeze.unsubscribed
+    assert "4.1!62329" not in breeze.unsubscribed
+    assert "4.1!62329" in worker._subscriptions
+    assert worker._subscription_ref_counts.get("4.1!62329") == 1
+
+
+def test_subscribe_same_token_many_then_all_unsubscribe(tmp_path) -> None:
+    """Three subscribers for the same token: only last unsubscribe tears down."""
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+    item = {
+        "display_symbol": "NIFTY",
+        "broker_symbol": "NIFTY",
+        "exchange_code": "NFO",
+        "product_type": "futures",
+        "token": "62329",
+    }
+    # Three callers subscribe
+    worker.subscribe([item])  # ref=1
+    worker.subscribe([item])  # ref=2
+    worker.subscribe([item])  # ref=3
+
+    assert worker._subscription_ref_counts.get("4.1!62329") == 3
+    assert breeze.subscribed.count("4.1!62329") == 1  # only once
+
+    # Two leave
+    worker.unsubscribe([item])  # ref=2
+    worker.unsubscribe([item])  # ref=1
+
+    assert "4.1!62329" not in breeze.unsubscribed  # still one subscriber
+    assert "4.1!62329" in worker._subscriptions
+
+    # Last leaves
+    result = worker.unsubscribe([item])  # ref=0
+
+    assert "4.1!62329" in result["removed"]
+    assert result["count"] == 0
+    assert breeze.unsubscribed.count("4.1!62329") == 1
+    assert "4.1!62329" not in worker._subscriptions

@@ -3118,3 +3118,30 @@ Websocket:
 - **Remaining risks**:
   - `target_strike` is derived from the best matching `normalize_input_strike` candidate — if the user types a strike that has no close DB match (e.g., "RELIANCE 9999 CE" where no strike near 9999 exists), `target_strike` picks the least-bad candidate, and ordering still works (closest to that candidate first)
   - Side-filtering behavior (CE-only/PE-only in results) is unchanged — non-matching side options are dropped from diversity output, same as before
+
+### 2026-06-26 — Subscription reference counting: fix global unsubscribe tearing down shared tokens
+
+- **Goal**: Prevent one page/component unmounting from stopping live prices for another page that shares the same instrument token.
+- **Root cause**: `MarketDataWorker` stored subscriptions in a single flat `_subscriptions` dict. The `subscribe()` method silently skipped duplicate token requests (no ref increment), and `unsubscribe()` performed a global `pop()` that removed the token and called `breeze.unsubscribe_feeds()` regardless of how many pages still needed it. The frontend `useLiveSubscribe` hook correctly unsubscribes on unmount (via diff/cleanup), but this torn down tokens still in use by other pages.
+- **Changes** in `backend/app/services/market_data_worker.py`:
+  1. Added `_subscription_ref_counts: dict[str, int]` — tracks how many active subscribers need each stock_token
+  2. `subscribe()`: when a token already exists, increments ref count instead of silently skipping; when new, sets ref count to 1 and calls Breeze subscribe once
+  3. `unsubscribe()`: when ref count > 1, decrements only and does NOT call Breeze unsubscribe; when ref count reaches 0, removes from both dicts and calls Breeze unsubscribe once
+  4. All ref-count mutations are lock-safe under the existing `self._lock` (`threading.RLock()`)
+
+- **No changes needed** in `backend/app/realtime.py` or `frontend/src/hooks/useLiveMarketData.tsx` — the socket handlers and frontend hook already emit the correct subscribe/unsubscribe events; the fix is purely in the worker's subscription ownership semantics.
+
+- **Tests added** (6 new in `backend/tests/test_market_data_worker.py`):
+  1. `test_subscribe_same_token_twice_increments_ref_count` — Breeze subscribe called once, ref count = 2
+  2. `test_unsubscribe_while_another_keeps_token` — unsubscribe decrements, Breeze unsubscribe NOT called, token still active
+  3. `test_last_unsubscribe_tears_down_token` — final unsubscribe removes token, Breeze unsubscribe called once
+  4. `test_mixed_unrelated_tokens_unaffected_by_ref_count` — unrelated token not affected by another's ref counting
+  5. `test_subscribe_same_token_many_then_all_unsubscribe` — 3 subscribers, only last unsubscribe tears down
+
+- **Verification**: `python -m pytest` → both test files pass:
+  - `tests/test_market_data_worker.py` — 27 passed
+  - `tests/test_dashboard_contract.py -k search` — 41 passed
+
+- **Remaining risks**:
+  - Ref counting is in-memory only — if the worker reconnects (supervisor restart), all active tokens are re-subscribed via `_resubscribe_all()` which only iterates `_subscriptions` (tokens with ref count > 0). This is correct behavior — tokens that had their ref count decremented to 0 and were removed from `_subscriptions` should not be re-subscribed.
+  - The existing `_resubscribe_all()` path is unchanged and still calls `_feed_subscribe` for each active subscription.
