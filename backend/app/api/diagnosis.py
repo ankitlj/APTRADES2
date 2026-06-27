@@ -140,7 +140,7 @@ def token_verify() -> tuple[object, int]:
                     Instrument.exchange_code,
                     Instrument.product_type,
                     Instrument.expiry_date.desc().nullslast(),
-                ).limit(50).all()
+                ).limit(50)
             ))
             result["candidate_count"] = len(candidates)
             result["candidates"] = [

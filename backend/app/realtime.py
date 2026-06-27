@@ -17,14 +17,14 @@ from .services.symbol_resolver import SymbolResolver, SymbolResolverError
 socketio = SocketIO(async_mode="threading", cors_allowed_origins="*")
 
 # The default dashboard watchlist that every connected client gets streamed.
-# All 4 are NSE cash/index symbols so the top ticker shows spot values, not futures.
-# SENSEX was removed because Breeze does not return usable live quotes for BSE cash
-# indices.
+# Breeze's NSE cash index rows can resolve to display-name tokens such as
+# "NIFTY 50", which are not valid websocket stock tokens. Use the matching NFO
+# futures contracts for websocket streaming; REST summary still provides the
+# cash/index fallback values for display.
 DEFAULT_WATCHLIST: list[dict[str, str]] = [
-    {"symbol": "NIFTY", "exchange": "NSE", "product_type": "cash"},
-    {"symbol": "BANKNIFTY", "exchange": "NSE", "product_type": "cash"},
-    {"symbol": "NIFTYMID50", "exchange": "NSE", "product_type": "cash"},
-    {"symbol": "FINNIFTY", "exchange": "NSE", "product_type": "cash"},
+    {"symbol": "NIFTY", "exchange": "NFO", "product_type": "futures"},
+    {"symbol": "BANKNIFTY", "exchange": "NFO", "product_type": "futures"},
+    {"symbol": "FINNIFTY", "exchange": "NFO", "product_type": "futures"},
 ]
 
 _worker: MarketDataWorker | None = None
@@ -78,10 +78,6 @@ def resolve_subscription_items(
     When an item already supplies a ``token``, DB resolution is skipped and the
     item is passed through directly. This allows the frontend to subscribe option
     contracts whose tokens were pre-resolved from an option-chain response."""
-    if not database_url:
-        return []
-
-    resolver = SymbolResolver(database_url)
     resolved_items: list[dict[str, Any]] = []
     for item in requests:
         token = str(item.get("token") or "").strip()
@@ -108,8 +104,12 @@ def resolve_subscription_items(
             )
             continue
 
+        if not database_url:
+            continue
+
         if not symbol or not exchange:
             continue
+        resolver = SymbolResolver(database_url)
         try:
             resolved = resolver.resolve(symbol, exchange, product_type=product_type)
         except SymbolResolverError:
@@ -140,8 +140,13 @@ def _subscribe_requests(requests: list[dict[str, Any]]) -> dict[str, Any]:
     worker = _worker
     if worker is None:
         return {"accepted": [], "skipped": [], "count": 0}
-    items = resolve_subscription_items(current_app.config.get("DATABASE_URL"), requests)
-    logger.info("market-data subscribe requests=%d resolved=%d requests=%s", len(requests), len(items), [r.get("symbol") for r in requests])
+    db_url = current_app.config.get("DATABASE_URL")
+    items = resolve_subscription_items(db_url, requests)
+    print(f"[diag] _subscribe_requests db_url={'set' if db_url else 'MISSING'} requests_in={len(requests)} resolved_out={len(items)}")
+    for r in requests:
+        print(f"[diag]   request symbol={r.get('symbol')} exchange={r.get('exchange')} token={'set' if r.get('token') else 'MISSING'}")
+    for i in items:
+        print(f"[diag]   resolved display_symbol={i.get('display_symbol')} exchange={i.get('exchange_code')} token={i.get('token')}")
     return worker.subscribe(items)
 
 

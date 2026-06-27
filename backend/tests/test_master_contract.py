@@ -162,6 +162,40 @@ def test_master_contract_status_endpoint_returns_not_configured(client):
     assert payload["status"] == "not_configured"
 
 
+def test_master_contract_ignores_non_numeric_token_in_csv(tmp_path):
+    csv_path = tmp_path / "StockScriptNew.csv"
+    db_path = tmp_path / "master_contract.sqlite"
+    _write_csv(csv_path)
+    service = MasterContractService(
+        database_url=f"sqlite:///{db_path}",
+        stock_script_csv_path=str(csv_path),
+        security_master_url="http://example.com/securitymaster.zip",
+    )
+
+    with patch.object(
+        service,
+        "_load_security_master_rows",
+        return_value=SourcePayload(
+            name="security_master",
+            rows=[],
+            digest_source=None,
+            warnings=[],
+        ),
+    ):
+        payload = service.import_master_contract()
+
+    assert payload["status"] == "ok"
+
+    session_factory = create_session_factory(f"sqlite:///{db_path}")
+    with session_factory() as session:
+        cnxban = session.query(Instrument).filter_by(exchange_code="NSE", broker_symbol="CNXBAN").first()
+
+    assert cnxban is not None
+    assert cnxban.token is None, (
+        f"CNXBAN token should be None (was '{cnxban.token}')"
+    )
+
+
 def test_master_contract_import_endpoint_requires_database(client):
     response = client.post("/api/master-contract/import")
 

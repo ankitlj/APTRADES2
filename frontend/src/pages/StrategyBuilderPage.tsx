@@ -10,7 +10,7 @@ import {
   type StrategyLeg,
 } from "@/lib/api";
 import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
-import type { SubscriptionRequest } from "@/lib/realtime";
+import { buildLiveSpotSubscription, type SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -180,7 +180,10 @@ export function StrategyBuilderPage() {
   const liveQuote = useLiveQuote(state.underlying);
   const liveSpot = liveQuote?.ltp;
   const spotSub = useMemo<SubscriptionRequest[]>(
-    () => [{ symbol: state.underlying, exchange: "NSE", product_type: "cash" }],
+    () => {
+      const request = buildLiveSpotSubscription(state.underlying);
+      return request ? [request] : [];
+    },
     [state.underlying],
   );
   useLiveSubscribe(spotSub);

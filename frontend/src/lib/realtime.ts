@@ -47,6 +47,22 @@ export interface SubscriptionRequest {
   token?: string;
 }
 
+const INDEX_FUTURES_LIVE_SYMBOLS = new Set(["NIFTY", "BANKNIFTY", "FINNIFTY"]);
+
+export function buildLiveSpotSubscription(symbol: string): SubscriptionRequest | null {
+  const normalized = symbol.trim().toUpperCase();
+  if (!normalized) return null;
+  if (INDEX_FUTURES_LIVE_SYMBOLS.has(normalized)) {
+    return { symbol: normalized, exchange: "NFO", product_type: "futures" };
+  }
+  if (normalized === "NIFTYMID50") {
+    // No valid Breeze websocket token is available for this index in the current
+    // master contract; REST quote fallback remains the source of truth.
+    return null;
+  }
+  return { symbol: normalized, exchange: "NSE", product_type: "cash" };
+}
+
 export function createMarketDataSocket(): Socket {
   return io(SOCKET_URL, {
     path: "/socket.io",

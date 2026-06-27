@@ -24,5 +24,10 @@ def test_market_data_watchlist_endpoint_returns_default_symbols(client) -> None:
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["status"] == "ok"
-    symbols = {item["symbol"] for item in payload["watchlist"]}
-    assert {"NIFTY", "BANKNIFTY"}.issubset(symbols)
+    watchlist = {item["symbol"]: item for item in payload["watchlist"]}
+    assert watchlist["NIFTY"]["exchange"] == "NFO"
+    assert watchlist["NIFTY"]["product_type"] == "futures"
+    assert watchlist["BANKNIFTY"]["exchange"] == "NFO"
+    assert watchlist["BANKNIFTY"]["product_type"] == "futures"
+    assert watchlist["FINNIFTY"]["exchange"] == "NFO"
+    assert watchlist["FINNIFTY"]["product_type"] == "futures"

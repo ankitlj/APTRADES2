@@ -3145,3 +3145,40 @@ Websocket:
 - **Remaining risks**:
   - Ref counting is in-memory only — if the worker reconnects (supervisor restart), all active tokens are re-subscribed via `_resubscribe_all()` which only iterates `_subscriptions` (tokens with ref count > 0). This is correct behavior — tokens that had their ref count decremented to 0 and were removed from `_subscriptions` should not be re-subscribed.
   - The existing `_resubscribe_all()` path is unchanged and still calls `_feed_subscribe` for each active subscription.
+
+### 2026-06-28 — Websocket Subscription Fix: Non-Numeric Token Data Hygiene
+- **Goal**: Fix websocket subscription bug where NSE index tokens (NIFTY, BANKNIFTY, NIFTYMID50, FINNIFTY) are non-numeric strings, blocking all live index subscriptions. `subscriptions` stays at 0 while `subscribe_requests_total` rises.
+- **Root cause**: Two entry paths for bad token data:
+  1. **Seed rows** (`master_contract_service.py:225-231`): Hardcoded `_seed_row` calls used display names as TK — `"NIFTY 50"` for NIFTY, `"NIFTY BANK"` for CNXBAN. These flowed directly into `Instrument.token`.
+  2. **SecurityMaster CSV** (`master_contract_service.py:331`): `TK = row.get("Token") or row.get("ScripCode") or ""` — for NSE cash indices, the SecurityMaster `Token` field contains the index display name, not a numeric Breeze script code.
+  3. **No import-time validation** (`_instrument_payload` at line 452): `"token": row.get("TK") or None` passed the raw value through with zero numeric validation.
+- **Proven via** `/api/diagnosis/token-verify`: NIFTY→`"NIFTY 50"`, BANKNIFTY→`"NIFTY BANK"`, NIFTYMID50→`"NIFTY MIDCAP 50"`, FINNIFTY→`"NIFTY FIN SERVICE"` — all fail `.isdigit()`.
+- **Fix**:
+  1. **`master_contract_service.py`: `_instrument_payload()`** — added non-numeric token validation at import time. If `cleaned_token` is non-empty and not all digits, logs a WARNING (symbol, exchange, token, source) and sets token to empty string → stored as `None` in DB.
+  2. **`master_contract_service.py`: `_load_seed_rows()`** — fixed CNXBAN and NIFTY seed rows: TK changed from `"NIFTY BANK"` and `"NIFTY 50"` to `""` (empty string). The row still exists; token is simply `None`.
+  3. **`market_data_worker.py`: `_to_subscription()`** — improved logging context: added `broker_symbol` and truncated token preview to the structured log line for non-numeric token skips.
+  4. **`test_master_contract.py`** — added `test_master_contract_ignores_non_numeric_token_in_csv`: imports CSV with CNXBAN token=`"NIFTY BANK"`, then asserts `cnxban.token is None`.
+- **Files changed**: `backend/app/services/master_contract_service.py`, `backend/app/services/market_data_worker.py`, `backend/tests/test_master_contract.py`
+- **Verification**: `python -m pytest tests/test_master_contract.py tests/test_market_data_worker.py tests/test_symbol_resolver.py` → 49 passed (9 + 32 + 2). Zero regressions.
+- **Design decisions**:
+  - Non-numeric tokens from any source (seed rows, SecurityMaster, StockScript CSV) are stripped to `None` at import time. No instrument data is lost — only the `token` column becomes `None`.
+  - `_to_subscription()` numeric guard stays unchanged; non-numeric tokens remain rejected.
+  - No hardcoded symbol exceptions for indices — if no numeric Breeze token exists for an instrument, it simply cannot be websocket-subscribed.
+- **Production impact**: After deploy, existing DB rows still have the stale non-numeric tokens until `POST /api/master-contract/import` is triggered. After reimport, index tokens will be `None`. DEFAULT_WATCHLIST index subscriptions will increment `subscribe_requests_total` but `subscriptions` will stay 0 — correct behavior when no numeric token is available.
+- **Next steps**: Deploy, trigger fresh import, verify via `/api/diagnosis/token-verify`, then verify Railway diagnosis counters.
+### 2026-06-28 - Websocket Subscription Fix: Use Streamable Index Futures
+- **Goal**: Restore dashboard/tools websocket subscriptions after proving NSE cash index rows resolve to non-numeric Breeze tokens.
+- **Root cause**: The prior import hygiene fix only strips invalid text tokens (`"NIFTY 50"`, `"NIFTY BANK"`, etc.) to `None`; it does not create valid websocket tokens. Meanwhile `DEFAULT_WATCHLIST` and tools spot subscriptions still requested `NSE/cash`, so they remained unsubscribable. Live Railway checks proved `NFO/futures` resolves to numeric tokens for NIFTY (`62329`), BANKNIFTY (`62326`), and FINNIFTY (`62327`), while NIFTYMID50 futures does not resolve.
+- **Fix**:
+  1. `backend/app/realtime.py`: default websocket watchlist now subscribes NIFTY, BANKNIFTY, and FINNIFTY via `NFO/futures`.
+  2. `backend/app/realtime.py`: pre-resolved-token subscription shortcut now works even when `DATABASE_URL` is unavailable; unresolved symbol lookup still requires DB.
+  3. `frontend/src/lib/realtime.ts`: added `buildLiveSpotSubscription()` so tools pages stream known index futures and keep stocks extensible via `NSE/cash`.
+  4. Tools pages now use `buildLiveSpotSubscription()` for spot live subscriptions. NIFTYMID50 returns no websocket subscription until a valid Breeze token/path exists; REST remains the fallback.
+  5. `backend/app/api/diagnosis.py`: fixed token-verify candidate scan SQLAlchemy bug (`.all()` was called on `Select`).
+- **Verification**:
+  - Live Railway token checks: `NSE/cash` index rows still resolve to text tokens; `NFO/futures` resolves numeric tokens for NIFTY, BANKNIFTY, FINNIFTY.
+  - `python -m pytest backend/tests/test_market_data_contract.py backend/tests/test_market_data_worker.py backend/tests/test_diagnosis_contract.py backend/tests/test_master_contract.py` -> 61 passed.
+  - `npm.cmd run build` -> production build clean, 1861 modules.
+- **Remaining risks**:
+  - NIFTYMID50 still has no verified streamable Breeze websocket token/path; it remains REST fallback only.
+  - Final tick movement still needs live-market validation because the market is closed.

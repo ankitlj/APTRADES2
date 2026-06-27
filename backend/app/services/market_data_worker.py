@@ -252,12 +252,18 @@ class MarketDataWorker:
         skipped: list[dict[str, str]] = []
         new_subscriptions: list[Subscription] = []
 
+        print(f"[diag] worker.subscribe items_in={len(items)} subs_before={len(self._subscriptions)}")
+
         for item in items:
             subscription = self._to_subscription(item)
             if subscription is None:
+                sym = str(item.get("display_symbol") or item.get("symbol") or "?")
+                tok = str(item.get("token") or "")
+                exc = str(item.get("exchange_code") or item.get("exchange") or "")
+                print(f"[diag]   SKIP symbol={sym} exchange={exc} token={tok} reason=to_subscription_none")
                 skipped.append(
                     {
-                        "symbol": str(item.get("display_symbol") or item.get("symbol") or "?"),
+                        "symbol": sym,
                         "reason": "missing token or unsupported exchange",
                     }
                 )
@@ -266,6 +272,7 @@ class MarketDataWorker:
                 if subscription.stock_token in self._subscriptions:
                     self._subscription_ref_counts[subscription.stock_token] += 1
                     accepted.append(subscription.stock_token)
+                    print(f"[diag]   REF_INC stock_token={subscription.stock_token} display_symbol={subscription.display_symbol} ref_count={self._subscription_ref_counts[subscription.stock_token]}")
                     continue
                 self._subscriptions[subscription.stock_token] = subscription
                 self._subscription_ref_counts[subscription.stock_token] = 1
@@ -276,36 +283,47 @@ class MarketDataWorker:
                 subscription.display_symbol,
                 subscription.broker_symbol,
             )
+            print(f"[diag]   NEW stock_token={subscription.stock_token} display_symbol={subscription.display_symbol} exchange={subscription.exchange_code} token={subscription.token}")
             new_subscriptions.append(subscription)
             accepted.append(subscription.stock_token)
 
         for subscription in new_subscriptions:
             self._feed_subscribe(subscription)
 
-        return {"accepted": accepted, "skipped": skipped, "count": len(self._subscriptions)}
+        result_count = len(self._subscriptions)
+        print(f"[diag] worker.subscribe done accepted={len(accepted)} skipped={len(skipped)} total_subs={result_count}")
+        return {"accepted": accepted, "skipped": skipped, "count": result_count}
 
     def unsubscribe(self, items: list[dict[str, Any]]) -> dict[str, Any]:
         removed: list[str] = []
         unsub_feeds: list[Subscription] = []
+        print(f"[diag] worker.unsubscribe items_in={len(items)} subs_before={len(self._subscriptions)}")
         for item in items:
             subscription = self._to_subscription(item)
             if subscription is None:
+                sym = str(item.get("display_symbol") or item.get("symbol") or "?")
+                print(f"[diag]   UNSUB_SKIP symbol={sym} reason=to_subscription_none")
                 continue
             with self._lock:
                 existing = self._subscriptions.get(subscription.stock_token)
                 if existing is None:
+                    print(f"[diag]   UNSUB_SKIP stock_token={subscription.stock_token} reason=not_in_subscriptions")
                     continue
                 current_count = self._subscription_ref_counts.get(subscription.stock_token, 0)
                 if current_count <= 1:
                     self._subscriptions.pop(subscription.stock_token, None)
                     self._subscription_ref_counts.pop(subscription.stock_token, None)
                     unsub_feeds.append(existing)
+                    print(f"[diag]   UNSUB_TEARDOWN stock_token={subscription.stock_token} display_symbol={subscription.display_symbol} ref_was={current_count}")
                 else:
                     self._subscription_ref_counts[subscription.stock_token] = current_count - 1
+                    print(f"[diag]   UNSUB_REF_DECR stock_token={subscription.stock_token} display_symbol={subscription.display_symbol} ref_now={current_count - 1}")
             removed.append(subscription.stock_token)
         for subscription in unsub_feeds:
             self._feed_unsubscribe(subscription)
-        return {"removed": removed, "count": len(self._subscriptions)}
+        result_count = len(self._subscriptions)
+        print(f"[diag] worker.unsubscribe done removed={len(unsub_feeds)} ref_decrements={len(removed) - len(unsub_feeds)} total_subs={result_count}")
+        return {"removed": removed, "count": result_count}
 
     def _resubscribe_all(self) -> None:
         with self._lock:
@@ -343,11 +361,12 @@ class MarketDataWorker:
         if not _is_numeric_token(token):
             logger.warning(
                 "market-data subscribe skipped: non-numeric token "
-                "symbol=%s exchange=%s product_type=%s token=%s reason=non_numeric_token",
-                item.get("display_symbol") or item.get("symbol") or "?",
+                "display_symbol=%s broker_symbol=%s exchange=%s product_type=%s token=%s reason=non_numeric_token",
+                item.get("display_symbol") or "?",
+                item.get("broker_symbol") or item.get("display_symbol") or "?",
                 exchange_code,
                 item.get("product_type") or "?",
-                token,
+                token[:32],
             )
             return None
         stock_token = build_stock_token(exchange_code, token)

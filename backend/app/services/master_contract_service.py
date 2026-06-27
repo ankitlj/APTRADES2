@@ -3,12 +3,15 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import logging
 import re
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import requests
 from sqlalchemy import delete, func, select
@@ -227,8 +230,8 @@ class MasterContractService:
             self._seed_row("RELIND", "RELIANCE INDUSTRIES", "NSE", "RELIND", "EQUITY", "2885", "1", "RELIND", "RELIANCE", "0.1", "INE002A01018", "EQ", ""),
             self._seed_row("ADAPOR", "ADANI PORT AND SPECIAL ECONO", "NSE", "ADAPOR", "EQUITY", "15083", "1", "ADAPOR", "ADANIPORTS", "0.1", "INE742F01042", "EQ", ""),
             self._seed_row("STABAN", "STATE BANK OF INDIA", "NSE", "STABAN", "EQUITY", "3045", "1", "STABAN", "SBIN", "0.1", "INE062A01020", "EQ", ""),
-            self._seed_row("CNXBAN", "NIFTY BANK", "NSE", "CNXBAN", "EQUITY", "NIFTY BANK", "1", "CNXBAN", "BANK NIFTY", "0", "", "0", ""),
-            self._seed_row("NIFTY", "NIFTY 50", "NSE", "NIFTY", "EQUITY", "NIFTY 50", "1", "NIFTY", "NIFTY", "0", "", "0", ""),
+            self._seed_row("CNXBAN", "NIFTY BANK", "NSE", "CNXBAN", "EQUITY", "", "1", "CNXBAN", "BANK NIFTY", "0", "", "0", ""),
+            self._seed_row("NIFTY", "NIFTY 50", "NSE", "NIFTY", "EQUITY", "", "1", "NIFTY", "NIFTY", "0", "", "0", ""),
         ]
         return SourcePayload(
             name="seed_aliases",
@@ -441,6 +444,16 @@ class MasterContractService:
         display_symbol = row.get("NS") or row.get("SI") or broker_symbol
         product_type, expiry_date, option_right, strike_price = self._contract_attributes(contract_code, row)
 
+        raw_token = row.get("TK") or ""
+        cleaned_token = raw_token.strip()
+        if cleaned_token and not cleaned_token.isdigit():
+            source_name = row.get("__source_name", "unknown")
+            logger.warning(
+                "Non-numeric token discarded in import: symbol=%s exchange=%s token=%r source=%s",
+                broker_symbol, exchange_code, cleaned_token, source_name,
+            )
+            cleaned_token = ""
+
         return {
             "exchange_code": exchange_code,
             "broker_symbol": broker_symbol,
@@ -449,7 +462,7 @@ class MasterContractService:
             "name": row.get("SN") or display_symbol,
             "instrument_group": row.get("SG") or None,
             "product_type": product_type,
-            "token": row.get("TK") or None,
+            "token": cleaned_token or None,
             "lot_size": self._parse_int(row.get("LS")),
             "tick_size": row.get("TS") or None,
             "isin": row.get("ISIN") or None,

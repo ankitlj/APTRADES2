@@ -599,3 +599,109 @@ def test_subscribe_same_token_many_then_all_unsubscribe(tmp_path) -> None:
     assert result["count"] == 0
     assert breeze.unsubscribed.count("4.1!62329") == 1
     assert "4.1!62329" not in worker._subscriptions
+
+
+def test_subscribe_with_empty_items_still_increments_counter() -> None:
+    """Calling subscribe([]) must increment the diagnostic counter even
+    though no subscriptions are created. This validates that the
+    'subscribe_requests_total > 0' observation can coexist with
+    'subscriptions = 0'."""
+    worker = _configured_worker()
+    before = worker.status()["subscribe_requests_total"]
+
+    result = worker.subscribe([])
+
+    assert result["accepted"] == []
+    assert result["count"] == 0
+    assert worker.status()["subscribe_requests_total"] == before + 1
+    assert worker.status()["subscriptions"] == 0
+
+
+def test_subscribe_all_skipped_still_increments_counter() -> None:
+    """Calling subscribe() where every item is rejected by _to_subscription
+    must increment the diagnostic counter but leave subscriptions unchanged."""
+    worker = _configured_worker()
+    before = worker.status()["subscribe_requests_total"]
+
+    result = worker.subscribe([
+        {"display_symbol": "NIFTY", "exchange_code": "NFO", "token": ""},
+        {"display_symbol": "BANKNIFTY", "exchange_code": "NFO", "token": "NOT_A_NUMBER"},
+    ])
+
+    assert len(result["accepted"]) == 0
+    assert len(result["skipped"]) == 2
+    assert result["count"] == 0
+    assert worker.status()["subscribe_requests_total"] == before + 1
+    assert worker.status()["subscriptions"] == 0
+
+
+def test_resolve_subscription_items_requires_database_for_symbol_lookup() -> None:
+    """When DATABASE_URL is not configured, unresolved symbols still cannot be
+    looked up through SymbolResolver."""
+    from app.realtime import resolve_subscription_items
+
+    result = resolve_subscription_items(None, [{"symbol": "NIFTY", "exchange": "NSE"}])
+
+    assert result == []
+
+
+def test_resolve_subscription_items_keeps_pre_resolved_token_without_database_url() -> None:
+    """Pre-resolved option/orderbook tokens must not be blocked by DB access."""
+    from app.realtime import resolve_subscription_items
+
+    result = resolve_subscription_items(
+        None,
+        [{
+            "symbol": "NIFTY|24000|CE",
+            "broker_symbol": "NIFTY",
+            "exchange": "NFO",
+            "product_type": "options",
+            "token": "12345",
+        }],
+    )
+
+    assert result == [{
+        "display_symbol": "NIFTY|24000|CE",
+        "broker_symbol": "NIFTY",
+        "exchange_code": "NFO",
+        "product_type": "options",
+        "token": "12345",
+    }]
+
+
+def test_subscribe_then_unsubscribe_cycle_leaves_subscriptions_zero() -> None:
+    """Full subscribe → unsubscribe cycle must leave subscriptions=0 even
+    when the worker is connected and items are valid."""
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+    item = {
+        "display_symbol": "NIFTY",
+        "broker_symbol": "NIFTY",
+        "exchange_code": "NFO",
+        "product_type": "futures",
+        "token": "62329",
+    }
+
+    sub_result = worker.subscribe([item])
+    assert sub_result["count"] == 1
+
+    unsub_result = worker.unsubscribe([item])
+    assert unsub_result["count"] == 0
+
+    status = worker.status()
+    assert status["subscriptions"] == 0
+    assert status["subscribe_requests_total"] == 1
+
+
+def test_subscribe_preserves_requests_total_across_multiple_calls() -> None:
+    """The subscribe_requests_total counter must accumulate across multiple
+    subscribe calls, even when items are empty or skipped."""
+    worker = _configured_worker()
+
+    worker.subscribe([])                          # empty
+    worker.subscribe([{"display_symbol": "NIFTY", "exchange_code": "NFO", "token": ""}])  # skipped
+    worker.subscribe([])                          # empty again
+
+    assert worker.status()["subscribe_requests_total"] == 3
+    assert worker.status()["subscriptions"] == 0

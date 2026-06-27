@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getOptionExpiries, getOIProfile, type OIProfileResponse, type OIRow } from "@/lib/api";
 import { useLiveMarketData, useLiveSubscribe, useLiveQuote } from "@/hooks/useLiveMarketData";
-import type { LiveTick, SubscriptionRequest } from "@/lib/realtime";
+import { buildLiveSpotSubscription, type LiveTick, type SubscriptionRequest } from "@/lib/realtime";
 import { ErrorState } from "@/components/ErrorState";
 import { formatNumber } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -123,7 +123,10 @@ export function OIProfilePage() {
 
   const { connectionState, ticks } = useLiveMarketData();
   const spotSub = useMemo<SubscriptionRequest[]>(
-    () => [{ symbol: underlying, exchange: "NSE", product_type: "cash" }],
+    () => {
+      const request = buildLiveSpotSubscription(underlying);
+      return request ? [request] : [];
+    },
     [underlying],
   );
   useLiveSubscribe(spotSub);
