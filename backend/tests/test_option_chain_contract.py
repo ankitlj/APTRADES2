@@ -144,6 +144,7 @@ def _option_chain_response(instrument):
                 "spot_price": 23268.8,
                 "previous_close": 23451.7,
                 "expiry_date": "30-Jun-2026",
+                "token": "90001",
             },
             {
                 "strike_price": "23300",
@@ -155,6 +156,7 @@ def _option_chain_response(instrument):
                 "spot_price": 23268.8,
                 "previous_close": 23451.7,
                 "expiry_date": "30-Jun-2026",
+                "token": "90003",
             },
         ]
     return [
@@ -168,6 +170,7 @@ def _option_chain_response(instrument):
             "spot_price": 23268.8,
             "previous_close": 23451.7,
             "expiry_date": "30-Jun-2026",
+            "token": "90002",
         },
         {
             "strike_price": "23300",
@@ -179,6 +182,7 @@ def _option_chain_response(instrument):
             "spot_price": 23268.8,
             "previous_close": 23451.7,
             "expiry_date": "30-Jun-2026",
+            "token": "90004",
         },
     ]
 
@@ -215,5 +219,12 @@ def test_option_chain_endpoint_returns_normalized_rows(tmp_path):
     assert payload["broker_symbol"] == "NIFTY"
     assert payload["atm_strike"] == 23300.0
     assert payload["rows"][0]["ce"]["ltp"] == 145.5
+    assert payload["rows"][0]["ce"]["token"] == "90001"
+    assert payload["rows"][0]["ce"]["broker_symbol"] == "NIFTY"
+    assert payload["rows"][0]["ce"]["expiry_date"] == expiry
+    assert payload["rows"][0]["ce"]["strike_price"] == "23200"
+    assert payload["rows"][0]["ce"]["right"] == "call"
+    assert payload["rows"][0]["pe"]["token"] == "90002"
+    assert payload["rows"][0]["pe"]["right"] == "put"
     assert payload["rows"][1]["pe"]["oi"] == 132000.0
     assert payload["pcr"] == round((95000 + 132000) / (120000 + 115000), 4)

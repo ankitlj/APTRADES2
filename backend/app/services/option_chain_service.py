@@ -174,6 +174,10 @@ class OptionChainService:
                     },
                 )
                 normalized = self._normalize_leg(row)
+                normalized["broker_symbol"] = broker_symbol
+                normalized["expiry_date"] = request.expiry_date.isoformat()
+                normalized["strike_price"] = strike_text
+                normalized["right"] = "call" if side == "ce" else "put"
                 entry[side] = normalized
                 if side == "ce":
                     total_call_oi += normalized["oi"] or 0.0

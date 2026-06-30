@@ -433,6 +433,10 @@ export interface OptionChainLeg {
   oi: number | null;
   volume: number | null;
   token: string | null;
+  broker_symbol?: string | null;
+  expiry_date?: string | null;
+  strike_price?: string | number | null;
+  right?: string | null;
 }
 
 export interface OptionChainRow {
@@ -467,11 +471,20 @@ export interface OIRow {
   pe_ltp: number | null;
   ce_token: string | null;
   pe_token: string | null;
+  ce_broker_symbol?: string | null;
+  pe_broker_symbol?: string | null;
+  ce_expiry_date?: string | null;
+  pe_expiry_date?: string | null;
+  ce_strike_price?: string | number | null;
+  pe_strike_price?: string | number | null;
+  ce_right?: string | null;
+  pe_right?: string | null;
 }
 
 export interface OITrackerResponse {
   status: string;
   underlying: string;
+  broker_symbol?: string | null;
   exchange_code: string;
   expiry: string;
   underlying_ltp: number | null;
@@ -488,6 +501,7 @@ export interface OITrackerResponse {
 export interface OIProfileResponse {
   status: string;
   underlying: string;
+  broker_symbol?: string | null;
   exchange_code: string;
   expiry: string;
   underlying_ltp: number | null;

@@ -45,6 +45,10 @@ export interface SubscriptionRequest {
   exchange: string;
   product_type?: string;
   token?: string;
+  broker_symbol?: string;
+  expiry_date?: string;
+  strike_price?: string | number;
+  right?: string;
 }
 
 const INDEX_FUTURES_LIVE_SYMBOLS = new Set(["NIFTY", "BANKNIFTY", "FINNIFTY"]);

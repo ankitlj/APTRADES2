@@ -1146,3 +1146,11 @@ See `development.md` for 13-step post-deploy checklist.
 - **Fix**: Default websocket watchlist now uses `NFO/futures` for NIFTY/BANKNIFTY/FINNIFTY. Tools spot subscriptions use `buildLiveSpotSubscription()` to choose streamable futures for those indices, skip NIFTYMID50 websocket until a valid token/path exists, and keep normal `NSE/cash` behavior for stocks.
 - **Diagnostics**: Fixed `/api/diagnosis/token-verify` candidate scan SQLAlchemy bug.
 - **Verification**: 61 targeted backend tests passed; frontend production build passed.
+
+## 2026-07-01 - Option Contract Websocket Fix: Breeze Option Params
+
+- **Root cause**: Option-chain/OI pages sent option tokens, but the worker subscribed every product with `stock_token`. Breeze option streaming requires option contract parameters: `exchange_code`, `stock_code`, `expiry_date`, `strike_price`, `right`, and `product_type="options"`.
+- **Fix**: `MarketDataWorker` now uses the documented Breeze option-parameter subscribe/unsubscribe path only for `product_type=="options"`. Futures/cash/dashboard streams stay on the existing `stock_token` path.
+- **API contract**: Option-chain and OI responses now pass broker symbol, expiry, strike, right, and token through to frontend rows. Tool pages include those fields in option websocket subscription requests.
+- **Verification**: 41 targeted backend tests passed; frontend production build passed.
+- **Risk**: Final option tick movement still needs live-market validation.

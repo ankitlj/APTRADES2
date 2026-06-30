@@ -152,6 +152,10 @@ export function OptionChainPage() {
             exchange: exchangeCode,
             product_type: "options",
             token: leg.token,
+            broker_symbol: leg.broker_symbol ?? state.data?.broker_symbol,
+            expiry_date: leg.expiry_date ?? state.data?.expiry,
+            strike_price: leg.strike_price ?? row.strike_price,
+            right: leg.right ?? (side === "ce" ? "call" : "put"),
           });
         }
       }

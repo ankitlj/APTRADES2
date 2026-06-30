@@ -14,6 +14,8 @@ class FakeBreeze:
         self.connected = False
         self.subscribed: list[str] = []
         self.unsubscribed: list[str] = []
+        self.subscribe_kwargs: list[dict] = []
+        self.unsubscribe_kwargs: list[dict] = []
 
     def ws_connect(self) -> None:
         self.connected = True
@@ -23,9 +25,11 @@ class FakeBreeze:
 
     def subscribe_feeds(self, stock_token=None, **_kwargs) -> None:
         self.subscribed.append(stock_token)
+        self.subscribe_kwargs.append({"stock_token": stock_token, **_kwargs})
 
     def unsubscribe_feeds(self, stock_token=None, **_kwargs) -> None:
         self.unsubscribed.append(stock_token)
+        self.unsubscribe_kwargs.append({"stock_token": stock_token, **_kwargs})
 
 
 class FakeRedis:
@@ -657,6 +661,9 @@ def test_resolve_subscription_items_keeps_pre_resolved_token_without_database_ur
             "exchange": "NFO",
             "product_type": "options",
             "token": "12345",
+            "expiry_date": "2026-06-30",
+            "strike_price": "24000",
+            "right": "call",
         }],
     )
 
@@ -666,6 +673,9 @@ def test_resolve_subscription_items_keeps_pre_resolved_token_without_database_ur
         "exchange_code": "NFO",
         "product_type": "options",
         "token": "12345",
+        "expiry_date": "2026-06-30",
+        "strike_price": "24000",
+        "right": "call",
     }]
 
 
@@ -705,3 +715,66 @@ def test_subscribe_preserves_requests_total_across_multiple_calls() -> None:
 
     assert worker.status()["subscribe_requests_total"] == 3
     assert worker.status()["subscriptions"] == 0
+
+
+def test_option_subscription_uses_breeze_contract_params() -> None:
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+
+    result = worker.subscribe(
+        [
+            {
+                "display_symbol": "NIFTY|24000|CE",
+                "broker_symbol": "NIFTY",
+                "exchange_code": "NFO",
+                "product_type": "options",
+                "token": "51219",
+                "expiry_date": "2026-06-30",
+                "strike_price": "24000",
+                "right": "ce",
+            }
+        ]
+    )
+
+    assert result["count"] == 1
+    assert result["accepted"] == ["4.1!51219"]
+    payload = breeze.subscribe_kwargs[-1]
+    assert payload["stock_token"] is None
+    assert payload["exchange_code"] == "NFO"
+    assert payload["stock_code"] == "NIFTY"
+    assert payload["expiry_date"] == "30-Jun-2026"
+    assert payload["strike_price"] == "24000"
+    assert payload["right"] == "call"
+    assert payload["product_type"] == "options"
+    assert payload["get_market_depth"] is False
+    assert payload["get_exchange_quotes"] is True
+
+
+def test_option_unsubscription_uses_breeze_contract_params() -> None:
+    breeze = FakeBreeze()
+    worker = _configured_worker(breeze_factory=lambda: breeze)
+    worker._connect()
+    item = {
+        "display_symbol": "NIFTY|24000|PE",
+        "broker_symbol": "NIFTY",
+        "exchange_code": "NFO",
+        "product_type": "options",
+        "token": "51220",
+        "expiry_date": "2026-06-30",
+        "strike_price": "24000",
+        "right": "pe",
+    }
+
+    worker.subscribe([item])
+    result = worker.unsubscribe([item])
+
+    assert result["removed"] == ["4.1!51220"]
+    payload = breeze.unsubscribe_kwargs[-1]
+    assert payload["stock_token"] is None
+    assert payload["exchange_code"] == "NFO"
+    assert payload["stock_code"] == "NIFTY"
+    assert payload["expiry_date"] == "30-Jun-2026"
+    assert payload["strike_price"] == "24000"
+    assert payload["right"] == "put"
+    assert payload["product_type"] == "options"

@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ORIENS Covered Call Yield Analytics Demo</title>
+  <style>
+    :root {
+      --bg: #0b0b0c;
+      --panel: #141416;
+      --panel-2: #19191d;
+      --border: rgba(255, 255, 255, 0.09);
+      --muted: #9e9ea6;
+      --text: #f4f4f5;
+      --violet: #b9a6ff;
+      --cyan: #00f2ff;
+      --cyan-soft: rgba(0, 242, 255, 0.14);
+      --green: #16c47f;
+      --green-soft: rgba(22, 196, 127, 0.14);
+      --amber: #ffb020;
+      --amber-soft: rgba(255, 176, 32, 0.14);
+      --red: #ff4d5a;
+      --red-soft: rgba(255, 77, 90, 0.14);
+      --blue: #2491ff;
+      --blue-soft: rgba(36, 145, 255, 0.16);
+      --shadow: 0 18px 48px rgba(0, 0, 0, 0.38);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background:
+        radial-gradient(circle at 18% 16%, rgba(120, 72, 255, 0.18), transparent 18%),
+        linear-gradient(180deg, #09090b 0%, #0d0d10 100%);
+      padding: 28px 18px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 8px 4px;
+    }
+
+    .brand-mark {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(185,166,255,0.8), transparent 22%),
+        conic-gradient(from 0deg, #4c2cff, #b89cff, #6f56ff, #4c2cff);
+      box-shadow: 0 0 30px rgba(127, 92, 255, 0.24);
+      position: relative;
+    }
+
+    .brand-mark::after {
+      content: "";
+      position: absolute;
+      inset: 11px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .brand-name {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #f3eefe;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+
+    .brand-tag {
+      margin-top: 4px;
+      font-size: 11px;
+      color: #9f8fff;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .nav-group {
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      color: #d0d0d7;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      background: transparent;
+      border: 1px solid transparent;
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, #1f8fff, #0f6ef2);
+      color: white;
+      box-shadow: 0 12px 28px rgba(36, 145, 255, 0.28);
+    }
+
+    .nav-pill {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      padding: 16px 8px 0;
+      color: #16c47f;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 16px currentColor;
+    }
+
+    .main {
+      overflow: auto;
+      background:
+        linear-gradient(180deg, rgba(0, 242, 255, 0.04), transparent 12%),
+        var(--bg);
+    }
+
+    .topbar {
+      height: 68px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 26px;
+      position: sticky;
+      top: 0;
+      background: rgba(11, 11, 12, 0.92);
+      backdrop-filter: blur(12px);
+      z-index: 20;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-weight: 700;
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-chip {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .status-chip.green {
+      color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .status-chip.amber {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .content {
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 22px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .hero-copy {
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-copy::after {
+      content: "";
+      position: absolute;
+      width: 320px;
+      height: 320px;
+      right: -120px;
+      top: -70px;
+      background: radial-gradient(circle, rgba(0,242,255,0.14), transparent 70%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      color: #a6a6b0;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+
+    .hero-title {
+      font-size: 38px;
+      line-height: 1.05;
+      margin: 0 0 16px;
+      max-width: 720px;
+    }
+
+    .hero-title span { color: var(--cyan); }
+
+    .hero-text {
+      margin: 0;
+      color: #bbbcc5;
+      font-size: 16px;
+      line-height: 1.65;
+      max-width: 760px;
+    }
+
+    .hero-list {
+      margin-top: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hero-tag {
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #c8faff;
+      background: rgba(0,242,255,0.08);
+      border: 1px solid rgba(0,242,255,0.14);
+      font-weight: 700;
+    }
+
+    .hero-side {
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .hero-metric {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: var(--muted);
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .value {
+      font-size: 32px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .subvalue {
+      margin-top: 10px;
+      color: #bfc0c9;
+      font-size: 14px;
+    }
+
+    .green { color: var(--green); }
+    .red { color: var(--red); }
+    .amber { color: var(--amber); }
+    .cyan { color: var(--cyan); }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .metric-card {
+      padding: 22px;
+      min-height: 172px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .metric-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 800;
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      color: var(--cyan);
+    }
+
+    .mini-chip {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      padding: 7px 10px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+
+    .mini-chip.safe {
+      color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .mini-chip.risk {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .mini-chip.alert {
+      color: var(--red);
+      background: var(--red-soft);
+    }
+
+    .metric-main {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .metric-main .big {
+      font-size: 34px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+    }
+
+    .metric-main .hint {
+      font-size: 14px;
+      color: #b9bac2;
+    }
+
+    .metric-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 13px;
+      color: #cbccd3;
+    }
+
+    .metric-footer strong {
+      color: var(--text);
+      font-weight: 800;
+    }
+
+    .core {
+      display: grid;
+      grid-template-columns: minmax(0, 2.3fr) minmax(320px, 0.9fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .table-card {
+      padding: 18px 18px 10px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.1;
+    }
+
+    .section-copy {
+      margin: 6px 0 0;
+      color: #b6b7bf;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.015);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1200px;
+    }
+
+    thead th {
+      text-align: left;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #8f9098;
+      padding: 14px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.025);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    tbody td {
+      padding: 15px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      vertical-align: top;
+    }
+
+    tbody tr:hover { background: rgba(0,242,255,0.03); }
+
+    .symbol {
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .symbol-sub {
+      margin-top: 4px;
+      color: #a6a7af;
+      font-size: 12px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .status-badge.safe {
+      color: var(--green);
+      background: var(--green-soft);
+    }
+
+    .status-badge.roll {
+      color: var(--amber);
+      background: var(--amber-soft);
+    }
+
+    .status-badge.risk {
+      color: var(--red);
+      background: var(--red-soft);
+    }
+
+    .action-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #8bdfff;
+      font-weight: 700;
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .side-stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .side-card {
+      padding: 18px;
+    }
+
+    .side-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .side-item {
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .side-item strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .side-item p {
+      margin: 0;
+      color: #b5b6bf;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .analytics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .analytics-card {
+      padding: 18px;
+      min-height: 250px;
+    }
+
+    .bars {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      align-items: end;
+      height: 170px;
+      margin-top: 20px;
+    }
+
+    .bar-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .bar {
+      width: 100%;
+      border-radius: 12px 12px 6px 6px;
+      background: linear-gradient(180deg, rgba(0,242,255,0.95), rgba(0,130,150,0.28));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+    }
+
+    .bar-label,
+    .bar-value {
+      font-size: 12px;
+      color: #b9bac2;
+    }
+
+    .bar-value {
+      font-weight: 800;
+      color: #e6fafe;
+    }
+
+    .yield-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .yield-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 72px;
+      gap: 12px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .track {
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #00f2ff, #0dbdff);
+    }
+
+    .risk-matrix {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .risk-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 76px;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .risk-cell {
+      padding: 11px 12px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      font-weight: 700;
+    }
+
+    .risk-cell.low { background: rgba(22,196,127,0.12); color: var(--green); }
+    .risk-cell.mid { background: rgba(255,176,32,0.12); color: var(--amber); }
+    .risk-cell.high { background: rgba(255,77,90,0.12); color: var(--red); }
+
+    .footer-note {
+      color: #8b8c96;
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 0 2px;
+    }
+
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.12);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: content-box;
+    }
+
+    @media (max-width: 1500px) {
+      .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .analytics { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 1220px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .hero, .core { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Primary">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <div class="brand-name">ORIENS</div>
+          <div class="brand-tag">TRACK | TRADE | TRIUMPH</div>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-item active">
+          <span>Covered Call Yield</span>
+          <span class="nav-pill">Live</span>
+        </div>
+        <div class="nav-item"><span>Portfolio</span><span class="nav-pill">248</span></div>
+        <div class="nav-item"><span>Roll Engine</span><span class="nav-pill">12</span></div>
+        <div class="nav-item"><span>Premium Ledger</span><span class="nav-pill">MTD</span></div>
+        <div class="nav-item"><span>Assignment Risk</span><span class="nav-pill">7</span></div>
+        <div class="nav-item"><span>Suggestions</span><span class="nav-pill">21</span></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <span class="dot"></span>
+        <span>Covered-call system ready</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">Current Page / Covered Call Yield Analytics</div>
+        <div class="topbar-right">
+          <div class="status-chip green">Portfolio synced</div>
+          <div class="status-chip amber">12 rolls pending review</div>
+        </div>
+      </header>
+
+      <section class="content">
+        <section class="hero">
+          <div class="panel hero-copy">
+            <div class="eyebrow">Covered Call Command Center</div>
+            <h1 class="hero-title">Rental-income dashboard for a <span>stock portfolio</span>.</h1>
+            <p class="hero-text">
+              This page is built for a high-capital covered-call book: which holdings are covered, where premium is coming from,
+              which expiries need action this week, and where assignment risk is building before it hurts yield discipline.
+            </p>
+            <div class="hero-list" aria-label="Focus Areas">
+              <div class="hero-tag">Holdings mapped to sold calls</div>
+              <div class="hero-tag">Monthly income and annualized yield</div>
+              <div class="hero-tag">Near-strike and roll candidates</div>
+              <div class="hero-tag">Uncovered stock opportunities</div>
+            </div>
+          </div>
+
+          <div class="panel hero-side">
+            <div class="hero-metric">
+              <div class="label">Portfolio Value</div>
+              <div class="value">₹25.84 Cr</div>
+              <div class="subvalue">149 holdings lots tracked across 38 symbols</div>
+            </div>
+            <div class="hero-metric">
+              <div class="label">Premium Collected MTD</div>
+              <div class="value green">₹28.6L</div>
+              <div class="subvalue">Realized ₹19.4L • Open premium ₹9.2L</div>
+            </div>
+            <div class="hero-metric">
+              <div class="label">Monthly Yield Run-Rate</div>
+              <div class="value cyan">1.42%</div>
+              <div class="subvalue">Annualized 17.0% before assignment losses</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="metrics-grid" aria-label="Top Summary Cards">
+          <article class="panel metric-card">
+            <div class="metric-head">
+              <div>
+                <div class="label">Covered Value</div>
+              </div>
+              <div class="metric-icon">⌁</div>
+            </div>
+            <div class="metric-main">
+              <div class="big">₹18.92 Cr</div>
+              <div class="hint">73.2% of portfolio currently monetized through written calls</div>
+            </div>
+            <div class="metric-footer">
+              <span><strong>118 lots</strong> active</span>
+              <span><strong>31 symbols</strong> covered</span>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-head">
+              <div>
+                <div class="label">Uncovered Value</div>
+              </div>
+              <div class="metric-icon">○</div>
+            </div>
+            <div class="metric-main">
+              <div class="big amber">₹6.92 Cr</div>
+              <div class="hint">Capital still idle for fresh call writing this cycle</div>
+            </div>
+            <div class="metric-footer">
+              <span><strong>18 symbols</strong> open to new calls</span>
+              <span><strong>₹11.8L</strong> est. premium available</span>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-head">
+              <div>
+                <div class="label">Expiries This Week</div>
+              </div>
+              <div class="mini-chip risk">7 urgent</div>
+            </div>
+            <div class="metric-main">
+              <div class="big">22</div>
+              <div class="hint">Contracts need hold / roll / allow-assignment decision</div>
+            </div>
+            <div class="metric-footer">
+              <span><strong>9</strong> safe</span>
+              <span><strong>8</strong> near strike</span>
+              <span><strong>5</strong> ITM</span>
+            </div>
+          </article>
+
+          <article class="panel metric-card">
+            <div class="metric-head">
+              <div>
+                <div class="label">At-Risk Positions</div>
+              </div>
+              <div class="mini-chip alert">Assignment watch</div>
+            </div>
+            <div class="metric-main">
+              <div class="big red">6</div>
+              <div class="hint">Spots within 1.5% of strike or already through strike</div>
+            </div>
+            <div class="metric-footer">
+              <span><strong>TCS</strong> +1.1% over strike</span>
+              <span><strong>SBIN</strong> 0.7% below strike</span>
+            </div>
+          </article>
+        </section>
+
+        <section class="core">
+          <article class="panel table-card">
+            <div class="section-head">
+              <div>
+                <div class="eyebrow">Main Holdings Table</div>
+                <h2 class="section-title">Covered holdings and roll candidates</h2>
+                <p class="section-copy">This is the core book-management view: premium earned, expiry pressure, distance to strike, and what needs action now.</p>
+              </div>
+              <div class="status-chip green">Born To Sell style logic</div>
+            </div>
+
+            <div class="table-wrap" role="region" aria-label="Covered Holdings Table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Stock</th>
+                    <th>Qty</th>
+                    <th>Avg Cost</th>
+                    <th>Spot</th>
+                    <th>Holding Value</th>
+                    <th>Covered</th>
+                    <th>Call Sold</th>
+                    <th>Expiry</th>
+                    <th>Premium</th>
+                    <th>Yield</th>
+                    <th>Distance</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class="symbol">SBIN</div>
+                      <div class="symbol-sub">State Bank of India</div>
+                    </td>
+                    <td>7,500</td>
+                    <td>₹912.40</td>
+                    <td>₹977.70</td>
+                    <td>₹73.33L</td>
+                    <td>100%</td>
+                    <td>1000 CE</td>
+                    <td>27 Jun 2026</td>
+                    <td class="green">₹6.25L</td>
+                    <td>0.85% / 10.2% ann.</td>
+                    <td class="amber">2.28%</td>
+                    <td><span class="status-badge roll">Near strike</span></td>
+                    <td><a class="action-link" href="#">Review roll</a></td>
+                  </tr>
+
+                  <tr>
+                    <td>
+                      <div class="symbol">INFY</div>
+                      <div class="symbol-sub">Infosys</div>
+                    </td>
+                    <td>4,200</td>
+                    <td>₹1,482.30</td>
+                    <td>₹1,540.00</td>
+                    <td>₹64.68L</td>
+                    <td>100%</td>
+                    <td>1600 CE</td>
+                    <td>27 Jun 2026</td>
+                    <td class="green">₹4.80L</td>
+                    <td>0.74% / 8.9% ann.</td>
+                    <td class="green">3.90%</td>
+                    <td><span class="status-badge safe">Safe</span></td>
+                    <td><a class="action-link" href="#">Hold</a></td>
+                  </tr>
+
+                  <tr>
+                    <td>
+                      <div class="symbol">TCS</div>
+                      <div class="symbol-sub">Tata Consultancy Services</div>
+                    </td>
+                    <td>2,400</td>
+                    <td>₹3,706.00</td>
+                    <td>₹3,918.00</td>
+                    <td>₹94.03L</td>
+                    <td>100%</td>
+                    <td>3880 CE</td>
+                    <td>27 Jun 2026</td>
+                    <td class="green">₹5.14L</td>
+                    <td>0.55% / 6.6% ann.</td>
+                    <td class="red">-0.97%</td>
+                    <td><span class="status-badge risk">ITM risk</span></td>
+                    <td><a class="action-link" href="#">Roll up/out</a></td>
+                  </tr>
+
+                  <tr>
+                    <td>
+                      <div class="symbol">RELIANCE</div>
+                      <div class="symbol-sub">Reliance Industries</div>
+                    </td>
+                    <td>3,000</td>
+                    <td>₹1,246.00</td>
+                    <td>₹1,291.00</td>
+                    <td>₹38.73L</td>
+                    <td>60%</td>
+                    <td>1320 CE</td>
+                    <td>04 Jul 2026</td>
+                    <td class="green">₹1.78L</td>
+                    <td>0.46% / 5.5% ann.</td>
+                    <td class="green">2.25%</td>
+                    <td><span class="status-badge safe">Partially covered</span></td>
+                    <td><a class="action-link" href="#">Sell new on balance</a></td>
+                  </tr>
+
+                  <tr>
+                    <td>
+                      <div class="symbol">HDFCBANK</div>
+                      <div class="symbol-sub">HDFC Bank</div>
+                    </td>
+                    <td>5,500</td>
+                    <td>₹1,688.20</td>
+                    <td>₹1,734.40</td>
+                    <td>₹95.39L</td>
+                    <td>0%</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td class="amber">—</td>
+                    <td>Potential 0.62%</td>
+                    <td>New idea</td>
+                    <td><span class="status-badge roll">Uncovered</span></td>
+                    <td><a class="action-link" href="#">Sell fresh call</a></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <aside class="side-stack">
+            <section class="panel side-card">
+              <div class="label">Action Panel</div>
+              <h3 class="section-title" style="font-size:24px;margin:0;">Best new covered-call candidates</h3>
+              <div class="side-list">
+                <div class="side-item">
+                  <strong>HDFCBANK 1780 CE • 27 Jun</strong>
+                  <p>Expected premium ₹2.1L, est. 0.62% monthly yield, 2.63% OTM.</p>
+                </div>
+                <div class="side-item">
+                  <strong>ITC 460 CE • 27 Jun</strong>
+                  <p>High repeatability, low assignment stress, 0.58% monthly carry.</p>
+                </div>
+                <div class="side-item">
+                  <strong>LT 3980 CE • 04 Jul</strong>
+                  <p>Better premium/OTM balance than the weekly line. Margin impact minimal.</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel side-card">
+              <div class="label">Roll Suggestions</div>
+              <div class="side-list">
+                <div class="side-item">
+                  <strong>TCS 3880 CE → 3960 CE</strong>
+                  <p>Current strike is ITM. Roll one week out to recover upside and retain premium.</p>
+                </div>
+                <div class="side-item">
+                  <strong>SBIN 1000 CE → 1010 CE</strong>
+                  <p>Spot is approaching strike. Shift up if intraday strength holds into Thursday.</p>
+                </div>
+              </div>
+            </section>
+
+            <section class="panel side-card">
+              <div class="label">Expiry Alerts</div>
+              <div class="side-list">
+                <div class="side-item">
+                  <strong>22 contracts expire this week</strong>
+                  <p>5 already ITM, 8 near strike, 9 safe but need end-of-week review before rollover batch.</p>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </section>
+
+        <section class="analytics">
+          <article class="panel analytics-card">
+            <div class="label">Income by Month</div>
+            <h3 class="section-title" style="font-size:24px;margin:0;">Premium income trend</h3>
+            <div class="bars" aria-label="Premium Income Bars">
+              <div class="bar-col"><div class="bar" style="height: 44%;"></div><div class="bar-value">₹12L</div><div class="bar-label">Jan</div></div>
+              <div class="bar-col"><div class="bar" style="height: 56%;"></div><div class="bar-value">₹15L</div><div class="bar-label">Feb</div></div>
+              <div class="bar-col"><div class="bar" style="height: 49%;"></div><div class="bar-value">₹13L</div><div class="bar-label">Mar</div></div>
+              <div class="bar-col"><div class="bar" style="height: 68%;"></div><div class="bar-value">₹18L</div><div class="bar-label">Apr</div></div>
+              <div class="bar-col"><div class="bar" style="height: 74%;"></div><div class="bar-value">₹20L</div><div class="bar-label">May</div></div>
+              <div class="bar-col"><div class="bar" style="height: 100%;"></div><div class="bar-value">₹28.6L</div><div class="bar-label">Jun</div></div>
+            </div>
+          </article>
+
+          <article class="panel analytics-card">
+            <div class="label">Yield by Stock</div>
+            <h3 class="section-title" style="font-size:24px;margin:0;">Who is paying the best rent</h3>
+            <div class="yield-list">
+              <div class="yield-row"><span>SBIN</span><div class="track"><div class="fill" style="width: 82%;"></div></div><span>10.2%</span></div>
+              <div class="yield-row"><span>INFY</span><div class="track"><div class="fill" style="width: 71%;"></div></div><span>8.9%</span></div>
+              <div class="yield-row"><span>TCS</span><div class="track"><div class="fill" style="width: 56%;"></div></div><span>6.6%</span></div>
+              <div class="yield-row"><span>RELIANCE</span><div class="track"><div class="fill" style="width: 48%;"></div></div><span>5.5%</span></div>
+              <div class="yield-row"><span>HDFCBANK</span><div class="track"><div class="fill" style="width: 38%;"></div></div><span>4.6%</span></div>
+            </div>
+          </article>
+
+          <article class="panel analytics-card">
+            <div class="label">Assignment Risk Panel</div>
+            <h3 class="section-title" style="font-size:24px;margin:0;">Heatmap before it becomes pain</h3>
+            <div class="risk-matrix">
+              <div class="risk-row"><span>TCS</span><div class="risk-cell high">Above strike by 1.1%</div><span class="red">High</span></div>
+              <div class="risk-row"><span>SBIN</span><div class="risk-cell mid">0.7% below strike</div><span class="amber">Watch</span></div>
+              <div class="risk-row"><span>LT</span><div class="risk-cell mid">Expiry in 2 days</div><span class="amber">Watch</span></div>
+              <div class="risk-row"><span>INFY</span><div class="risk-cell low">3.9% cushion</div><span class="green">Low</span></div>
+            </div>
+          </article>
+        </section>
+
+        <div class="footer-note">
+          Demo only: static ORIENS-style covered-call yield page. Intended as a product direction sample for holdings analytics, premium tracking, expiry management, and roll decisions.
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

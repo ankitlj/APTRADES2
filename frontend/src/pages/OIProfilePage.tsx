@@ -143,6 +143,10 @@ export function OIProfilePage() {
           exchange: exchangeCode,
           product_type: "options",
           token: row.ce_token,
+          broker_symbol: row.ce_broker_symbol ?? state.data?.broker_symbol ?? underlying,
+          expiry_date: row.ce_expiry_date ?? state.data?.expiry,
+          strike_price: row.ce_strike_price ?? row.strike_price,
+          right: row.ce_right ?? "call",
         });
       }
       if (row.pe_token) {
@@ -151,6 +155,10 @@ export function OIProfilePage() {
           exchange: exchangeCode,
           product_type: "options",
           token: row.pe_token,
+          broker_symbol: row.pe_broker_symbol ?? state.data?.broker_symbol ?? underlying,
+          expiry_date: row.pe_expiry_date ?? state.data?.expiry,
+          strike_price: row.pe_strike_price ?? row.strike_price,
+          right: row.pe_right ?? "put",
         });
       }
     }

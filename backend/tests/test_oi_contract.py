@@ -79,6 +79,7 @@ def _mock_chain_quotes(instrument):
                 "spot_price": 23268.8,
                 "previous_close": 23451.7,
                 "expiry_date": "30-Jun-2026",
+                "token": f"91{s}",
             }
             for s in ["23200", "23300", "23400"]
         ]
@@ -91,6 +92,7 @@ def _mock_chain_quotes(instrument):
             "spot_price": 23268.8,
             "previous_close": 23451.7,
             "expiry_date": "30-Jun-2026",
+            "token": f"92{s}",
         }
         for s in ["23200", "23300", "23400"]
     ]
@@ -126,11 +128,20 @@ def test_oi_tracker_rows_sorted_by_total_oi_descending(tmp_path):
     payload = response.get_json()
     assert payload["status"] == "ok"
     assert payload["underlying"] == "NIFTY"
+    assert payload["broker_symbol"] == "NIFTY"
     rows = payload["rows"]
     assert len(rows) == 3
     for i in range(len(rows) - 1):
         assert rows[i]["total_oi"] >= rows[i + 1]["total_oi"]
     assert rows[0]["strike_price"] == 23300.0
+    assert rows[0]["ce_broker_symbol"] == "NIFTY"
+    assert rows[0]["pe_broker_symbol"] == "NIFTY"
+    assert rows[0]["ce_expiry_date"] == expiry.isoformat()
+    assert rows[0]["pe_expiry_date"] == expiry.isoformat()
+    assert rows[0]["ce_right"] == "call"
+    assert rows[0]["pe_right"] == "put"
+    assert rows[0]["ce_token"] == "9123300"
+    assert rows[0]["pe_token"] == "9223300"
     assert payload["max_ce_oi_strike"] == 23200.0
     assert payload["max_pe_oi_strike"] == 23300.0
 
@@ -148,6 +159,7 @@ def test_oi_profile_rows_sorted_by_strike_ascending(tmp_path):
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["status"] == "ok"
+    assert payload["broker_symbol"] == "NIFTY"
     rows = payload["rows"]
     assert len(rows) == 3
     for i in range(len(rows) - 1):
@@ -155,4 +167,6 @@ def test_oi_profile_rows_sorted_by_strike_ascending(tmp_path):
     assert rows[0]["strike_price"] == 23200.0
     assert rows[0]["ce_oi"] == 150000.0
     assert rows[0]["pe_oi"] == 80000.0
+    assert rows[0]["ce_strike_price"] == "23200"
+    assert rows[0]["pe_strike_price"] == "23200"
     assert rows[2]["strike_price"] == 23400.0

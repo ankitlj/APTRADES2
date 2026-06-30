@@ -100,6 +100,9 @@ def resolve_subscription_items(
                     "exchange_code": exchange,
                     "product_type": product_type or "",
                     "token": token,
+                    "expiry_date": item.get("expiry_date") or "",
+                    "strike_price": item.get("strike_price") or "",
+                    "right": item.get("right") or "",
                 }
             )
             continue

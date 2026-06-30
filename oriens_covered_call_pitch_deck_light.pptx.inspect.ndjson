@@ -1,0 +1,203 @@
+{"kind":"deck","id":"pr/zqeh8t","name":"Deck"}
+{"kind":"layout","layoutId":"917c3ee2-fdb7-47ce-adf4-49af3de27223","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"620f7833-a5ce-46cd-a93c-0ec57c40c87c","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/j3rmh7","slide":1,"title":"ORIENS","textShapes":20}
+{"kind":"textbox","id":"sh/r65wjudg","slide":1,"text":"ORIENS","textPreview":"ORIENS","textChars":6,"textLines":1,"bbox":[64,42,180,32]}
+{"kind":"textbox","id":"sh/gr2p8nqx","slide":1,"text":"Covered Call Intelligence Platform","textPreview":"Covered Call Intelligence Platform","textChars":34,"textLines":1,"bbox":[64,72,300,16]}
+{"kind":"textbox","id":"sh/9cvixcze","slide":1,"text":"TITLE","textPreview":"TITLE","textChars":5,"textLines":1,"bbox":[934,50,180,18]}
+{"kind":"textbox","id":"sh/yxobm58z","slide":1,"text":"Slide 1","textPreview":"Slide 1","textChars":7,"textLines":1,"bbox":[1124,50,92,18]}
+{"kind":"shape","id":"sh/nih4byhg","slide":1,"bbox":[64,98,1152,0]}
+{"kind":"shape","id":"sh/g3ex0nux","slide":1,"bbox":[64,122,728,500]}
+{"kind":"shape","id":"sh/5o7qpg3e","slide":1,"bbox":[816,122,400,500]}
+{"kind":"textbox","id":"sh/y1kre1w7","slide":1,"text":"ORIENS Covered Call OS","textPreview":"ORIENS Covered Call OS","textChars":22,"textLines":1,"bbox":[96,164,620,92]}
+{"kind":"textbox","id":"sh/rmhk3q5o","slide":1,"text":"A broker-connected covered-call tracking and execution platform for ultra-HNI traders, prop operators, and serious premium-income portfolios.","textPreview":"A broker-connected covered-call tracking and execution platform for ultra-HNI traders, prop operators, and serious premium-income portfol...","textChars":141,"textLines":1,"bbox":[96,270,600,118]}
+{"kind":"shape","id":"sh/fa9w3m94","slide":1,"bbox":[96,414,182,38]}
+{"kind":"textbox","id":"sh/qpg3ex0n","slide":1,"text":"Trading stack already built","textPreview":"Trading stack already built","textChars":27,"textLines":1,"bbox":[108,425,158,16]}
+{"kind":"shape","id":"sh/xczed8v6","slide":1,"bbox":[290,414,182,38]}
+{"kind":"textbox","id":"sh/8v6psfil","slide":1,"text":"Covered-call layer next","textPreview":"Covered-call layer next","textChars":23,"textLines":1,"bbox":[302,425,158,16]}
+{"kind":"shape","id":"sh/fyxobm58","slide":1,"bbox":[484,414,182,38]}
+{"kind":"textbox","id":"sh/qd4vmtwr","slide":1,"text":"Portfolio + execution + analytics","textPreview":"Portfolio + execution + analytics","textChars":33,"textLines":1,"bbox":[496,425,158,16]}
+{"kind":"textbox","id":"sh/x4nap4r6","slide":1,"text":"Presenter","textPreview":"Presenter","textChars":9,"textLines":1,"bbox":[96,524,120,18]}
+{"kind":"textbox","id":"sh/8jqh0fep","slide":1,"text":"Ankit Sharma","textPreview":"Ankit Sharma","textChars":12,"textLines":1,"bbox":[96,546,220,24]}
+{"kind":"shape","id":"sh/fmlkjm1c","slide":1,"bbox":[844,152,344,108]}
+{"kind":"textbox","id":"sh/q1orytsv","slide":1,"text":"CORE VALUE PROPOSITION","textPreview":"CORE VALUE PROPOSITION","textChars":22,"textLines":1,"bbox":[864,170,304,16]}
+{"kind":"textbox","id":"sh/y1kre1w7","slide":1,"text":"Own stock. Sell calls. Systematize income.","textPreview":"Own stock. Sell calls. Systematize income.","textChars":42,"textLines":1,"bbox":[864,198,304,42]}
+{"kind":"textbox","id":"sh/rmhk3q5o","slide":1,"text":"Turn a live trading system into a covered-call operating platform.","textPreview":"Turn a live trading system into a covered-call operating platform.","textChars":66,"textLines":1,"bbox":[864,212,304,34]}
+{"kind":"shape","id":"sh/g7adsji5","slide":1,"bbox":[844,280,344,116]}
+{"kind":"textbox","id":"sh/9s36hcrm","slide":1,"text":"CURRENT BASE","textPreview":"CURRENT BASE","textChars":12,"textLines":1,"bbox":[864,298,304,16]}
+{"kind":"textbox","id":"sh/yd0z6103","slide":1,"text":"Trading system foundation","textPreview":"Trading system foundation","textChars":25,"textLines":1,"bbox":[864,326,304,42]}
+{"kind":"textbox","id":"sh/rytsvu9k","slide":1,"text":"Live market data, positions, order surfaces, broker workflows, and options tooling already exist.","textPreview":"Live market data, positions, order surfaces, broker workflows, and options tooling already exist.","textChars":97,"textLines":1,"bbox":[864,348,304,34]}
+{"kind":"shape","id":"sh/gfmlkjm1","slide":1,"bbox":[844,416,344,132]}
+{"kind":"textbox","id":"sh/90je9cvi","slide":1,"text":"NEXT LAYER","textPreview":"NEXT LAYER","textChars":10,"textLines":1,"bbox":[864,434,304,16]}
+{"kind":"textbox","id":"sh/ylc7u54z","slide":1,"text":"Covered-call intelligence","textPreview":"Covered-call intelligence","textChars":25,"textLines":1,"bbox":[864,462,304,42]}
+{"kind":"textbox","id":"sh/r65wjudg","slide":1,"text":"Add holdings mapping, premium ledger, yield analytics, expiry alerts, and rule-based execution.","textPreview":"Add holdings mapping, premium ledger, yield analytics, expiry alerts, and rule-based execution.","textChars":95,"textLines":1,"bbox":[864,500,304,34]}
+{"kind":"notes","id":"nt/j3rmh7","slide":1,"text":""}
+{"kind":"slide","id":"sl/73lxrx","slide":2,"title":"ORIENS","textShapes":17}
+{"kind":"textbox","id":"sh/qpg3ex0n","slide":2,"text":"ORIENS","textPreview":"ORIENS","textChars":6,"textLines":1,"bbox":[64,42,180,32]}
+{"kind":"textbox","id":"sh/xczed8v6","slide":2,"text":"Covered Call Intelligence Platform","textPreview":"Covered Call Intelligence Platform","textChars":34,"textLines":1,"bbox":[64,72,300,16]}
+{"kind":"textbox","id":"sh/8v6psfil","slide":2,"text":"PROBLEM AND SOLUTION","textPreview":"PROBLEM AND SOLUTION","textChars":20,"textLines":1,"bbox":[934,50,180,18]}
+{"kind":"textbox","id":"sh/fyxobm58","slide":2,"text":"Slide 2","textPreview":"Slide 2","textChars":7,"textLines":1,"bbox":[1124,50,92,18]}
+{"kind":"shape","id":"sh/qd4vmtwr","slide":2,"bbox":[64,98,1152,0]}
+{"kind":"shape","id":"sh/x4nap4r6","slide":2,"bbox":[64,116,548,550]}
+{"kind":"shape","id":"sh/8jqh0fep","slide":2,"bbox":[636,116,580,550]}
+{"kind":"textbox","id":"sh/fmlkjm1c","slide":2,"text":"The problem","textPreview":"The problem","textChars":11,"textLines":1,"bbox":[92,148,220,28]}
+{"kind":"shape","id":"sh/q1orytsv","slide":2,"bbox":[96,206,8,8]}
+{"kind":"textbox","id":"sh/4nap4r65","slide":2,"text":"Holdings, sold calls, premium, and assignment risk usually live across separate screens.","textPreview":"Holdings, sold calls, premium, and assignment risk usually live across separate screens.","textChars":88,"textLines":1,"bbox":[114,198,462,54]}
+{"kind":"shape","id":"sh/t83itgfm","slide":2,"bbox":[96,254,8,8]}
+{"kind":"textbox","id":"sh/mhk3q5o7","slide":2,"text":"Most broker terminals are execution-first, not covered-call portfolio-first.","textPreview":"Most broker terminals are execution-first, not covered-call portfolio-first.","textChars":76,"textLines":1,"bbox":[114,246,462,54]}
+{"kind":"shape","id":"sh/b2hwfyxo","slide":2,"bbox":[96,302,8,8]}
+{"kind":"textbox","id":"sh/4byhgn29","slide":2,"text":"Existing tools rarely combine yield analytics, live execution, and roll workflow in one system.","textPreview":"Existing tools rarely combine yield analytics, live execution, and roll workflow in one system.","textChars":95,"textLines":1,"bbox":[114,294,462,54]}
+{"kind":"shape","id":"sh/twra5gbq","slide":2,"bbox":[96,350,8,8]}
+{"kind":"textbox","id":"sh/m58z25kb","slide":2,"text":"Manual monitoring becomes fragile as position count and capital size increase.","textPreview":"Manual monitoring becomes fragile as position count and capital size increase.","textChars":78,"textLines":1,"bbox":[114,342,462,54]}
+{"kind":"textbox","id":"sh/bq1oryts","slide":2,"text":"The solution","textPreview":"The solution","textChars":12,"textLines":1,"bbox":[664,148,220,28]}
+{"kind":"shape","id":"sh/47y1kre1","slide":2,"bbox":[668,206,8,8]}
+{"kind":"textbox","id":"sh/tsvu9kni","slide":2,"text":"Dedicated covered-call dashboard with covered value, uncovered value, premium, and expiry pressure.","textPreview":"Dedicated covered-call dashboard with covered value, uncovered value, premium, and expiry pressure.","textChars":99,"textLines":1,"bbox":[686,198,482,54]}
+{"kind":"shape","id":"sh/xkf6dcbu","slide":2,"bbox":[668,254,8,8]}
+{"kind":"textbox","id":"sh/4zidonyd","slide":2,"text":"Yield engine that compares premium income to capital blocked and assignment risk.","textPreview":"Yield engine that compares premium income to capital blocked and assignment risk.","textChars":81,"textLines":1,"bbox":[686,246,482,54]}
+{"kind":"shape","id":"sh/fepkzupw","slide":2,"bbox":[668,302,8,8]}
+{"kind":"textbox","id":"sh/mtwra5gb","slide":2,"text":"Action panel for roll candidates, expiry alerts, and fresh call-selling opportunities.","textPreview":"Action panel for roll candidates, expiry alerts, and fresh call-selling opportunities.","textChars":86,"textLines":1,"bbox":[686,294,482,54]}
+{"kind":"shape","id":"sh/xc3ylc7u","slide":2,"bbox":[668,350,8,8]}
+{"kind":"textbox","id":"sh/4r65wjud","slide":2,"text":"Broker-connected execution layer instead of spreadsheet-driven decision making.","textPreview":"Broker-connected execution layer instead of spreadsheet-driven decision making.","textChars":79,"textLines":1,"bbox":[686,342,482,54]}
+{"kind":"shape","id":"sh/f6dcbulw","slide":2,"bbox":[668,432,520,178]}
+{"kind":"textbox","id":"sh/mlkjm1cf","slide":2,"text":"WHAT ORIENS ADDS","textPreview":"WHAT ORIENS ADDS","textChars":16,"textLines":1,"bbox":[688,450,480,16]}
+{"kind":"textbox","id":"sh/x0nuxc3y","slide":2,"text":"Portfolio intelligence on top of execution","textPreview":"Portfolio intelligence on top of execution","textChars":42,"textLines":1,"bbox":[688,478,480,42]}
+{"kind":"textbox","id":"sh/4fu18jqh","slide":2,"text":"Current ORIENS base: live market data, order surfaces, positions, and options tools.\nNext layer: covered holdings map, yield analytics, premium history, roll actions.","textPreview":"Current ORIENS base: live market data, order surfaces, positions, and options tools. | Next layer: covered holdings map, yield analytics,...","textChars":166,"textLines":2,"bbox":[688,562,480,34]}
+{"kind":"notes","id":"nt/73lxrx","slide":2,"text":""}
+{"kind":"slide","id":"sl/qdmd8h","slide":3,"title":"ORIENS","textShapes":15}
+{"kind":"textbox","id":"sh/eloj2t83","slide":3,"text":"ORIENS","textPreview":"ORIENS","textChars":6,"textLines":1,"bbox":[64,42,180,32]}
+{"kind":"textbox","id":"sh/lc7u54zi","slide":3,"text":"Covered Call Intelligence Platform","textPreview":"Covered Call Intelligence Platform","textChars":34,"textLines":1,"bbox":[64,72,300,16]}
+{"kind":"textbox","id":"sh/wra5gbq1","slide":3,"text":"DIFFERENTIATION","textPreview":"DIFFERENTIATION","textChars":15,"textLines":1,"bbox":[934,50,180,18]}
+{"kind":"textbox","id":"sh/7u54zido","slide":3,"text":"Slide 3","textPreview":"Slide 3","textChars":7,"textLines":1,"bbox":[1124,50,92,18]}
+{"kind":"shape","id":"sh/ed8bat47","slide":3,"bbox":[64,98,1152,0]}
+{"kind":"textbox","id":"sh/l0rqd4vm","slide":3,"text":"Why ORIENS wins","textPreview":"Why ORIENS wins","textChars":15,"textLines":1,"bbox":[64,116,420,40]}
+{"kind":"shape","id":"sh/wfyxobm5","slide":3,"bbox":[64,188,356,232]}
+{"kind":"textbox","id":"sh/7mp0bi9s","slide":3,"text":"Workflow-native","textPreview":"Workflow-native","textChars":15,"textLines":1,"bbox":[88,218,260,28]}
+{"kind":"textbox","id":"sh/e1w7mp0b","slide":3,"text":"Designed around covered inventory, premium streams, strike distance, expiry pressure, and assignment management.","textPreview":"Designed around covered inventory, premium streams, strike distance, expiry pressure, and assignment management.","textChars":112,"textLines":1,"bbox":[88,262,304,120]}
+{"kind":"shape","id":"sh/0rqd4vmt","slide":3,"bbox":[452,188,356,232]}
+{"kind":"textbox","id":"sh/tcj6tova","slide":3,"text":"Analytics + execution","textPreview":"Analytics + execution","textChars":21,"textLines":1,"bbox":[476,218,260,28]}
+{"kind":"textbox","id":"sh/il0rqd4v","slide":3,"text":"Combines Born To Sell style opportunity logic with live broker connectivity and operator-grade workflow.","textPreview":"Combines Born To Sell style opportunity logic with live broker connectivity and operator-grade workflow.","textChars":104,"textLines":1,"bbox":[476,262,304,120]}
+{"kind":"shape","id":"sh/b6xkf6dc","slide":3,"bbox":[840,188,356,232]}
+{"kind":"textbox","id":"sh/0je9cvix","slide":3,"text":"Built on real infrastructure","textPreview":"Built on real infrastructure","textChars":28,"textLines":1,"bbox":[864,218,260,28]}
+{"kind":"textbox","id":"sh/t47y1kre","slide":3,"text":"Not a pitch from zero. The trading foundation already exists: live data, options surfaces, positions, and strategy tooling.","textPreview":"Not a pitch from zero. The trading foundation already exists: live data, options surfaces, positions, and strategy tooling.","textChars":123,"textLines":1,"bbox":[864,262,304,120]}
+{"kind":"shape","id":"sh/idonyd0z","slide":3,"bbox":[64,452,1152,172]}
+{"kind":"textbox","id":"sh/byhgn29g","slide":3,"text":"Core UX principles","textPreview":"Core UX principles","textChars":18,"textLines":1,"bbox":[92,484,240,26]}
+{"kind":"shape","id":"sh/0fepkzup","slide":3,"bbox":[96,534,8,8]}
+{"kind":"textbox","id":"sh/p0bi9s36","slide":3,"text":"Always show uncovered holdings, expiring calls, and roll urgency first.","textPreview":"Always show uncovered holdings, expiring calls, and roll urgency first.","textChars":71,"textLines":1,"bbox":[114,526,1002,54]}
+{"kind":"shape","id":"sh/tsvu9kni","slide":3,"bbox":[96,572,8,8]}
+{"kind":"textbox","id":"sh/47y1kre1","slide":3,"text":"Keep premium, yield, and assignment risk visible without opening secondary panels.","textPreview":"Keep premium, yield, and assignment risk visible without opening secondary panels.","textChars":82,"textLines":1,"bbox":[114,564,1002,54]}
+{"kind":"shape","id":"sh/bm58z25k","slide":3,"bbox":[96,610,8,8]}
+{"kind":"textbox","id":"sh/m1cfa9w3","slide":3,"text":"Execution feedback must be explicit: placed, pending, rolled, expired, or assigned.","textPreview":"Execution feedback must be explicit: placed, pending, rolled, expired, or assigned.","textChars":83,"textLines":1,"bbox":[114,602,1002,54]}
+{"kind":"notes","id":"nt/qdmd8h","slide":3,"text":""}
+{"kind":"slide","id":"sl/394gwj","slide":4,"title":"ORIENS","textShapes":26}
+{"kind":"textbox","id":"sh/i5sneloj","slide":4,"text":"ORIENS","textPreview":"ORIENS","textChars":6,"textLines":1,"bbox":[64,42,180,32]}
+{"kind":"textbox","id":"sh/pwb2hwfy","slide":4,"text":"Covered Call Intelligence Platform","textPreview":"Covered Call Intelligence Platform","textChars":34,"textLines":1,"bbox":[64,72,300,16]}
+{"kind":"textbox","id":"sh/0bi9s36h","slide":4,"text":"MARKET OPPORTUNITY","textPreview":"MARKET OPPORTUNITY","textChars":18,"textLines":1,"bbox":[934,50,180,18]}
+{"kind":"textbox","id":"sh/7y1kre1w","slide":4,"text":"Slide 4","textPreview":"Slide 4","textChars":7,"textLines":1,"bbox":[1124,50,92,18]}
+{"kind":"shape","id":"sh/ed8v6psf","slide":4,"bbox":[64,98,1152,0]}
+{"kind":"shape","id":"sh/p4r65wju","slide":4,"bbox":[64,118,560,536]}
+{"kind":"shape","id":"sh/wjudg7ad","slide":4,"bbox":[648,118,568,536]}
+{"kind":"textbox","id":"sh/72x4nap4","slide":4,"text":"Why now","textPreview":"Why now","textChars":7,"textLines":1,"bbox":[92,150,220,30]}
+{"kind":"textbox","id":"sh/ih4byhgn","slide":4,"text":"India’s active derivatives participation, HNI use of options income strategies, and the lack of specialized covered-call operating software create a high-value niche right now.","textPreview":"India’s active derivatives participation, HNI use of options income strategies, and the lack of specialized covered-call operating softwa...","textChars":176,"textLines":1,"bbox":[92,196,492,100]}
+{"kind":"textbox","id":"sh/032lszqt","slide":4,"text":"TAM","textPreview":"TAM","textChars":3,"textLines":1,"bbox":[92,314,180,16]}
+{"kind":"shape","id":"sh/tovahoza","slide":4,"bbox":[92,334,360,22]}
+{"kind":"shape","id":"sh/ixczed8v","slide":4,"bbox":[92,334,331.2,22]}
+{"kind":"textbox","id":"sh/bi9s36hc","slide":4,"text":"92%","textPreview":"92%","textChars":3,"textLines":1,"bbox":[464,332,56,18]}
+{"kind":"textbox","id":"sh/0fepkzup","slide":4,"text":"SAM","textPreview":"SAM","textChars":3,"textLines":1,"bbox":[92,384,180,16]}
+{"kind":"shape","id":"sh/p0bi9s36","slide":4,"bbox":[92,404,290,22]}
+{"kind":"shape","id":"sh/i9s36hcr","slide":4,"bbox":[92,404,208.8,22]}
+{"kind":"textbox","id":"sh/bulwval8","slide":4,"text":"72%","textPreview":"72%","textChars":3,"textLines":1,"bbox":[394,402,56,18]}
+{"kind":"textbox","id":"sh/0je9cvix","slide":4,"text":"SOM","textPreview":"SOM","textChars":3,"textLines":1,"bbox":[92,454,180,16]}
+{"kind":"shape","id":"sh/t47y1kre","slide":4,"bbox":[92,474,170,22]}
+{"kind":"shape","id":"sh/xobm58z2","slide":4,"bbox":[92,474,69.7,22]}
+{"kind":"textbox","id":"sh/83itgfml","slide":4,"text":"41%","textPreview":"41%","textChars":3,"textLines":1,"bbox":[274,472,56,18]}
+{"kind":"textbox","id":"sh/fil0rqd4","slide":4,"text":"TAM: broad active Indian equity and derivatives investor base\nSAM: HNIs, covered-call investors, prop-style operators, and advisory products\nSOM: users who value custom workflow, execution, and full-stack support","textPreview":"TAM: broad active Indian equity and derivatives investor base | SAM: HNIs, covered-call investors, prop-style operators, and advisory pro...","textChars":212,"textLines":3,"bbox":[92,532,470,98]}
+{"kind":"textbox","id":"sh/qxs72x4n","slide":4,"text":"Business model and pricing","textPreview":"Business model and pricing","textChars":26,"textLines":1,"bbox":[676,150,360,30]}
+{"kind":"shape","id":"sh/x0nuxc3y","slide":4,"bbox":[676,206,512,146]}
+{"kind":"textbox","id":"sh/4fu18jqh","slide":4,"text":"CONTRACT PRICING","textPreview":"CONTRACT PRICING","textChars":16,"textLines":1,"bbox":[696,224,472,16]}
+{"kind":"textbox","id":"sh/fu18jqh0","slide":4,"text":"₹3,00,000 flat","textPreview":"₹3,00,000 flat","textChars":14,"textLines":1,"bbox":[696,252,472,42]}
+{"kind":"textbox","id":"sh/m94fu18j","slide":4,"text":"Includes 1 year of full-time support and product changes/additions within agreed scope.","textPreview":"Includes 1 year of full-time support and product changes/additions within agreed scope.","textChars":87,"textLines":1,"bbox":[696,304,472,34]}
+{"kind":"shape","id":"sh/xc3ylc7u","slide":4,"bbox":[676,372,246,106]}
+{"kind":"textbox","id":"sh/4r65wjud","slide":4,"text":"WHO THIS FITS","textPreview":"WHO THIS FITS","textChars":13,"textLines":1,"bbox":[696,390,206,16]}
+{"kind":"textbox","id":"sh/ih4byhgn","slide":4,"text":"Ultra-HNI desks","textPreview":"Ultra-HNI desks","textChars":15,"textLines":1,"bbox":[696,418,206,42]}
+{"kind":"textbox","id":"sh/72x4nap4","slide":4,"text":"Private operators\nFamily-office style users","textPreview":"Private operators | Family-office style users","textChars":43,"textLines":2,"bbox":[696,430,206,34]}
+{"kind":"shape","id":"sh/0nuxc3yl","slide":4,"bbox":[942,372,246,106]}
+{"kind":"textbox","id":"sh/p8nqxs72","slide":4,"text":"SALES ARGUMENT","textPreview":"SALES ARGUMENT","textChars":14,"textLines":1,"bbox":[962,390,206,16]}
+{"kind":"textbox","id":"sh/itgfmlkj","slide":4,"text":"High trust","textPreview":"High trust","textChars":10,"textLines":1,"bbox":[962,418,206,42]}
+{"kind":"textbox","id":"sh/7ed8bat4","slide":4,"text":"Custom changes covered\nExecution-oriented support","textPreview":"Custom changes covered | Execution-oriented support","textChars":49,"textLines":2,"bbox":[962,430,206,34]}
+{"kind":"shape","id":"sh/0z61032l","slide":4,"bbox":[676,500,512,122]}
+{"kind":"textbox","id":"sh/pkzupwb2","slide":4,"text":"POSITIONING","textPreview":"POSITIONING","textChars":11,"textLines":1,"bbox":[696,518,472,16]}
+{"kind":"textbox","id":"sh/i5sneloj","slide":4,"text":"Not another broker dashboard","textPreview":"Not another broker dashboard","textChars":28,"textLines":1,"bbox":[696,546,472,42]}
+{"kind":"textbox","id":"sh/7qpg3ex0","slide":4,"text":"ORIENS helps run a covered-call business process, not just place option orders.","textPreview":"ORIENS helps run a covered-call business process, not just place option orders.","textChars":79,"textLines":1,"bbox":[696,574,472,34]}
+{"kind":"notes","id":"nt/394gwj","slide":4,"text":""}
+{"kind":"slide","id":"sl/ahvubh","slide":5,"title":"ORIENS","textShapes":17}
+{"kind":"textbox","id":"sh/k3q5o7qp","slide":5,"text":"ORIENS","textPreview":"ORIENS","textChars":6,"textLines":1,"bbox":[64,42,180,32]}
+{"kind":"textbox","id":"sh/vixczed8","slide":5,"text":"Covered Call Intelligence Platform","textPreview":"Covered Call Intelligence Platform","textChars":34,"textLines":1,"bbox":[64,72,300,16]}
+{"kind":"textbox","id":"sh/2x4nap4r","slide":5,"text":"IMPLEMENTATION PLAN","textPreview":"IMPLEMENTATION PLAN","textChars":19,"textLines":1,"bbox":[934,50,180,18]}
+{"kind":"textbox","id":"sh/dcbulwva","slide":5,"text":"Slide 5","textPreview":"Slide 5","textChars":7,"textLines":1,"bbox":[1124,50,92,18]}
+{"kind":"shape","id":"sh/kre1w7mp","slide":5,"bbox":[64,98,1152,0]}
+{"kind":"textbox","id":"sh/val87ed8","slide":5,"text":"Deployment roadmap","textPreview":"Deployment roadmap","textChars":18,"textLines":1,"bbox":[64,118,360,40]}
+{"kind":"shape","id":"sh/6psfil0r","slide":5,"bbox":[84,192,1112,96]}
+{"kind":"textbox","id":"sh/d8bat47y","slide":5,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[110,214,54,38]}
+{"kind":"textbox","id":"sh/knih4byh","slide":5,"text":"Map data foundations","textPreview":"Map data foundations","textChars":20,"textLines":1,"bbox":[190,210,360,26]}
+{"kind":"textbox","id":"sh/uxc3ylc7","slide":5,"text":"Normalize holdings, contract specs, sold-call positions, and premium history into one covered-call book.","textPreview":"Normalize holdings, contract specs, sold-call positions, and premium history into one covered-call book.","textChars":104,"textLines":1,"bbox":[190,240,930,34]}
+{"kind":"shape","id":"sh/ji5snelo","slide":5,"bbox":[84,306,1112,96]}
+{"kind":"textbox","id":"sh/c3ylc7u5","slide":5,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[110,328,54,38]}
+{"kind":"textbox","id":"sh/1kre1w7m","slide":5,"text":"Launch dashboard + yield analytics","textPreview":"Launch dashboard + yield analytics","textChars":34,"textLines":1,"bbox":[190,324,360,26]}
+{"kind":"textbox","id":"sh/ulwval87","slide":5,"text":"Expose coverage, yield, expiries, strike distance, premium ledger, and opportunity suggestions.","textPreview":"Expose coverage, yield, expiries, strike distance, premium ledger, and opportunity suggestions.","textChars":95,"textLines":1,"bbox":[190,354,930,34]}
+{"kind":"shape","id":"sh/j6tovaho","slide":5,"bbox":[84,420,1112,96]}
+{"kind":"textbox","id":"sh/crmhk3q5","slide":5,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[110,442,54,38]}
+{"kind":"textbox","id":"sh/1cfa9w3m","slide":5,"text":"Add rule engine","textPreview":"Add rule engine","textChars":15,"textLines":1,"bbox":[190,438,360,26]}
+{"kind":"textbox","id":"sh/qh0fepkz","slide":5,"text":"Support %OTM, yield-on-margin, utilization, timing rules, and decision filters.","textPreview":"Support %OTM, yield-on-margin, utilization, timing rules, and decision filters.","textChars":79,"textLines":1,"bbox":[190,468,930,34]}
+{"kind":"shape","id":"sh/j2t83itg","slide":5,"bbox":[84,534,1112,96]}
+{"kind":"textbox","id":"sh/bq1oryts","slide":5,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[110,556,54,38]}
+{"kind":"textbox","id":"sh/m58z25kb","slide":5,"text":"Enable guided execution","textPreview":"Enable guided execution","textChars":23,"textLines":1,"bbox":[190,552,360,26]}
+{"kind":"textbox","id":"sh/twra5gbq","slide":5,"text":"Route approved sell/roll actions through broker-connected workflows with audit visibility.","textPreview":"Route approved sell/roll actions through broker-connected workflows with audit visibility.","textChars":90,"textLines":1,"bbox":[190,582,930,34]}
+{"kind":"notes","id":"nt/ahvubh","slide":5,"text":""}
+{"kind":"slide","id":"sl/9iyhyv","slide":6,"title":"ORIENS","textShapes":14}
+{"kind":"textbox","id":"sh/m94fu18j","slide":6,"text":"ORIENS","textPreview":"ORIENS","textChars":6,"textLines":1,"bbox":[64,42,180,32]}
+{"kind":"textbox","id":"sh/x0nuxc3y","slide":6,"text":"Covered Call Intelligence Platform","textPreview":"Covered Call Intelligence Platform","textChars":34,"textLines":1,"bbox":[64,72,300,16]}
+{"kind":"textbox","id":"sh/4fu18jqh","slide":6,"text":"TEAM AND EXPERTISE","textPreview":"TEAM AND EXPERTISE","textChars":18,"textLines":1,"bbox":[934,50,180,18]}
+{"kind":"textbox","id":"sh/fil0rqd4","slide":6,"text":"Slide 6","textPreview":"Slide 6","textChars":7,"textLines":1,"bbox":[1124,50,92,18]}
+{"kind":"shape","id":"sh/qxs72x4n","slide":6,"bbox":[64,98,1152,0]}
+{"kind":"shape","id":"sh/xobm58z2","slide":6,"bbox":[64,120,520,520]}
+{"kind":"shape","id":"sh/83itgfml","slide":6,"bbox":[612,120,604,520]}
+{"kind":"textbox","id":"sh/fepkzupw","slide":6,"text":"Built lean, with strong systems thinking","textPreview":"Built lean, with strong systems thinking","textChars":40,"textLines":1,"bbox":[92,156,430,80]}
+{"kind":"textbox","id":"sh/mtwra5gb","slide":6,"text":"Solo-built with the help of AI models and better system design concepts, on top of a real trading dashboard foundation already handling live data, options tooling, latency hardening, and broker workflows.","textPreview":"Solo-built with the help of AI models and better system design concepts, on top of a real trading dashboard foundation already handling l...","textChars":204,"textLines":1,"bbox":[92,254,430,166]}
+{"kind":"shape","id":"sh/oj2t83it","slide":6,"bbox":[92,448,460,142]}
+{"kind":"textbox","id":"sh/d4vmtwra","slide":6,"text":"EXECUTION CREDIBILITY","textPreview":"EXECUTION CREDIBILITY","textChars":21,"textLines":1,"bbox":[112,466,420,16]}
+{"kind":"textbox","id":"sh/6dcbulwv","slide":6,"text":"Already evolving from a live stack","textPreview":"Already evolving from a live stack","textChars":34,"textLines":1,"bbox":[112,494,420,42]}
+{"kind":"textbox","id":"sh/vy90je9c","slide":6,"text":"This is a product extension plan, not a greenfield concept with no implementation base.","textPreview":"This is a product extension plan, not a greenfield concept with no implementation base.","textChars":87,"textLines":1,"bbox":[112,542,420,34]}
+{"kind":"textbox","id":"sh/o7qpg3ex","slide":6,"text":"Current technical base","textPreview":"Current technical base","textChars":22,"textLines":1,"bbox":[640,156,280,30]}
+{"kind":"shape","id":"sh/dsji5sne","slide":6,"bbox":[644,218,8,8]}
+{"kind":"textbox","id":"sh/61032lsz","slide":6,"text":"Live market data and websocket-backed dashboard surfaces","textPreview":"Live market data and websocket-backed dashboard surfaces","textChars":56,"textLines":1,"bbox":[662,210,502,54]}
+{"kind":"shape","id":"sh/vmtwra5g","slide":6,"bbox":[644,266,8,8]}
+{"kind":"textbox","id":"sh/ovahoza1","slide":6,"text":"Positions, orderbook, tradebook, option chain, OI tracker, and strategy tooling","textPreview":"Positions, orderbook, tradebook, option chain, OI tracker, and strategy tooling","textChars":79,"textLines":1,"bbox":[662,258,502,54]}
+{"kind":"shape","id":"sh/dg7adsji","slide":6,"bbox":[644,314,8,8]}
+{"kind":"textbox","id":"sh/1kre1w7m","slide":6,"text":"Broker workflow foundation and latency-hardening already in place","textPreview":"Broker workflow foundation and latency-hardening already in place","textChars":65,"textLines":1,"bbox":[662,306,502,54]}
+{"kind":"shape","id":"sh/c3ylc7u5","slide":6,"bbox":[644,362,8,8]}
+{"kind":"textbox","id":"sh/ji5snelo","slide":6,"text":"Reusable architecture for portfolio intelligence, alerts, and execution rules","textPreview":"Reusable architecture for portfolio intelligence, alerts, and execution rules","textChars":77,"textLines":1,"bbox":[662,354,502,54]}
+{"kind":"notes","id":"nt/9iyhyv","slide":6,"text":""}
+{"kind":"slide","id":"sl/hgiox9","slide":7,"title":"ORIENS","textShapes":16}
+{"kind":"textbox","id":"sh/s72x4nap","slide":7,"text":"ORIENS","textPreview":"ORIENS","textChars":6,"textLines":1,"bbox":[64,42,180,32]}
+{"kind":"textbox","id":"sh/3m94fu18","slide":7,"text":"Covered Call Intelligence Platform","textPreview":"Covered Call Intelligence Platform","textChars":34,"textLines":1,"bbox":[64,72,300,16]}
+{"kind":"textbox","id":"sh/a5gbq1or","slide":7,"text":"CONCLUSION AND CTA","textPreview":"CONCLUSION AND CTA","textChars":18,"textLines":1,"bbox":[934,50,180,18]}
+{"kind":"textbox","id":"sh/h4byhgn2","slide":7,"text":"Slide 7","textPreview":"Slide 7","textChars":7,"textLines":1,"bbox":[1124,50,92,18]}
+{"kind":"shape","id":"sh/sji5snel","slide":7,"bbox":[64,98,1152,0]}
+{"kind":"shape","id":"sh/3ylc7u54","slide":7,"bbox":[64,132,720,460]}
+{"kind":"shape","id":"sh/adsji5sn","slide":7,"bbox":[812,132,404,460]}
+{"kind":"textbox","id":"sh/hgn29gr2","slide":7,"text":"The opportunity is clear","textPreview":"The opportunity is clear","textChars":24,"textLines":1,"bbox":[96,176,500,42]}
+{"kind":"textbox","id":"sh/svu9knih","slide":7,"text":"ORIENS can become a differentiated covered-call platform by adding the missing portfolio intelligence layer on top of the trading stack already built. The outcome is not just another terminal, but a repeatable premium-management operating system for serious capital.","textPreview":"ORIENS can become a differentiated covered-call platform by adding the missing portfolio intelligence layer on top of the trading stack a...","textChars":266,"textLines":1,"bbox":[96,238,620,150]}
+{"kind":"textbox","id":"sh/ed8bat47","slide":7,"text":"Exact next step","textPreview":"Exact next step","textChars":15,"textLines":1,"bbox":[96,426,220,24]}
+{"kind":"textbox","id":"sh/7u54zido","slide":7,"text":"Approve the covered-call MVP scope: holdings layer, premium ledger, yield analytics, expiry alerts, and roll suggestions first. Then layer rules and execution on top.","textPreview":"Approve the covered-call MVP scope: holdings layer, premium ledger, yield analytics, expiry alerts, and roll suggestions first. Then laye...","textChars":166,"textLines":1,"bbox":[96,460,620,98]}
+{"kind":"shape","id":"sh/wfyxobm5","slide":7,"bbox":[844,176,340,138]}
+{"kind":"textbox","id":"sh/l0rqd4vm","slide":7,"text":"CALL TO ACTION","textPreview":"CALL TO ACTION","textChars":14,"textLines":1,"bbox":[864,194,300,16]}
+{"kind":"textbox","id":"sh/eloj2t83","slide":7,"text":"Approve MVP scope","textPreview":"Approve MVP scope","textChars":17,"textLines":1,"bbox":[864,222,300,42]}
+{"kind":"textbox","id":"sh/36hcrmhk","slide":7,"text":"Covered holdings + premium + yield + expiry + roll layer first","textPreview":"Covered holdings + premium + yield + expiry + roll layer first","textChars":62,"textLines":1,"bbox":[864,266,300,34]}
+{"kind":"shape","id":"sh/wra5gbq1","slide":7,"bbox":[844,334,340,138]}
+{"kind":"textbox","id":"sh/lc7u54zi","slide":7,"text":"COMMERCIAL ASK","textPreview":"COMMERCIAL ASK","textChars":14,"textLines":1,"bbox":[864,352,300,16]}
+{"kind":"textbox","id":"sh/epkzupwb","slide":7,"text":"₹3 lakh fixed","textPreview":"₹3 lakh fixed","textChars":13,"textLines":1,"bbox":[864,380,300,42]}
+{"kind":"textbox","id":"sh/7adsji5s","slide":7,"text":"1 year support\nChanges/additions covered in program scope","textPreview":"1 year support | Changes/additions covered in program scope","textChars":57,"textLines":2,"bbox":[864,424,300,34]}
+{"kind":"shape","id":"sh/z61032ls","slide":7,"bbox":[844,492,340,76]}
+{"kind":"textbox","id":"sh/al87ed8b","slide":7,"text":"POSITIONING","textPreview":"POSITIONING","textChars":11,"textLines":1,"bbox":[864,510,300,16]}
+{"kind":"textbox","id":"sh/hcrmhk3q","slide":7,"text":"From trading terminal to covered-call OS","textPreview":"From trading terminal to covered-call OS","textChars":40,"textLines":1,"bbox":[864,538,300,42]}
+{"kind":"notes","id":"nt/hgiox9","slide":7,"text":""}

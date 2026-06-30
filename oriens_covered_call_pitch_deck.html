@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ORIENS Covered Call Platform Proposal</title>
+  <style>
+    :root {
+      --bg: #07080a;
+      --page: #0d0f12;
+      --panel: #14181d;
+      --panel-soft: #191f26;
+      --border: rgba(255,255,255,0.09);
+      --text: #eef2f7;
+      --muted: #9aa4b2;
+      --cyan: #00e6ff;
+      --blue: #2c8cff;
+      --violet: #a987ff;
+      --green: #15c57a;
+      --amber: #ffb020;
+      --red: #ff5b6e;
+      --white: #ffffff;
+      --shadow: 0 20px 60px rgba(0,0,0,0.35);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: Inter, "Segoe UI", Arial, sans-serif; }
+    body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+
+    .deck {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 24px auto 48px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .page {
+      background:
+        radial-gradient(circle at top right, rgba(0,230,255,0.08), transparent 25%),
+        radial-gradient(circle at left top, rgba(169,135,255,0.08), transparent 22%),
+        var(--page);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+      min-height: 1020px;
+      display: grid;
+      gap: 18px;
+      page-break-after: always;
+    }
+
+    .page:last-child { page-break-after: auto; }
+
+    .page-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .mark {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.8), transparent 18%),
+        conic-gradient(from 0deg, #5433ff, #9a7dff, #1fe7ff, #5433ff);
+      box-shadow: 0 0 24px rgba(128, 96, 255, 0.28);
+      position: relative;
+    }
+
+    .mark::after {
+      content: "";
+      position: absolute;
+      inset: 9px;
+      border-radius: 50%;
+      background: var(--page);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .brand-copy h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0.08em;
+      font-family: Georgia, "Times New Roman", serif;
+      color: #f7f1ff;
+    }
+
+    .brand-copy p {
+      margin: 4px 0 0;
+      font-size: 11px;
+      color: var(--violet);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .page-no {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-weight: 800;
+    }
+
+    .grid-hero {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 18px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0.01));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      overflow: hidden;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .title-xl {
+      margin: 0 0 14px;
+      font-size: 42px;
+      line-height: 1.06;
+      max-width: 800px;
+    }
+
+    .title-xl span,
+    .title-lg span { color: var(--cyan); }
+
+    .title-lg {
+      margin: 0 0 10px;
+      font-size: 28px;
+      line-height: 1.15;
+    }
+
+    .body-copy {
+      margin: 0;
+      color: #c5ced9;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .tag {
+      border: 1px solid rgba(0,230,255,0.16);
+      color: #b7f7ff;
+      background: rgba(0,230,255,0.08);
+      border-radius: 999px;
+      padding: 9px 12px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .stat-stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px 18px;
+    }
+
+    .stat .label {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .stat .value {
+      font-size: 30px;
+      font-weight: 900;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .stat .meta {
+      color: #b9c2cf;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .green { color: var(--green); }
+    .amber { color: var(--amber); }
+    .red { color: var(--red); }
+    .cyan { color: var(--cyan); }
+    .blue { color: var(--blue); }
+
+    .slides-3,
+    .slides-2 {
+      display: grid;
+      gap: 18px;
+    }
+
+    .slides-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .slides-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .slide {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 280px;
+    }
+
+    .slide-no {
+      width: fit-content;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.06);
+      color: #dce6f3;
+    }
+
+    .bullets {
+      margin: 0;
+      padding-left: 18px;
+      color: #c6ced9;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .bullets li + li { margin-top: 10px; }
+
+    .problem-list,
+    .uvp-list,
+    .steps,
+    .team-points {
+      display: grid;
+      gap: 12px;
+    }
+
+    .mini {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .mini strong {
+      display: block;
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .mini p {
+      margin: 0;
+      color: #bbc4cf;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .bars {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      align-items: end;
+      height: 190px;
+    }
+
+    .bar-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      height: 100%;
+      justify-content: end;
+    }
+
+    .bar {
+      width: 100%;
+      border-radius: 14px 14px 8px 8px;
+      background: linear-gradient(180deg, rgba(0,230,255,0.9), rgba(44,140,255,0.35));
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .bar-col small { color: var(--muted); font-size: 12px; }
+    .bar-col strong { font-size: 13px; }
+
+    .price-card {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 18px;
+      border-radius: 18px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+    }
+
+    .price-card .price {
+      font-size: 32px;
+      font-weight: 900;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .pill.green { background: rgba(21,197,122,0.14); color: var(--green); }
+    .pill.blue { background: rgba(44,140,255,0.16); color: #86c3ff; }
+    .pill.amber { background: rgba(255,176,32,0.14); color: var(--amber); }
+
+    .table-shell {
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .table-shell table {
+      width: 100%;
+      min-width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table-shell th,
+    .table-shell td {
+      padding: 12px 14px;
+      text-align: left;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .table-shell th {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.03);
+    }
+
+    .roadmap {
+      display: grid;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .road-step {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .road-step .num {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: rgba(0,230,255,0.1);
+      color: var(--cyan);
+      font-weight: 900;
+      font-size: 16px;
+    }
+
+    .road-step strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+
+    .road-step p {
+      margin: 0;
+      color: #c1cad5;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .cta {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .cta-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .price-box {
+      padding: 22px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(36,140,255,0.12), rgba(0,230,255,0.08));
+      border: 1px solid rgba(36,140,255,0.18);
+    }
+
+    .price-box .amount {
+      font-size: 42px;
+      font-weight: 900;
+      margin: 8px 0;
+    }
+
+    .price-box p {
+      margin: 0;
+      color: #c8d1dc;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .footer {
+      margin-top: auto;
+      font-size: 12px;
+      color: #87909c;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    @media (max-width: 1180px) {
+      .grid-hero, .slides-3, .slides-2, .cta { grid-template-columns: 1fr; }
+      .page { min-height: auto; }
+    }
+
+    @media print {
+      html, body { background: white; }
+      .deck { width: 100%; margin: 0; }
+      .page {
+        border-radius: 0;
+        box-shadow: none;
+        border: none;
+        min-height: auto;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="deck">
+    <section class="page">
+      <div class="page-head">
+        <div class="brand">
+          <div class="mark"></div>
+          <div class="brand-copy">
+            <h1>ORIENS</h1>
+            <p>Covered Call Intelligence Platform</p>
+          </div>
+        </div>
+        <div class="page-no">Pages 1 / 3</div>
+      </div>
+
+      <div class="grid-hero">
+        <article class="card">
+          <p class="eyebrow">Slide 1 / Title</p>
+          <h2 class="title-xl">ORIENS <span>Covered Call OS</span></h2>
+          <p class="body-copy">
+            A broker-connected covered-call tracking and execution platform for ultra-HNI traders, desks, and prop operators who want recurring option income with controlled assignment risk.
+          </p>
+          <div class="tag-row">
+            <span class="tag">Presenter: Ankit Sharma</span>
+            <span class="tag">Product proposal deck</span>
+            <span class="tag">Logo placeholder included</span>
+          </div>
+        </article>
+
+        <aside class="stat-stack">
+            <div class="stat">
+              <div class="label">Slide 2 / Executive Summary</div>
+              <div class="value cyan">Own stock. Sell calls. Systematize income.</div>
+              <div class="meta">ORIENS converts a live trading terminal into a covered-call operating platform: portfolio visibility, yield analytics, broker workflows, and rule-based execution in one place.</div>
+            </div>
+            <div class="stat">
+              <div class="label">Current Product Position</div>
+              <div class="value">Trading system foundation</div>
+              <div class="meta">Already built around live market data, options tooling, broker workflows, positions, order surfaces, and strategy infrastructure. Covered-call intelligence becomes the next product layer on top.</div>
+            </div>
+          </aside>
+        </div>
+
+      <div class="slides-2">
+        <article class="card slide">
+          <div class="slide-no">Slide 3 / The Problem</div>
+          <h3 class="title-lg">The current flow is fragmented, manual, and <span>hard to manage at scale</span>.</h3>
+          <div class="problem-list">
+            <div class="mini">
+                  <strong>Portfolio blind spots</strong>
+                  <p>Traders can see stock holdings and option trades separately, but not the exact covered mapping, uncovered value, or assignment exposure in one decisive view.</p>
+                </div>
+            <div class="mini">
+              <strong>Weak action priority</strong>
+              <p>Most platforms show prices, not decision pressure. They do not surface what is nearing strike, what expires this week, or what should be rolled first.</p>
+            </div>
+            <div class="mini">
+                  <strong>Existing tools fall short</strong>
+                  <p>Broker terminals are execution-first. Screeners are idea-first. Reporting tools are portfolio-first. None combine these into one covered-call operating console.</p>
+                </div>
+          </div>
+        </article>
+
+        <article class="card slide">
+          <div class="slide-no">Slide 4 / The Solution</div>
+          <h3 class="title-lg">ORIENS turns covered-call trading into a <span>managed system</span>.</h3>
+          <ul class="bullets">
+            <li>Dedicated covered-call dashboard: holdings, sold calls, premium, expiry pressure, and roll candidates.</li>
+            <li>Live broker-linked options tools already exist: chain, OI, orderbook, positions, tradebook, and strategy workflows.</li>
+            <li>Rule-ready architecture for strike proposals: %OTM, yield-on-margin, utilization, expiry filters, and later Greeks-based ranking.</li>
+            <li>Execution surface for manual and automated trade handling without switching terminals all day.</li>
+          </ul>
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr><th>Feature Block</th><th>What It Does</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Current ORIENS Base</td><td>Live market data, order surfaces, tools, strategy and broker integration foundation</td></tr>
+                <tr><td>Covered Holdings Layer</td><td>Maps stock inventory to active short calls</td></tr>
+                <tr><td>Yield Analytics Layer</td><td>Tracks premium income, monthly yield, annualized return</td></tr>
+                <tr><td>Roll / Execution Layer</td><td>Flags at-risk positions and routes covered-call actions</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+
+      <div class="footer">
+        <span>Professional proposal draft • PDF-ready HTML</span>
+        <span>ORIENS / Covered Call Platform</span>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="page-head">
+        <div class="brand">
+          <div class="mark"></div>
+          <div class="brand-copy">
+            <h1>ORIENS</h1>
+            <p>Proposal and Commercial Structure</p>
+          </div>
+        </div>
+        <div class="page-no">Pages 2 / 3</div>
+      </div>
+
+      <div class="slides-3">
+        <article class="card slide">
+          <div class="slide-no">Slide 5 / UVP</div>
+          <h3 class="title-lg">Three reasons this wins.</h3>
+          <div class="uvp-list">
+            <div class="mini">
+              <strong>1. Portfolio-first, not just terminal-first</strong>
+              <p>ORIENS is designed around covered inventory, premium streams, and assignment management instead of only quotes and orders.</p>
+            </div>
+            <div class="mini">
+              <strong>2. Live + analytical</strong>
+              <p>It combines Born To Sell style opportunity logic with live broker connectivity and execution architecture.</p>
+            </div>
+            <div class="mini">
+              <strong>3. Modular upgrade path</strong>
+              <p>Shadow mode, algo rules, roll automation, reporting, and portfolio-level execution can be layered without rebuilding from scratch.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="card slide">
+          <div class="slide-no">Slide 6 / Market Opportunity</div>
+          <h3 class="title-lg">Why now.</h3>
+          <p class="body-copy">India’s active derivatives participation, rising HNI use of options income strategies, and the lack of specialized covered-call operating software create a narrow but high-value product gap.</p>
+          <div class="bars" aria-label="Indicative Market Opportunity">
+            <div class="bar-col">
+              <div class="bar" style="height: 100%;"></div>
+              <strong>Large</strong>
+              <small>TAM</small>
+            </div>
+            <div class="bar-col">
+              <div class="bar" style="height: 58%;"></div>
+              <strong>Focused</strong>
+              <small>SAM</small>
+            </div>
+            <div class="bar-col">
+              <div class="bar" style="height: 24%;"></div>
+              <strong>High-value</strong>
+              <small>SOM</small>
+            </div>
+          </div>
+          <ul class="bullets">
+            <li>TAM: active options participants and desks needing structured income systems.</li>
+            <li>SAM: HNIs, covered-call investors, prop-style operators, advisory products.</li>
+            <li>SOM: high-conviction users who value custom workflow, execution, and full-stack support.</li>
+          </ul>
+        </article>
+
+        <article class="card slide">
+          <div class="slide-no">Slide 7 / Business Model</div>
+          <h3 class="title-lg">Simple pricing. High trust.</h3>
+          <div class="price-box">
+            <div class="label">Flat Program Fee</div>
+            <div class="amount">₹3,00,000</div>
+            <p>Includes 1 year of full-time support, adjustments, and feature additions within agreed product scope. Positioned as a serious operating platform, not a disposable SaaS toy.</p>
+          </div>
+          <div class="tag-row">
+            <span class="tag">No usage-based surprise billing</span>
+            <span class="tag">1-year support included</span>
+            <span class="tag">Custom changes covered</span>
+          </div>
+        </article>
+      </div>
+
+      <div class="slides-2">
+        <article class="card slide">
+          <div class="slide-no">Product Marketing Angle</div>
+          <h3 class="title-lg">Why this product is different from generic broker dashboards.</h3>
+          <ul class="bullets">
+            <li>Broker apps help you place orders. ORIENS helps you run a covered-call business process.</li>
+            <li>Most UIs show price and P&amp;L. ORIENS adds yield, premium, strike distance, expiry pressure, and action ranking.</li>
+            <li>It is extensible into shadow mode, execution logic, PDF reporting, allocation engines, and multi-book management.</li>
+          </ul>
+        </article>
+
+        <article class="card slide">
+          <div class="slide-no">UX Audit Snapshot</div>
+          <h3 class="title-lg">Core flow design priorities</h3>
+          <div class="team-points">
+            <div class="mini"><strong>Weak hierarchy to avoid</strong><p>Price-heavy dashboards with no action priority, no coverage view, and no expiry urgency are not enough for covered-call management.</p></div>
+            <div class="mini"><strong>Feedback that must exist</strong><p>Roll suggestions, expiry warnings, uncovered holdings, and premium-ledger confirmation should always be visible.</p></div>
+            <div class="mini"><strong>Error/empty states to build</strong><p>No calls sold, partial coverage, missed expiry mapping, stale broker sync, and low-liquidity contracts must have explicit state design.</p></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="footer">
+        <span>Commercial + strategic framing</span>
+        <span>Designed for ultra-HNI / prop style users</span>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="page-head">
+        <div class="brand">
+          <div class="mark"></div>
+          <div class="brand-copy">
+            <h1>ORIENS</h1>
+            <p>Execution Roadmap and Call to Action</p>
+          </div>
+        </div>
+        <div class="page-no">Pages 3 / 3</div>
+      </div>
+
+      <div class="slides-2">
+        <article class="card slide">
+          <div class="slide-no">Slide 8 / Implementation Plan</div>
+          <h3 class="title-lg">Deployment roadmap</h3>
+          <div class="roadmap">
+            <div class="road-step">
+              <div class="num">1</div>
+              <div>
+                <strong>Onboard portfolio and broker flows</strong>
+                <p>Map holdings, contract specs, sold-call positions, and premium history into one normalized covered-call book.</p>
+              </div>
+            </div>
+            <div class="road-step">
+              <div class="num">2</div>
+              <div>
+                <strong>Launch covered-call dashboard + yield analytics</strong>
+                <p>Expose holdings, yield, expiries, risk flags, and fresh opportunity suggestions in one operator-grade screen.</p>
+              </div>
+            </div>
+            <div class="road-step">
+              <div class="num">3</div>
+              <div>
+                <strong>Enable rule engine and assisted execution</strong>
+                <p>Apply %OTM, utilization, expiry, and margin rules to propose trades and roll decisions at stock or portfolio level.</p>
+              </div>
+            </div>
+            <div class="road-step">
+              <div class="num">4</div>
+              <div>
+                <strong>Expand into reports and automation</strong>
+                <p>PDF / Excel reporting, portfolio analytics, shadow mode, and later semi-auto execution workflows.</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card slide">
+          <div class="slide-no">Slide 9 / Team & Expertise</div>
+          <h3 class="title-lg">Built lean, with strong systems thinking.</h3>
+          <div class="team-points">
+            <div class="mini">
+                  <strong>Solo-built with AI leverage</strong>
+                  <p>The system is being shaped by one operator with AI-assisted implementation, but with deliberate architecture, diagnostics, and production-style iteration instead of random prototyping.</p>
+                </div>
+                <div class="mini">
+                  <strong>Real product depth already present</strong>
+                  <p>Live broker data, options surfaces, orderbook workflows, latency hardening, websocket stabilization, and reusable dashboard architecture are already part of the current ORIENS base.</p>
+                </div>
+                <div class="mini">
+                  <strong>Why this matters</strong>
+                  <p>This is not a pitch from zero. It is a proposal built on an already evolving trading system that can be extended into a covered-call OS.</p>
+                </div>
+              </div>
+        </article>
+      </div>
+
+      <div class="cta">
+        <article class="card cta-box">
+          <div>
+            <div class="slide-no">Slide 10 / Conclusion</div>
+            <h3 class="title-lg">The product opportunity is clear.</h3>
+            <p class="body-copy">
+              ORIENS can become a differentiated covered-call platform by adding the missing portfolio intelligence layer on top of the trading stack already built. The result is not just another terminal, but a repeatable premium-management system for serious capital.
+            </p>
+          </div>
+          <div class="tag-row">
+            <span class="tag">Live broker connectivity</span>
+            <span class="tag">Yield-focused analytics</span>
+            <span class="tag">Execution-ready architecture</span>
+          </div>
+        </article>
+
+        <aside class="card cta-box">
+          <div>
+            <div class="label">Exact Next Step</div>
+            <div class="value cyan" style="font-size:34px;">Approve covered-call MVP scope</div>
+            <p class="body-copy">Start with one dedicated covered-call page: holdings, premium, yield, expiry alerts, and roll suggestions. Then layer rules and execution on top of the current ORIENS foundation.</p>
+          </div>
+          <div class="price-card">
+            <div>
+              <div class="label">Proposal summary</div>
+              <div class="meta">Dark-theme trading foundation • covered-call intelligence layer next • 1-year support • extensible into algo workflows</div>
+            </div>
+            <div class="pill blue">Ready to discuss</div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="footer">
+        <span>Next recommended artifact: real React page based on this deck</span>
+        <span>ORIENS / Product Proposal</span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

@@ -3182,3 +3182,17 @@ Websocket:
 - **Remaining risks**:
   - NIFTYMID50 still has no verified streamable Breeze websocket token/path; it remains REST fallback only.
   - Final tick movement still needs live-market validation because the market is closed.
+
+### 2026-07-01 - Option Contract Websocket Fix: Use Breeze Option Params
+- **Goal**: Make option prices in `/optionchain`, `/oi-tracker`, and `/oi-profile` update through websocket without changing the working dashboard futures/cash websocket path.
+- **Root cause**: Option pages subscribed pre-resolved option tokens, but `MarketDataWorker` always called `breeze.subscribe_feeds(stock_token=...)`. Breeze option streaming expects contract parameters (`exchange_code`, `stock_code`, `expiry_date`, `strike_price`, `right`, `product_type="options"`), while token streaming remains valid for futures/cash.
+- **Fix**:
+  1. `market_data_worker.py`: `Subscription` now carries `expiry_date`, `strike_price`, and `right`; `product_type=="options"` uses Breeze option-parameter subscribe/unsubscribe, while all other products still use the existing `stock_token` path.
+  2. `realtime.py`: pre-resolved token shortcut preserves option metadata from frontend subscription requests.
+  3. `option_chain_service.py` and `oi_service.py`: option-chain/OI responses now pass broker symbol, expiry, strike, right, and token through to frontend rows.
+  4. `OptionChainPage.tsx`, `OITrackerPage.tsx`, and `OIProfilePage.tsx`: option contract subscriptions now include broker symbol, expiry, strike, and right. Existing row tick keys remain unchanged.
+- **Verification**:
+  - `python -m pytest backend/tests/test_market_data_worker.py backend/tests/test_option_chain_contract.py backend/tests/test_oi_contract.py -q` -> 41 passed.
+  - `npm.cmd run build` -> production build clean, 1861 modules.
+- **Remaining risks**:
+  - Live option tick movement still requires market-hours validation with Breeze. The code now follows Breeze's documented option subscription shape and keeps dashboard futures/cash subscriptions isolated on the old path.

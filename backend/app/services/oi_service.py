@@ -42,6 +42,7 @@ class OIService:
         return {
             "status": "ok",
             "underlying": chain["underlying"],
+            "broker_symbol": chain.get("broker_symbol"),
             "exchange_code": chain["exchange_code"],
             "expiry": chain["expiry"],
             "underlying_ltp": chain["underlying_ltp"],
@@ -62,6 +63,7 @@ class OIService:
         return {
             "status": "ok",
             "underlying": chain["underlying"],
+            "broker_symbol": chain.get("broker_symbol"),
             "exchange_code": chain["exchange_code"],
             "expiry": chain["expiry"],
             "underlying_ltp": chain["underlying_ltp"],
@@ -101,4 +103,12 @@ class OIService:
             "pe_ltp": pe.get("ltp"),
             "ce_token": str(ce.get("token") or "").strip() or None,
             "pe_token": str(pe.get("token") or "").strip() or None,
+            "ce_broker_symbol": ce.get("broker_symbol"),
+            "pe_broker_symbol": pe.get("broker_symbol"),
+            "ce_expiry_date": ce.get("expiry_date"),
+            "pe_expiry_date": pe.get("expiry_date"),
+            "ce_strike_price": ce.get("strike_price"),
+            "pe_strike_price": pe.get("strike_price"),
+            "ce_right": ce.get("right"),
+            "pe_right": pe.get("right"),
         }

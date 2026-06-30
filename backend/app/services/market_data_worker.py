@@ -54,6 +54,9 @@ class Subscription:
     product_type: str
     token: str
     stock_token: str
+    expiry_date: str = ""
+    strike_price: str = "0"
+    right: str = "others"
 
 
 def _is_numeric_token(token: object) -> bool:
@@ -331,6 +334,27 @@ class MarketDataWorker:
         for subscription in subscriptions:
             self._feed_subscribe(subscription)
 
+    @staticmethod
+    def _normalize_option_right(value: Any) -> str:
+        right = str(value or "others").strip().lower()
+        if right in {"ce", "call"}:
+            return "call"
+        if right in {"pe", "put"}:
+            return "put"
+        return right or "others"
+
+    @staticmethod
+    def _format_breeze_expiry(value: Any) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        for fmt in ("%Y-%m-%d", "%d-%b-%Y", "%d-%B-%Y"):
+            try:
+                return datetime.strptime(text, fmt).strftime("%d-%b-%Y")
+            except ValueError:
+                continue
+        return text
+
     def _feed_subscribe(self, subscription: Subscription) -> None:
         self._subscribe_attempt_count += 1
         with self._lock:
@@ -339,7 +363,19 @@ class MarketDataWorker:
             logger.warning("market-data feed subscribe skipped: breeze not connected for %s", subscription.stock_token)
             return
         try:
-            breeze.subscribe_feeds(stock_token=subscription.stock_token)
+            if subscription.product_type == "options":
+                breeze.subscribe_feeds(
+                    exchange_code=subscription.exchange_code,
+                    stock_code=subscription.broker_symbol,
+                    expiry_date=subscription.expiry_date,
+                    strike_price=subscription.strike_price,
+                    right=subscription.right,
+                    product_type="options",
+                    get_market_depth=False,
+                    get_exchange_quotes=True,
+                )
+            else:
+                breeze.subscribe_feeds(stock_token=subscription.stock_token)
         except Exception as error:  # noqa: BLE001 — one bad symbol must not kill the stream
             self._subscribe_error_count += 1
             logger.error("market-data feed subscribe failed for %s: %s", subscription.stock_token, error)
@@ -351,7 +387,19 @@ class MarketDataWorker:
         if breeze is None:
             return
         try:
-            breeze.unsubscribe_feeds(stock_token=subscription.stock_token)
+            if subscription.product_type == "options":
+                breeze.unsubscribe_feeds(
+                    exchange_code=subscription.exchange_code,
+                    stock_code=subscription.broker_symbol,
+                    expiry_date=subscription.expiry_date,
+                    strike_price=subscription.strike_price,
+                    right=subscription.right,
+                    product_type="options",
+                    get_market_depth=False,
+                    get_exchange_quotes=True,
+                )
+            else:
+                breeze.unsubscribe_feeds(stock_token=subscription.stock_token)
         except Exception:  # noqa: BLE001
             pass
 
@@ -375,6 +423,9 @@ class MarketDataWorker:
         display_symbol = str(item.get("display_symbol") or item.get("symbol") or "").strip().upper()
         broker_symbol = str(item.get("broker_symbol") or display_symbol).strip().upper()
         product_type = str(item.get("product_type") or "").strip().lower()
+        expiry_date = self._format_breeze_expiry(item.get("expiry_date"))
+        strike_price = str(item.get("strike_price") or "0").strip() or "0"
+        right = self._normalize_option_right(item.get("right"))
         return Subscription(
             display_symbol=display_symbol or broker_symbol or stock_token,
             broker_symbol=broker_symbol or display_symbol or stock_token,
@@ -382,6 +433,9 @@ class MarketDataWorker:
             product_type=product_type,
             token=token,
             stock_token=stock_token,
+            expiry_date=expiry_date,
+            strike_price=strike_price,
+            right=right,
         )
 
     # ----- tick handling -------------------------------------------------
