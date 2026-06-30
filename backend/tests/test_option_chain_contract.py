@@ -144,7 +144,6 @@ def _option_chain_response(instrument):
                 "spot_price": 23268.8,
                 "previous_close": 23451.7,
                 "expiry_date": "30-Jun-2026",
-                "token": "90001",
             },
             {
                 "strike_price": "23300",
@@ -156,7 +155,6 @@ def _option_chain_response(instrument):
                 "spot_price": 23268.8,
                 "previous_close": 23451.7,
                 "expiry_date": "30-Jun-2026",
-                "token": "90003",
             },
         ]
     return [
@@ -170,7 +168,6 @@ def _option_chain_response(instrument):
             "spot_price": 23268.8,
             "previous_close": 23451.7,
             "expiry_date": "30-Jun-2026",
-            "token": "90002",
         },
         {
             "strike_price": "23300",
@@ -182,7 +179,6 @@ def _option_chain_response(instrument):
             "spot_price": 23268.8,
             "previous_close": 23451.7,
             "expiry_date": "30-Jun-2026",
-            "token": "90004",
         },
     ]
 

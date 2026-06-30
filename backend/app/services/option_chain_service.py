@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy import Select, func, select
@@ -159,6 +160,11 @@ class OptionChainService:
 
         total_call_oi = 0.0
         total_put_oi = 0.0
+        option_tokens = self._load_option_token_map(
+            broker_symbol=broker_symbol,
+            exchange_code=request.exchange_code,
+            expiry_date=request.expiry_date,
+        )
 
         for side, rows in (("ce", call_rows), ("pe", put_rows)):
             for row in rows:
@@ -178,6 +184,10 @@ class OptionChainService:
                 normalized["expiry_date"] = request.expiry_date.isoformat()
                 normalized["strike_price"] = strike_text
                 normalized["right"] = "call" if side == "ce" else "put"
+                if not normalized.get("token"):
+                    normalized["token"] = option_tokens.get(
+                        (self._strike_key(strike_text), normalized["right"])
+                    )
                 entry[side] = normalized
                 if side == "ce":
                     total_call_oi += normalized["oi"] or 0.0
@@ -213,6 +223,36 @@ class OptionChainService:
         }
         return payload
 
+    def _load_option_token_map(
+        self,
+        *,
+        broker_symbol: str,
+        exchange_code: str,
+        expiry_date: date,
+    ) -> dict[tuple[str, str], str]:
+        if not self.database_url:
+            return {}
+
+        session_factory = create_session_factory(self.database_url)
+        statement = select(Instrument).where(
+            Instrument.exchange_code == exchange_code.upper(),
+            Instrument.product_type == "options",
+            Instrument.broker_symbol == broker_symbol,
+            Instrument.expiry_date == expiry_date,
+            Instrument.is_active.is_(True),
+            Instrument.token.is_not(None),
+        )
+        token_map: dict[tuple[str, str], str] = {}
+        with session_factory() as session:
+            for instrument in session.scalars(statement).all():
+                token = str(instrument.token or "").strip()
+                if not token:
+                    continue
+                right = self._right_key(instrument.option_right)
+                for strike_key in self._strike_lookup_keys(instrument.strike_price):
+                    token_map[(strike_key, right)] = token
+        return token_map
+
     @staticmethod
     def _summary_quote(call_rows: list[dict[str, Any]], put_rows: list[dict[str, Any]]) -> dict[str, Any]:
         for row in call_rows + put_rows:
@@ -239,6 +279,44 @@ class OptionChainService:
             ),
             "token": token,
         }
+
+    @staticmethod
+    def _right_key(value: Any) -> str:
+        right = str(value or "").strip().lower()
+        if right in {"ce", "call"}:
+            return "call"
+        if right in {"pe", "put"}:
+            return "put"
+        return right or "others"
+
+    @classmethod
+    def _strike_lookup_keys(cls, value: Any) -> set[str]:
+        keys: set[str] = set()
+        raw_key = cls._strike_key(value)
+        if raw_key:
+            keys.add(raw_key)
+        try:
+            strike = Decimal(str(value).replace(",", "").strip())
+        except (InvalidOperation, ValueError):
+            return keys
+        if strike >= Decimal("100000"):
+            display_key = cls._decimal_key(strike / Decimal("100"))
+            if display_key:
+                keys.add(display_key)
+        return keys
+
+    @classmethod
+    def _strike_key(cls, value: Any) -> str:
+        try:
+            return cls._decimal_key(Decimal(str(value).replace(",", "").strip()))
+        except (InvalidOperation, ValueError):
+            return str(value or "").strip()
+
+    @staticmethod
+    def _decimal_key(value: Decimal) -> str:
+        if value == value.to_integral_value():
+            return str(int(value))
+        return format(value.normalize(), "f")
 
     @staticmethod
     def _strike_text(row: dict[str, Any]) -> str | None:
