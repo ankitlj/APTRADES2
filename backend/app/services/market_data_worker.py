@@ -102,6 +102,7 @@ class MarketDataWorker:
         reconnect_backoff_seconds: float = 5.0,
         max_backoff_seconds: float = 60.0,
         gap_log_seconds: float = 5.0,
+        stale_reconnect_seconds: float = 75.0,
     ):
         self._app_key = app_key
         self._secret_key = secret_key
@@ -113,6 +114,7 @@ class MarketDataWorker:
         self._reconnect_backoff_seconds = reconnect_backoff_seconds
         self._max_backoff_seconds = max_backoff_seconds
         self._gap_log_seconds = gap_log_seconds
+        self._stale_reconnect_seconds = stale_reconnect_seconds
 
         self._lock = threading.RLock()
         self._stop = threading.Event()
@@ -120,6 +122,7 @@ class MarketDataWorker:
         self._breeze: Any | None = None
         self._redis: Any | None = None
         self._last_tick_monotonic: float | None = None
+        self._last_connect_monotonic: float | None = None
 
         self._state = STATE_OFFLINE
         self._error: str | None = None
@@ -145,6 +148,8 @@ class MarketDataWorker:
         self._last_redis_write_error_at: str | None = None
         self._emit_error_count: int = 0
         self._last_emit_error_at: str | None = None
+        self._stale_reconnect_count: int = 0
+        self._last_stale_reconnect_at: str | None = None
 
     # ----- configuration -------------------------------------------------
 
@@ -203,6 +208,13 @@ class MarketDataWorker:
                         breeze = self._breeze
                     if breeze is None:
                         raise RuntimeError("Breeze websocket client was lost.")
+                    stale_reason = self._stale_stream_reason()
+                    if stale_reason is not None:
+                        with self._lock:
+                            self._stale_reconnect_count += 1
+                            self._last_stale_reconnect_at = self._utc_now()
+                        logger.warning("market-data stale stream reconnect: %s", stale_reason)
+                        raise RuntimeError(stale_reason)
                     self._stop.wait(5)
             except Exception as error:  # noqa: BLE001 — keep supervisor alive
                 self._teardown_breeze()
@@ -218,6 +230,7 @@ class MarketDataWorker:
         breeze.ws_connect()
         with self._lock:
             self._breeze = breeze
+            self._last_connect_monotonic = time.monotonic()
 
     def _create_breeze(self) -> Any:
         if self._breeze_factory is not None:
@@ -236,6 +249,7 @@ class MarketDataWorker:
         with self._lock:
             breeze = self._breeze
             self._breeze = None
+            self._last_connect_monotonic = None
         if breeze is not None:
             try:
                 breeze.ws_disconnect()
@@ -488,6 +502,33 @@ class MarketDataWorker:
             if gap >= self._gap_log_seconds:
                 logger.warning("market-data stream gap of %.1fs", gap)
 
+    def _stale_stream_reason(self) -> str | None:
+        """Return a reconnect reason when Breeze is connected but silent.
+
+        The Breeze socket can stay connected while no ticks arrive for minutes.
+        Keeping the worker in ``live`` state in that condition leaves the UI on
+        stale websocket data until a page reload/REST refresh. If there are
+        active subscriptions and no tick activity after the threshold, force the
+        supervisor through its existing reconnect + resubscribe path.
+        """
+        with self._lock:
+            if not self._subscriptions:
+                return None
+            last_tick = self._last_tick_monotonic
+            last_connect = self._last_connect_monotonic
+            subscription_count = len(self._subscriptions)
+        reference = last_tick or last_connect
+        if reference is None:
+            return None
+        age = time.monotonic() - reference
+        if age < self._stale_reconnect_seconds:
+            return None
+        source = "last_tick" if last_tick is not None else "connect"
+        return (
+            f"no market-data ticks for {age:.1f}s since {source}; "
+            f"subscriptions={subscription_count}"
+        )
+
     def _normalize_tick(self, tick: dict[str, Any]) -> dict[str, Any] | None:
         stock_token = str(tick.get("symbol") or "").strip()
         subscription = self._subscriptions.get(stock_token) if stock_token else None
@@ -634,6 +675,9 @@ class MarketDataWorker:
                 "last_redis_write_error_at": self._last_redis_write_error_at,
                 "emit_error_count": self._emit_error_count,
                 "last_emit_error_at": self._last_emit_error_at,
+                "stale_reconnect_count": self._stale_reconnect_count,
+                "last_stale_reconnect_at": self._last_stale_reconnect_at,
+                "stale_reconnect_seconds": self._stale_reconnect_seconds,
                 "ticks_received_ever": self._ticks_received_ever,
                 "freshness": self._freshness(),
                 "error": self._error,

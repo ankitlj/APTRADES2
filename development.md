@@ -3196,3 +3196,21 @@ Websocket:
   - `npm.cmd run build` -> production build clean, 1861 modules.
 - **Remaining risks**:
   - Live option tick movement still requires market-hours validation with Breeze. The code now follows Breeze's documented option subscription shape and keeps dashboard futures/cash subscriptions isolated on the old path.
+### 2026-07-01 - Websocket Stale Stream Watchdog
+
+- **Goal**: Recover the live market websocket when Breeze keeps the socket connected but stops delivering ticks, which caused dashboard ticker/orderbook/tools to remain on stale websocket data while REST reloads still worked.
+- **Root cause**: `MarketDataWorker` only reconnected when the Breeze websocket object was lost or raised. Railway logs proved subscriptions were accepted and retained (`NIFTY`, `BANKNIFTY`, `FINNIFTY`, plus option contracts), but ticks stopped for long gaps (`market-data stream gap of 2960s`, `1213s`, `424s`). The worker logged the gap only after a later tick arrived; it did not proactively reconnect during silence.
+- **Fix**:
+  1. Added `stale_reconnect_seconds` to `MarketDataWorker` (default `75s`).
+  2. Added `_last_connect_monotonic` tracking on websocket connect/teardown.
+  3. Added `_stale_stream_reason()` to detect active subscriptions with no tick activity since last tick/connect.
+  4. Supervisor loop now raises through the existing reconnect path when the stream is stale, then reuses `_teardown_breeze()`, `_connect()`, and `_resubscribe_all()`.
+  5. Status now exposes `stale_reconnect_count`, `last_stale_reconnect_at`, and `stale_reconnect_seconds` via `/api/diagnosis/worker`.
+- **Files changed**:
+  - `backend/app/services/market_data_worker.py`
+  - `backend/tests/test_market_data_worker.py`
+- **Verification**:
+  - `python -m pytest backend/tests/test_market_data_worker.py -q` -> 39 passed.
+  - `python -m pytest backend/tests/test_market_data_worker.py backend/tests/test_market_data_contract.py backend/tests/test_diagnosis_contract.py -q` -> 58 passed.
+- **Remaining risks**:
+  - If Breeze silently throttles/drops large option subscription sets, reconnect improves recovery but cannot guarantee every option contract ticks. If that persists, cap option websocket subscriptions and keep REST reconciliation for the full chain.

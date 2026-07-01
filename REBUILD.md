@@ -1154,3 +1154,10 @@ See `development.md` for 13-step post-deploy checklist.
 - **API contract**: Option-chain and OI responses now pass broker symbol, expiry, strike, right, and token through to frontend rows. Tool pages include those fields in option websocket subscription requests.
 - **Verification**: 41 targeted backend tests passed; frontend production build passed.
 - **Risk**: Final option tick movement still needs live-market validation.
+
+## 2026-07-01 - Websocket Stale Stream Watchdog
+
+- **Root cause**: Railway logs showed accepted subscriptions but long tick gaps (`2960s`, `1213s`, `424s`). The worker only logged gaps after ticks resumed and only reconnected if the Breeze object was lost; it did not recover from a connected-but-silent Breeze stream.
+- **Fix**: `MarketDataWorker` now tracks websocket connect time and tick activity. When active subscriptions exist and no tick arrives for `75s`, the supervisor forces the existing reconnect + `_resubscribe_all()` path. `/api/diagnosis/worker` exposes `stale_reconnect_count`, `last_stale_reconnect_at`, and `stale_reconnect_seconds`.
+- **Verification**: `backend/tests/test_market_data_worker.py` -> 39 passed. Websocket-adjacent suite (`test_market_data_worker.py`, `test_market_data_contract.py`, `test_diagnosis_contract.py`) -> 58 passed.
+- **Risk**: If Breeze throttles large option subscription sets, reconnect improves recovery but cannot force delivery for every contract. Keep REST fallback/reconciliation active for tools.

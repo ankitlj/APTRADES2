@@ -1,3 +1,4 @@
+import time
 from unittest.mock import patch
 
 from app.services.market_data_worker import (
@@ -778,3 +779,72 @@ def test_option_unsubscription_uses_breeze_contract_params() -> None:
     assert payload["strike_price"] == "24000"
     assert payload["right"] == "put"
     assert payload["product_type"] == "options"
+
+
+def test_stale_stream_reason_requires_active_subscription() -> None:
+    worker = _configured_worker(stale_reconnect_seconds=0.0)
+    worker._last_connect_monotonic = 1.0
+
+    assert worker._stale_stream_reason() is None
+
+
+def test_stale_stream_reason_detects_silent_connected_stream() -> None:
+    breeze = FakeBreeze()
+    worker = _configured_worker(
+        breeze_factory=lambda: breeze,
+        stale_reconnect_seconds=10.0,
+    )
+    worker._connect()
+    worker.subscribe(
+        [
+            {
+                "display_symbol": "NIFTY",
+                "broker_symbol": "NIFTY",
+                "exchange_code": "NFO",
+                "product_type": "futures",
+                "token": "62329",
+            }
+        ]
+    )
+    worker._last_connect_monotonic = 1.0
+    worker._last_tick_monotonic = None
+
+    reason = worker._stale_stream_reason()
+
+    assert reason is not None
+    assert "no market-data ticks" in reason
+    assert "subscriptions=1" in reason
+
+
+def test_stale_stream_reason_uses_recent_tick_activity() -> None:
+    breeze = FakeBreeze()
+    worker = _configured_worker(
+        breeze_factory=lambda: breeze,
+        stale_reconnect_seconds=60.0,
+    )
+    worker._connect()
+    worker.subscribe(
+        [
+            {
+                "display_symbol": "NIFTY",
+                "broker_symbol": "NIFTY",
+                "exchange_code": "NFO",
+                "product_type": "futures",
+                "token": "62329",
+            }
+        ]
+    )
+    worker._last_connect_monotonic = 1.0
+    worker._last_tick_monotonic = time.monotonic()
+
+    assert worker._stale_stream_reason() is None
+
+
+def test_status_exposes_stale_reconnect_diagnostics() -> None:
+    worker = _configured_worker(stale_reconnect_seconds=75.0)
+
+    status = worker.status()
+
+    assert status["stale_reconnect_count"] == 0
+    assert status["last_stale_reconnect_at"] is None
+    assert status["stale_reconnect_seconds"] == 75.0
