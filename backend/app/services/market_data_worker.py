@@ -197,6 +197,11 @@ class MarketDataWorker:
             try:
                 self._set_state(STATE_CONNECTING, error=None)
                 self._connect()
+                # breeze-connect ws_connect() starts the internal socket.io
+                # thread asynchronously; give it 2 seconds to complete the
+                # SSL handshake and transport negotiation before sending
+                # subscription requests through the same client.
+                self._stop.wait(2.0)
                 self._resubscribe_all()
                 self._set_state(STATE_LIVE, error=None)
                 backoff = self._reconnect_backoff_seconds
@@ -377,22 +382,27 @@ class MarketDataWorker:
             logger.warning("market-data feed subscribe skipped: breeze not connected for %s", subscription.stock_token)
             return
         try:
-            if subscription.product_type == "options":
+            if subscription.exchange_code in {"NFO", "BFO"}:
+                # NFO/BFO futures AND options: Breeze SDK docs show ALL NFO/BFO
+                # subscriptions must use the full parameter form with
+                # exchange_code, stock_code, expiry_date, product_type.
+                # stock_token-only subscribe only works for NSE/BSE equity.
                 breeze.subscribe_feeds(
                     exchange_code=subscription.exchange_code,
                     stock_code=subscription.broker_symbol,
                     expiry_date=subscription.expiry_date,
                     strike_price=subscription.strike_price,
                     right=subscription.right,
-                    product_type="options",
+                    product_type=subscription.product_type,
                     get_market_depth=False,
                     get_exchange_quotes=True,
                 )
             else:
+                # NSE/BSE cash equity: SDK confirms stock_token works here.
                 breeze.subscribe_feeds(stock_token=subscription.stock_token)
         except Exception as error:  # noqa: BLE001 — one bad symbol must not kill the stream
             self._subscribe_error_count += 1
-            logger.error("market-data feed subscribe failed for %s: %s", subscription.stock_token, error)
+            logger.error("market-data feed subscribe failed for %s (%s %s): %s", subscription.stock_token, subscription.exchange_code, subscription.product_type, error)
             self._set_state(self._state, error=f"subscribe failed for {subscription.stock_token}: {error}")
 
     def _feed_unsubscribe(self, subscription: Subscription) -> None:
@@ -401,14 +411,14 @@ class MarketDataWorker:
         if breeze is None:
             return
         try:
-            if subscription.product_type == "options":
+            if subscription.exchange_code in {"NFO", "BFO"}:
                 breeze.unsubscribe_feeds(
                     exchange_code=subscription.exchange_code,
                     stock_code=subscription.broker_symbol,
                     expiry_date=subscription.expiry_date,
                     strike_price=subscription.strike_price,
                     right=subscription.right,
-                    product_type="options",
+                    product_type=subscription.product_type,
                     get_market_depth=False,
                     get_exchange_quotes=True,
                 )
@@ -531,7 +541,8 @@ class MarketDataWorker:
 
     def _normalize_tick(self, tick: dict[str, Any]) -> dict[str, Any] | None:
         stock_token = str(tick.get("symbol") or "").strip()
-        subscription = self._subscriptions.get(stock_token) if stock_token else None
+        with self._lock:
+            subscription = self._subscriptions.get(stock_token) if stock_token else None
 
         ltp = self._to_float(tick.get("last") if "last" in tick else tick.get("close"))
         close = self._to_float(tick.get("close"))

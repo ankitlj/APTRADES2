@@ -134,6 +134,9 @@ def resolve_subscription_items(
                 "exchange_code": resolved.exchange_code,
                 "product_type": resolved.product_type,
                 "token": resolved.token,
+                "expiry_date": resolved.expiry_date.isoformat() if resolved.expiry_date else "",
+                "strike_price": resolved.strike_price or "",
+                "right": resolved.right or "",
             }
         )
     return resolved_items

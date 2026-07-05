@@ -24,12 +24,20 @@ class FakeBreeze:
     def ws_disconnect(self) -> None:
         self.connected = False
 
+    def _call_key(self, stock_token=None, **_kwargs) -> str | None:
+        """Return the canonical key for this subscribe/unsubscribe call."""
+        if stock_token is not None:
+            return str(stock_token)
+        if _kwargs.get("exchange_code") and _kwargs.get("stock_code"):
+            return f"{_kwargs['exchange_code']}:{_kwargs['stock_code']}:{_kwargs.get('product_type','?')}"
+        return None
+
     def subscribe_feeds(self, stock_token=None, **_kwargs) -> None:
-        self.subscribed.append(stock_token)
+        self.subscribed.append(self._call_key(stock_token, **_kwargs))
         self.subscribe_kwargs.append({"stock_token": stock_token, **_kwargs})
 
     def unsubscribe_feeds(self, stock_token=None, **_kwargs) -> None:
-        self.unsubscribed.append(stock_token)
+        self.unsubscribed.append(self._call_key(stock_token, **_kwargs))
         self.unsubscribe_kwargs.append({"stock_token": stock_token, **_kwargs})
 
 
@@ -117,7 +125,7 @@ def test_subscribe_registers_and_calls_breeze() -> None:
     )
 
     assert result["count"] == 1
-    assert "4.1!62329" in breeze.subscribed
+    assert "NFO:NIFTY:futures" in breeze.subscribed
     status = worker.status()
     assert status["subscriptions"] == 1
     assert status["symbols"] == ["NIFTY"]
@@ -288,7 +296,7 @@ def test_unsubscribe_removes_subscription() -> None:
 
     assert "4.1!62326" in result["removed"]
     assert result["count"] == 0
-    assert "4.1!62326" in breeze.unsubscribed
+    assert "NFO:CNXBAN:futures" in breeze.unsubscribed
 
 
 def test_on_ticks_writes_to_redis_when_configured() -> None:
@@ -472,7 +480,7 @@ def test_subscribe_same_token_twice_increments_ref_count(tmp_path) -> None:
     assert r1["count"] == 1
     assert r2["count"] == 1
     # Breeze subscribe should have been called exactly once
-    assert breeze.subscribed.count("4.1!62329") == 1
+    assert breeze.subscribed.count("NFO:NIFTY:futures") == 1
     assert len(breeze.subscribed) == 1
     # Ref count should be 2 (two callers)
     assert worker._subscription_ref_counts.get("4.1!62329") == 2
@@ -499,7 +507,7 @@ def test_unsubscribe_while_another_keeps_token(tmp_path) -> None:
     assert "4.1!62329" in result["removed"]
     assert result["count"] == 1  # token still active
     # Breeze unsubscribe should NOT have been called
-    assert "4.1!62329" not in breeze.unsubscribed
+    assert "NFO:NIFTY:futures" not in breeze.unsubscribed
     assert worker._subscription_ref_counts.get("4.1!62329") == 1
     # Token still in subscriptions dict
     assert "4.1!62329" in worker._subscriptions
@@ -527,7 +535,7 @@ def test_last_unsubscribe_tears_down_token(tmp_path) -> None:
     assert "4.1!62329" in result["removed"]
     assert result["count"] == 0  # token removed
     # Breeze unsubscribe should have been called exactly once
-    assert breeze.unsubscribed.count("4.1!62329") == 1
+    assert breeze.unsubscribed.count("NFO:NIFTY:futures") == 1
     assert "4.1!62329" not in worker._subscriptions
     assert worker._subscription_ref_counts.get("4.1!62329") is None
 
@@ -564,8 +572,8 @@ def test_mixed_unrelated_tokens_unaffected_by_ref_count(tmp_path) -> None:
 
     assert "4.1!62326" in result["removed"]
     assert result["count"] == 1  # only nifty left
-    assert "4.1!62326" in breeze.unsubscribed
-    assert "4.1!62329" not in breeze.unsubscribed
+    assert "NFO:CNXBAN:futures" in breeze.unsubscribed
+    assert "NFO:NIFTY:futures" not in breeze.unsubscribed
     assert "4.1!62329" in worker._subscriptions
     assert worker._subscription_ref_counts.get("4.1!62329") == 1
 
@@ -588,13 +596,13 @@ def test_subscribe_same_token_many_then_all_unsubscribe(tmp_path) -> None:
     worker.subscribe([item])  # ref=3
 
     assert worker._subscription_ref_counts.get("4.1!62329") == 3
-    assert breeze.subscribed.count("4.1!62329") == 1  # only once
+    assert breeze.subscribed.count("NFO:NIFTY:futures") == 1  # only once
 
     # Two leave
     worker.unsubscribe([item])  # ref=2
     worker.unsubscribe([item])  # ref=1
 
-    assert "4.1!62329" not in breeze.unsubscribed  # still one subscriber
+    assert "NFO:NIFTY:futures" not in breeze.unsubscribed  # still one subscriber
     assert "4.1!62329" in worker._subscriptions
 
     # Last leaves
@@ -602,7 +610,7 @@ def test_subscribe_same_token_many_then_all_unsubscribe(tmp_path) -> None:
 
     assert "4.1!62329" in result["removed"]
     assert result["count"] == 0
-    assert breeze.unsubscribed.count("4.1!62329") == 1
+    assert breeze.unsubscribed.count("NFO:NIFTY:futures") == 1
     assert "4.1!62329" not in worker._subscriptions
 
 
