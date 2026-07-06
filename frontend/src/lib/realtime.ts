@@ -2,7 +2,12 @@ import { io, type Socket } from "socket.io-client";
 
 // In dev the Vite proxy forwards /socket.io to the Flask backend; in prod we
 // connect to the configured API origin (same origin as the REST base URL).
-const SOCKET_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
+function normalizeSocketUrl(value: string | undefined): string {
+  if (!value || value === "/") return "";
+  return value.replace(/\/+$/, "");
+}
+
+const SOCKET_URL = import.meta.env.DEV ? "" : normalizeSocketUrl(import.meta.env.VITE_API_BASE_URL);
 
 export interface LiveTick {
   symbol: string;

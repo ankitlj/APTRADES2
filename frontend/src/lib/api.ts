@@ -513,7 +513,12 @@ export interface OIProfileResponse {
   rows: OIRow[];
 }
 
-const API_BASE_URL = import.meta.env.DEV ? "" : (import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:5000");
+function normalizeApiBaseUrl(value: string | undefined): string {
+  if (!value || value === "/") return "";
+  return value.replace(/\/+$/, "");
+}
+
+const API_BASE_URL = import.meta.env.DEV ? "" : normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
 
 function extractErrorMessage(payload: unknown): string | undefined {
   if (typeof payload !== "object" || payload === null) return undefined;
@@ -530,7 +535,8 @@ function extractErrorMessage(payload: unknown): string | undefined {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
+  const apiPath = path.startsWith("/") ? path : `/${path}`;
+  const response = await fetch(`${API_BASE_URL}${apiPath}`, init);
 
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
