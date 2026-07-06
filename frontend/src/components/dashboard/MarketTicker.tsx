@@ -31,7 +31,7 @@ export function MarketTicker() {
   }, []);
 
   const quotes: TickerQuote[] = (summary?.ticker ?? []).map((item) => {
-    const live = ticks[item.symbol.toUpperCase()];
+    const live = ticks[item.symbol.toUpperCase()] ?? ticks[item.broker_symbol?.toUpperCase() ?? ""];
     return {
       label: item.label || item.symbol,
       ltp: live?.ltp ?? item.ltp,

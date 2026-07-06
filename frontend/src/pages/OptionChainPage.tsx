@@ -283,8 +283,8 @@ export function OptionChainPage() {
                   const isAtm = row.strike_price === state.data?.atm_strike;
                   const ceKey = `${underlying}|${row.strike_price}|CE`;
                   const peKey = `${underlying}|${row.strike_price}|PE`;
-                  const ceTick = ticks[ceKey];
-                  const peTick = ticks[peKey];
+                  const ceTick = ticks[ceKey] ?? ticks[row.ce?.token ? `${exchangeCode}:${row.ce.token}` : ""];
+                  const peTick = ticks[peKey] ?? ticks[row.pe?.token ? `${exchangeCode}:${row.pe.token}` : ""];
                   return (
                     <tr key={row.strike_price} className={cn("hover:bg-muted/20", isAtm && "bg-primary/5")}>
                       <LegCells row={row} side="ce" liveTick={ceTick} />

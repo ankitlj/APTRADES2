@@ -195,10 +195,6 @@ export function useLiveSubscribe(items: SubscriptionRequest[]): void {
       return;
     }
     const parsed = JSON.parse(serialized) as SubscriptionRequest[];
-    if (!parsed.length) {
-      return;
-    }
-
     const prevJson = prevRef.current;
     prevRef.current = serialized;
 
@@ -211,6 +207,9 @@ export function useLiveSubscribe(items: SubscriptionRequest[]): void {
 
     if (removed.length) {
       unsubscribe(removed);
+    }
+    if (!parsed.length) {
+      return;
     }
     if (added.length) {
       subscribe(added);

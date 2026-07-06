@@ -267,8 +267,8 @@ export function OITrackerPage() {
                     key={row.strike_price}
                     row={row}
                     atmStrike={state.data!.atm_strike}
-                    ceTick={ticks[`${underlying}|${row.strike_price}|CE`]}
-                    peTick={ticks[`${underlying}|${row.strike_price}|PE`]}
+                    ceTick={ticks[`${underlying}|${row.strike_price}|CE`] ?? ticks[row.ce_token ? `${exchangeCode}:${row.ce_token}` : ""]}
+                    peTick={ticks[`${underlying}|${row.strike_price}|PE`] ?? ticks[row.pe_token ? `${exchangeCode}:${row.pe_token}` : ""]}
                   />
                 ))}
               </tbody>
