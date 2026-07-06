@@ -98,7 +98,21 @@ export function LiveMarketDataProvider({ children }: PropsWithChildren) {
       if (!tick || !tick.symbol) {
         return;
       }
-      setTicks((current) => ({ ...current, [tick.symbol]: tick }));
+      const aliases = [
+        tick.symbol,
+        tick.symbol.toUpperCase(),
+        tick.broker_symbol,
+        tick.broker_symbol?.toUpperCase(),
+        tick.token ? `${tick.exchange_code}:${tick.token}` : "",
+        tick.stock_token,
+      ].filter(Boolean);
+      setTicks((current) => {
+        const next = { ...current };
+        for (const alias of aliases) {
+          next[alias] = tick;
+        }
+        return next;
+      });
     });
 
     return () => {
@@ -150,7 +164,7 @@ export function useLiveQuote(symbol: string | null | undefined): LiveTick | unde
   if (!symbol) {
     return undefined;
   }
-  return ticks[symbol.toUpperCase()];
+  return ticks[symbol] ?? ticks[symbol.toUpperCase()];
 }
 
 /** Subscribe to a set of symbols for the lifetime of the calling component.

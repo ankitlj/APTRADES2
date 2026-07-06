@@ -163,9 +163,14 @@ export function DashboardOptionOrderBook() {
   const orderbookSubscriptions: SubscriptionRequest[] = selectedInstrument
     ? [
         {
-          symbol: selectedInstrument.broker_symbol,
-          exchange: selectedInstrument.exchange_code,
-          product_type: selectedInstrument.product_type,
+          symbol: orderbook.status === "ok" ? orderbook.data.instrument.display_symbol : selectedInstrument.broker_symbol,
+          exchange: orderbook.status === "ok" ? orderbook.data.instrument.exchange_code : selectedInstrument.exchange_code,
+          product_type: orderbook.status === "ok" ? orderbook.data.instrument.product_type : selectedInstrument.product_type,
+          token: orderbook.status === "ok" ? orderbook.data.instrument.token ?? undefined : undefined,
+          broker_symbol: orderbook.status === "ok" ? orderbook.data.instrument.broker_symbol : selectedInstrument.broker_symbol,
+          expiry_date: selectedInstrument.expiry_date ?? undefined,
+          strike_price: selectedInstrument.strike_price ?? undefined,
+          right: selectedInstrument.right ?? undefined,
         },
       ]
     : [];
