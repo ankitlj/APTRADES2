@@ -5,6 +5,10 @@
       "destination": "http://34.100.176.134:5000/api/socket.io"
     },
     {
+      "source": "/api/socket.io/",
+      "destination": "http://34.100.176.134:5000/api/socket.io/"
+    },
+    {
       "source": "/api/socket.io/:path*",
       "destination": "http://34.100.176.134:5000/api/socket.io/:path*"
     },
