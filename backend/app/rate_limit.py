@@ -30,6 +30,7 @@ def init_rate_limiting(app: Flask) -> None:
         path = request.path or ""
         return (
             path.startswith("/socket.io")
+            or path.startswith("/api/socket.io")
             or path.startswith("/api/health")
             or path.startswith("/api/market-data")
         )

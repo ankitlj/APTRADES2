@@ -49,6 +49,9 @@ def init_realtime(app: Flask) -> MarketDataWorker:
     init_kwargs: dict[str, Any] = {
         "cors_allowed_origins": origins,
         "async_mode": "threading",
+        # Vercel reliably proxies /api/* to the GCP VM. Mount Socket.IO under
+        # the same prefix so polling and websocket upgrade share that route.
+        "path": "api/socket.io",
         "ping_interval": app.config.get("SOCKETIO_PING_INTERVAL", 25),
         "ping_timeout": app.config.get("SOCKETIO_PING_TIMEOUT", 60),
     }
