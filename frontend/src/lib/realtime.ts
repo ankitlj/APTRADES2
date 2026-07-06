@@ -74,7 +74,7 @@ export function buildLiveSpotSubscription(symbol: string): SubscriptionRequest |
 
 export function createMarketDataSocket(): Socket {
   return io(SOCKET_URL, {
-    path: "/socket.io",
+    path: "/api/socket.io",
     // Vercel rewrites proxy HTTP reliably, but websocket upgrade can fail when
     // the backend is a raw HTTP VM. Start with polling so the live feed connects
     // first, then let Socket.IO upgrade to websocket if the proxy supports it.
