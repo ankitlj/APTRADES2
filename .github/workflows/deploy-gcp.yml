@@ -1,0 +1,37 @@
+name: Deploy GCP Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Deploy backend to GCP
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USER }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/mailmetoankitsharma/apps/oriens
+            git fetch origin main
+            git reset --hard origin/main
+
+            cd /home/mailmetoankitsharma/apps/oriens/backend
+            . .venv/bin/activate
+            pip install -r requirements.txt
+            alembic upgrade head
+
+            sudo systemctl restart oriens
+            sleep 3
+
+            curl --fail --silent http://127.0.0.1:5000/api/health
+            echo
+            curl --fail --silent http://127.0.0.1:5000/api/dashboard/alerts
+            echo
